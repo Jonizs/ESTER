@@ -1,0 +1,84 @@
+:root {
+  --ink: #e9f1ff;
+  --dim: #7f8ea8;
+  --accent: #7ad7ff;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #04050a;
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+#viewport {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  cursor: grab;
+  touch-action: none;
+}
+
+#viewport.dragging { cursor: grabbing; }
+
+#hud, #help, #loading {
+  position: fixed;
+  user-select: none;
+  pointer-events: none;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
+}
+
+#hud {
+  top: 22px;
+  left: 26px;
+}
+
+#hud h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.42em;
+  color: var(--ink);
+}
+
+#hud .tag {
+  margin: 6px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.75;
+}
+
+#help {
+  bottom: 22px;
+  left: 26px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--dim);
+}
+
+#help b { color: var(--ink); font-weight: 600; }
+
+#loading {
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #04050a;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--dim);
+  transition: opacity 0.6s ease;
+  pointer-events: all;
+}
+
+#loading.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
