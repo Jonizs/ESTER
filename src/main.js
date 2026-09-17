@@ -69,3 +69,6 @@ loading.classList.add('hidden');
 setTimeout(() => loading.remove(), 800);
 
 console.log(`[ESTER] island built from ${island.userData.blockCount} visible blocks`);
+
+// Handle for poking at the running game from the devtools console (F12).
+window.ESTER = { scene, camera, renderer, controls, island };

@@ -4,6 +4,11 @@
 
 Always immediately push all changes to main on github https://github.com/Jonizs/ESTER
 
+The working copy on Jonas's machine lives at `C:\Users\jonas\Desktop\ESTER`.
+Claude runs in a remote container and cannot write to that folder directly, so
+after every push tell Jonas to double-click `UPDATE.bat` there - it pulls
+origin/main, installs any new dependencies and rebuilds.
+
 ## Project
 
 ESTER is a 3D space survival game.

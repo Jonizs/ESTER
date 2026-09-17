@@ -1,11 +1,15 @@
 import * as THREE from 'three';
 
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const LOCAL_RIGHT = new THREE.Vector3(1, 0, 0);
+
 /**
  * Quaternion-based orbit camera.
  *
- * Rotation is accumulated in the camera's own local frame, so the island can
- * be spun a full 360 degrees on every axis - straight over the poles and
- * upside down - without gimbal lock or the "up" vector snapping.
+ * Yaw turns around the world's vertical axis and pitch around the camera's
+ * own right axis, so the island can be spun a full 360 degrees on every axis -
+ * straight over the poles and upside down - with no pitch clamping, no gimbal
+ * lock, and no roll creeping in when you swipe sideways.
  */
 export class OrbitCamera {
   constructor(camera, domElement, options = {}) {
@@ -15,10 +19,10 @@ export class OrbitCamera {
     this.target = options.target ?? new THREE.Vector3(0, 0, 0);
     this.minDistance = options.minDistance ?? 8;
     this.maxDistance = options.maxDistance ?? 220;
-    this.rotateSpeed = options.rotateSpeed ?? 0.0045;
+    this.rotateSpeed = options.rotateSpeed ?? 0.003;
     this.zoomSpeed = options.zoomSpeed ?? 0.0012;
-    this.damping = options.damping ?? 0.086;
-    this.autoSpinSpeed = options.autoSpinSpeed ?? 0.055;
+    this.damping = options.damping ?? 0.12;
+    this.autoSpinSpeed = options.autoSpinSpeed ?? 0.03;
 
     this.distance = options.distance ?? 52;
     this.targetDistance = this.distance;
@@ -49,10 +53,16 @@ export class OrbitCamera {
 
   /** Apply a rotation in pixels of drag. */
   rotate(dx, dy) {
-    this._scratch.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -dx * this.rotateSpeed);
+    // Yaw premultiplies around WORLD up: applying it in the camera's local
+    // frame instead makes a sideways swipe slowly roll the horizon over.
+    this._scratch.setFromAxisAngle(WORLD_UP, -dx * this.rotateSpeed);
+    this.orientation.premultiply(this._scratch);
+
+    // Pitch postmultiplies around the camera's own right axis - unclamped, so
+    // it keeps going over the pole and out the other side.
+    this._scratch.setFromAxisAngle(LOCAL_RIGHT, -dy * this.rotateSpeed);
     this.orientation.multiply(this._scratch);
-    this._scratch.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -dy * this.rotateSpeed);
-    this.orientation.multiply(this._scratch);
+
     this.orientation.normalize();
   }
 
@@ -107,7 +117,7 @@ export class OrbitCamera {
       }
 
       this.rotate(dx, dy);
-      this.velocity.set(dx * 0.55, dy * 0.55);
+      this.velocity.set(dx * 0.4, dy * 0.4);
     });
 
     const release = (e) => {
@@ -132,10 +142,10 @@ export class OrbitCamera {
         case 'f': case 'F': this.autoSpin = !this.autoSpin; break;
         case '+': case '=': this.zoom(-260); break;
         case '-': case '_': this.zoom(260); break;
-        case 'ArrowLeft': this.rotate(-22, 0); break;
-        case 'ArrowRight': this.rotate(22, 0); break;
-        case 'ArrowUp': this.rotate(0, -22); break;
-        case 'ArrowDown': this.rotate(0, 22); break;
+        case 'ArrowLeft': this.rotate(-28, 0); break;
+        case 'ArrowRight': this.rotate(28, 0); break;
+        case 'ArrowUp': this.rotate(0, -28); break;
+        case 'ArrowDown': this.rotate(0, 28); break;
         default: return;
       }
     });

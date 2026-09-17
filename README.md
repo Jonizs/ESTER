@@ -27,7 +27,8 @@ Equivalent from a shell, if you prefer:
 .\SETUP.bat
 ```
 
-To update later: `git pull` (note the space), then double-click `ESTER.bat`.
+To update later: **double-click `UPDATE.bat`** - it pulls from GitHub,
+installs anything new and rebuilds. Then launch from the Desktop shortcut.
 
 ## Running it from source
 

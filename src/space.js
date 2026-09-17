@@ -85,7 +85,12 @@ export function createSpace(scene) {
   rim.position.set(-40, -30, -25);
   scene.add(rim);
 
-  scene.add(new THREE.HemisphereLight(0x8fb6ff, 0x0b1026, 0.55));
+  // Soft up-light so the flat underside of the isle is readable from below.
+  const underglow = new THREE.DirectionalLight(0x7c9ade, 0.6);
+  underglow.position.set(0, -50, 8);
+  scene.add(underglow);
+
+  scene.add(new THREE.HemisphereLight(0x8fb6ff, 0x1a2444, 0.6));
   scene.add(new THREE.AmbientLight(0x243056, 0.6));
 
   return {

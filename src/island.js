@@ -11,7 +11,7 @@ const LAYERS = {
   moss: { color: 0x3a8a5e, roughness: 0.9, metalness: 0.0 },
   dirt: { color: 0x6d503c, roughness: 0.95, metalness: 0.0 },
   stone: { color: 0x707a8c, roughness: 0.8, metalness: 0.05 },
-  core: { color: 0x44506b, roughness: 0.4, metalness: 0.18, emissive: 0x1f6a9e, emissiveIntensity: 0.45 }
+  bedrock: { color: 0x4d5670, roughness: 0.75, metalness: 0.1, emissive: 0x13314d, emissiveIntensity: 0.18 }
 };
 
 const key = (x, y, z) => `${x},${y},${z}`;
@@ -28,7 +28,6 @@ export function createIsland() {
 
   const cells = [];
   const filled = new Set();
-  let deepest = 0;
 
   // --- Pass 1: decide which cells are solid -------------------------------
   for (let x = -RADIUS; x <= RADIUS; x++) {
@@ -47,27 +46,25 @@ export function createIsland() {
       const base = noise2(x * 0.085, z * 0.085, SEED + 5);
       const hills = fbm2(x * 0.17, z * 0.17, 3, SEED + 7);
       const ridge = Math.pow(noise2(x * 0.05, z * 0.05, SEED + 11), 2.4);
-      const top = Math.round(base * 8 + (hills - 0.5) * 5 + ridge * 5 - 2);
+      const top = Math.round(base * 4.5 + (hills - 0.5) * 3 + ridge * 2.5 - 1);
 
-      // Underside: deepest at the centre, feathering out at the rim.
-      const bulk = Math.pow(inland, 1.45);
+      // Underside: a shallow, uneven rock base - a slab, not an iceberg.
+      const bulk = Math.pow(inland, 0.8);
       const jitter = fbm2(x * 0.19, z * 0.19, 2, SEED + 23);
-      const bottom = -Math.round(1 + bulk * 18 + jitter * 2.5);
-
-      if (bottom < deepest) deepest = bottom;
+      const bottom = -Math.round(1 + bulk * 3 + jitter * 1.6);
 
       for (let y = bottom; y <= top; y++) {
         filled.add(key(x, y, z));
-        cells.push({ x, y, z, top });
+        cells.push({ x, y, z, top, bottomOf: bottom });
       }
     }
   }
 
   // --- Pass 2: keep only cells with at least one exposed face ------------
-  const buckets = { grass: [], moss: [], dirt: [], stone: [], core: [] };
+  const buckets = { grass: [], moss: [], dirt: [], stone: [], bedrock: [] };
 
   for (const cell of cells) {
-    const { x, y, z, top } = cell;
+    const { x, y, z, top, bottomOf } = cell;
 
     const buried =
       filled.has(key(x + 1, y, z)) &&
@@ -84,7 +81,7 @@ export function createIsland() {
     if (fromTop === 0) layer = 'grass';
     else if (fromTop === 1) layer = 'moss';
     else if (fromTop <= 3) layer = 'dirt';
-    else if (y <= deepest + 2) layer = 'core';
+    else if (y <= bottomOf + 1) layer = 'bedrock';
     else layer = 'stone';
 
     buckets[layer].push(cell);
