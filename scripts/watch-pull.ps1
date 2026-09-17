@@ -130,7 +130,7 @@ while ($true) {
 
     $incoming = git log --oneline "$local..$remote"
     $count = ($incoming | Measure-Object).Count
-    Write-Stamp "$count new commit(s) on origin/$Branch:" 'Green'
+    Write-Stamp "$count new commit(s) on origin/${Branch}:" 'Green'
     $incoming | ForEach-Object { Write-Host "         $_" -ForegroundColor Green }
 
     $lockBefore = if (Test-Path package-lock.json) { (Get-FileHash package-lock.json).Hash } else { '' }
