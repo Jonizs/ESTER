@@ -28,7 +28,7 @@
 
 [CmdletBinding()]
 param(
-  [string]$Path = (Split-Path -Parent $PSScriptRoot),
+  [string]$Path = '',
   [ValidateRange(2, 3600)]
   [int]$IntervalSeconds = 10,
   [string]$Branch = 'main',
@@ -39,6 +39,33 @@ param(
 # ordinary output into a terminating NativeCommandError in Windows PowerShell,
 # so errors here are handled via $LASTEXITCODE instead.
 $ErrorActionPreference = 'Continue'
+
+# Default -Path to the clone this script lives in. This is resolved here and
+# not as a param() default, because Windows PowerShell 5.1 has not populated
+# $PSScriptRoot yet while it is binding parameters (PowerShell 7 has).
+if (-not $Path) {
+  $scriptDir = $PSScriptRoot
+  if (-not $scriptDir) {
+    # Definition is the script's path when run from a file, but the script's
+    # own text in some hosts - only treat it as a path if it is one.
+    $definition = $MyInvocation.MyCommand.Definition
+    if ($definition -and (Test-Path -LiteralPath $definition -ErrorAction SilentlyContinue)) {
+      $scriptDir = Split-Path -Parent $definition
+    }
+  }
+
+  if ($scriptDir) {
+    $Path = Split-Path -Parent $scriptDir
+  } else {
+    # Launched in a way that hides the script's location; WATCH.bat cd's to the
+    # project folder first, so the current directory is the right guess.
+    $Path = (Get-Location).Path
+  }
+}
+
+function Get-LockHash {
+  if (Test-Path package-lock.json) { (Get-FileHash package-lock.json).Hash } else { '' }
+}
 
 function Write-Stamp {
   param([string]$Message, [string]$Color = 'Gray')
@@ -133,7 +160,7 @@ while ($true) {
     Write-Stamp "$count new commit(s) on origin/${Branch}:" 'Green'
     $incoming | ForEach-Object { Write-Host "         $_" -ForegroundColor Green }
 
-    $lockBefore = if (Test-Path package-lock.json) { (Get-FileHash package-lock.json).Hash } else { '' }
+    $lockBefore = Get-LockHash
 
     git merge --ff-only $remote
     if ($LASTEXITCODE -ne 0) {
@@ -145,7 +172,7 @@ while ($true) {
     Write-Stamp "Pulled." 'Green'
 
     if (-not $NoBuild) {
-      $lockAfter = if (Test-Path package-lock.json) { (Get-FileHash package-lock.json).Hash } else { '' }
+      $lockAfter = Get-LockHash
       if ($lockBefore -ne $lockAfter) {
         Write-Stamp "Dependencies changed - running npm install..." 'Cyan'
         npm install
