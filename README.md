@@ -27,8 +27,24 @@ Equivalent from a shell, if you prefer:
 .\SETUP.bat
 ```
 
-To update later: **double-click `UPDATE.bat`** - it pulls from GitHub,
-installs anything new and rebuilds. Then launch from the Desktop shortcut.
+To update later, either:
+
+- **double-click `UPDATE.bat`** for a one-off pull + rebuild, or
+- **double-click `WATCH.bat`** and leave the window open - it checks GitHub
+  every 10 seconds and pulls, installs and rebuilds automatically whenever
+  something new lands on `main`. Ctrl+C or close the window to stop.
+
+`WATCH.bat` only ever fast-forwards. If the folder has uncommitted edits or
+local commits that differ from `origin/main`, it says so and waits rather than
+touching your work. After it rebuilds, restart the game window to see the
+changes.
+
+Options, if you want to run the watcher by hand:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\watch-pull.ps1 -IntervalSeconds 30
+powershell -ExecutionPolicy Bypass -File scripts\watch-pull.ps1 -NoBuild
+```
 
 ## Running it from source
 

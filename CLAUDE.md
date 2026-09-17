@@ -7,7 +7,9 @@ Always immediately push all changes to main on github https://github.com/Jonizs/
 The working copy on Jonas's machine lives at `C:\Users\jonas\Desktop\ESTER`.
 Claude runs in a remote container and cannot write to that folder directly, so
 after every push tell Jonas to double-click `UPDATE.bat` there - it pulls
-origin/main, installs any new dependencies and rebuilds.
+origin/main, installs any new dependencies and rebuilds. If `WATCH.bat` is
+already running in that folder it picks the push up on its own within ~10
+seconds, so there is nothing to tell him.
 
 ## Project
 
