@@ -48,10 +48,11 @@ export function createIsland() {
       const ridge = Math.pow(noise2(x * 0.05, z * 0.05, SEED + 11), 2.4);
       const top = Math.round(base * 4.5 + (hills - 0.5) * 3 + ridge * 2.5 - 1);
 
-      // Underside: a shallow, uneven rock base - a slab, not an iceberg.
-      const bulk = Math.pow(inland, 0.8);
+      // Underside: an iceberg keel tapering to a point under the centre,
+      // kept shorter than the island is wide so it does not dominate.
+      const bulk = Math.pow(inland, 1.4);
       const jitter = fbm2(x * 0.19, z * 0.19, 2, SEED + 23);
-      const bottom = -Math.round(1 + bulk * 3 + jitter * 1.6);
+      const bottom = -Math.round(1 + bulk * 11 + jitter * 2);
 
       for (let y = bottom; y <= top; y++) {
         filled.add(key(x, y, z));
