@@ -28,6 +28,8 @@ export function createIsland() {
 
   const cells = [];
   const filled = new Set();
+  // "x,z" -> y of the topmost block, i.e. the ground colonists stand on.
+  const surface = new Map();
 
   // --- Pass 1: decide which cells are solid -------------------------------
   for (let x = -RADIUS; x <= RADIUS; x++) {
@@ -53,6 +55,8 @@ export function createIsland() {
       const bulk = Math.pow(inland, 1.4);
       const jitter = fbm2(x * 0.19, z * 0.19, 2, SEED + 23);
       const bottom = -Math.round(1 + bulk * 11 + jitter * 2);
+
+      surface.set(`${x},${z}`, top);
 
       for (let y = bottom; y <= top; y++) {
         filled.add(key(x, y, z));
@@ -126,6 +130,7 @@ export function createIsland() {
   }
 
   group.userData.blockCount = Object.values(buckets).reduce((n, l) => n + l.length, 0);
+  group.userData.surface = surface;
   return group;
 }
 

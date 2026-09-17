@@ -94,6 +94,24 @@ export function createSpace(scene) {
   scene.add(new THREE.AmbientLight(0x243056, 0.6));
 
   return {
+    sun,
+
+    /**
+     * Swing the sun around the island for the colony's day/night cycle.
+     * @param {number} t 0 = midnight, 0.5 = midday.
+     */
+    setDayPhase(t) {
+      const angle = (t - 0.25) * Math.PI * 2;
+      const height = Math.sin(angle);
+      sun.position.set(Math.cos(angle) * 60, height * 70, 34);
+
+      const daylight = Math.max(0, height);
+      sun.intensity = 0.25 + daylight * 2.3;
+      sun.color.setHSL(0.09 + daylight * 0.04, 0.55 - daylight * 0.35, 0.55 + daylight * 0.2);
+      underglow.intensity = 0.6 + (1 - daylight) * 0.35;
+      rim.intensity = 0.9 + (1 - daylight) * 0.6;
+    },
+
     /** Called once per frame from the render loop. */
     update(elapsed, delta) {
       starLayers[0].rotation.y = elapsed * 0.004;
