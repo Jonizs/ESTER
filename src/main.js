@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { createIsland, ISLAND_RADIUS } from './island.js';
 import { createSpace } from './space.js';
 import { OrbitCamera } from './orbitCamera.js';
-import { createProps } from './props.js';
+import { createProps, setPropHighlight, GROUND_OFFSET } from './props.js';
 import { Person } from './person.js';
+import { createMarkers } from './markers.js';
 
 const canvas = document.getElementById('viewport');
 
@@ -49,9 +50,29 @@ function startingCell() {
   return best ?? { x: 0, z: 0 };
 }
 
+const markers = createMarkers(scene);
+
+// The prop the agent is on its way to, lit up until it gets there.
+let targeted = null;
+
+function setTarget(prop) {
+  if (targeted === prop) return;
+  if (targeted) setPropHighlight(targeted, false);
+  targeted = prop;
+  if (prop) setPropHighlight(prop, true);
+}
+
+/** Drop the highlight once the agent has walked up to it - or lost the job. */
+function updateTarget() {
+  if (!targeted) return;
+  const arrived = person.path.length === 0;
+  if (arrived || person.task?.prop !== targeted || targeted.gone) setTarget(null);
+}
+
 function finishProp(prop) {
   prop.gone = true;
   prop.mesh.visible = false;
+  if (targeted === prop) setTarget(null);
 }
 
 // --- controls --------------------------------------------------------------
@@ -100,7 +121,10 @@ function handleClick(event) {
 
       if (object.userData.propId) {
         const prop = props.find((p) => p.id === object.userData.propId);
-        if (prop && !prop.gone) { person.workOn(prop); return; }
+        if (prop && !prop.gone) {
+          if (person.workOn(prop)) setTarget(prop);
+          return;
+        }
       }
       object = object.parent;
     }
@@ -108,7 +132,13 @@ function handleClick(event) {
     // Otherwise walk to whatever patch of island was clicked.
     const x = Math.round(hit.point.x);
     const z = Math.round(hit.point.z);
-    if (surface.has(`${x},${z}`)) { person.walkTo({ x, z }); return; }
+    if (surface.has(`${x},${z}`)) {
+      if (person.walkTo({ x, z })) {
+        setTarget(null);
+        markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
+      }
+      return;
+    }
   }
 
   // Clicked the void: nothing is selected any more.
@@ -201,6 +231,8 @@ function frame() {
   const delta = Math.min(clock.getDelta(), 0.1);
 
   person.update(delta, props, finishProp);
+  updateTarget();
+  markers.update(delta);
   controls.update(delta);
   updateLabel();
   updatePanel();
@@ -218,4 +250,5 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { scene, camera, renderer, controls, island, person, props, surface, raycaster, THREE };
+window.ESTER = { scene, camera, renderer, controls, island, person, props, surface, markers, raycaster, THREE };
+Object.defineProperty(window.ESTER, 'targeted', { get: () => targeted });

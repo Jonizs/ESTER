@@ -19,6 +19,26 @@ export const PROP_KINDS = {
 
 const COUNTS = { tree: 9, rock: 6 };
 
+// The tint a prop takes on once the agent has been set on it, until it
+// arrives. Every prop builds its own materials, so this is safe to mutate.
+const HIGHLIGHT = 0xffc83d;
+
+/** Light a prop up yellow, or put it back the way it was. */
+export function setPropHighlight(prop, on) {
+  prop.mesh.traverse((object) => {
+    const material = object.material;
+    if (!material?.isMeshStandardMaterial) return;
+    if (on) {
+      material.userData.baseEmissive ??= material.emissive.getHex();
+      material.emissive.setHex(HIGHLIGHT);
+      material.emissiveIntensity = 0.75;
+    } else {
+      material.emissive.setHex(material.userData.baseEmissive ?? 0x000000);
+      material.emissiveIntensity = 1;
+    }
+  });
+}
+
 export function createProps(surface, scene) {
   const group = new THREE.Group();
   group.name = 'props';

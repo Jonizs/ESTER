@@ -93,8 +93,8 @@ On Linux/macOS use `./ester.sh` instead of the `.bat` files.
 | Input | Action |
 | --- | --- |
 | **Click** the agent | Select it - a ring marks it and its stats open top left |
-| **Click** a tree or rock | It walks over and works on it |
-| **Click** the ground | It walks there |
+| **Click** a tree or rock | It walks over and works on it - the target glows yellow until it arrives |
+| **Click** the ground | It walks there - a green wave pulses where you clicked |
 | **Right click** | Deselect the agent |
 | Drag / arrow keys | Orbit the island - unlimited, all axes |
 | Wheel / `+` `-` | Zoom |

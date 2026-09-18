@@ -47,7 +47,8 @@ with one inhabitant who walks around and works on what is there.
   - `src/space.js` - nebula shell, stars and lighting.
   - `src/orbitCamera.js` - quaternion orbit camera.
   - `src/noise.js` - deterministic value noise.
-  - `src/props.js` - the few trees and rocks.
+  - `src/props.js` - the few trees and rocks, and the yellow target tint.
+  - `src/markers.js` - the ground-click wave, pooled expanding rings.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
   - `src/path.js` - A* across the surface cells.
 - **Desktop shell:** `electron/main.cjs`.
@@ -98,6 +99,14 @@ with one inhabitant who walks around and works on what is there.
   and standing idle say nothing at all, and `person.activity` is null then too.
 - **The top layer of the island is all grass.** No dirt or stone patches wear
   through it; soil and stone start one block down.
+- **Click feedback is two separate things.** A ground order pulses a green
+  wave at the cell (`markers.js`); a prop order tints the target yellow until
+  the agent arrives, then clears (`setPropHighlight` in `props.js`, driven by
+  `setTarget`/`updateTarget` in `main.js`). The wave is green rather than the
+  accent cyan so it does not read as a second selection ring.
+- **Every prop builds its own materials**, which is why the yellow tint can be
+  written straight onto them. If props are ever switched to shared materials
+  or an `InstancedMesh`, highlighting has to change with it.
 - **Props must not block pathing.** `path.js` only refuses steps of more than
   one block of height; keeping props walkable avoids pockets the person can
   never leave.
