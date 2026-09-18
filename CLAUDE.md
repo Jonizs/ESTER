@@ -47,8 +47,8 @@ with one inhabitant who walks around and works on what is there.
   - `src/space.js` - nebula shell, stars and lighting.
   - `src/orbitCamera.js` - quaternion orbit camera.
   - `src/noise.js` - deterministic value noise.
-  - `src/props.js` - the few trees, rocks and flowers.
-  - `src/person.js` - the single inhabitant: walking, tasks, current action.
+  - `src/props.js` - the few trees and rocks.
+  - `src/person.js` - the agent: walking, tasks, stats, selection.
   - `src/path.js` - A* across the surface cells.
 - **Desktop shell:** `electron/main.cjs`.
 - **Web deploy:** `.github/workflows/deploy-pages.yml` builds and publishes
@@ -89,16 +89,20 @@ with one inhabitant who walks around and works on what is there.
 - **Nothing in the scene drifts.** The island does not bob or rotate, the
   stars do not turn, and there is no debris belt. Idle motion was removed on
   request - do not reintroduce it.
-- **The person's `action` is user-facing text.** It is rendered above their
-  head every frame, so it must always be a readable sentence
-  ("Chopping wood"), never an internal state name.
-- **`onFinish` runs after the fallback action is set**, so a callback's
-  message ("Collected a flower") is what stays on screen.
+- **The agent never acts on its own.** It only walks and works when clicked;
+  there is no idle "find something to do" behaviour, and reintroducing one was
+  explicitly refused.
+- **`person.action` is user-facing text**, rendered above their head while
+  they work, so it must be a readable sentence ("Cutting down a tree"), never
+  an internal state name. It is `null` whenever no work is under way - walking
+  and standing idle say nothing at all, and `person.activity` is null then too.
+- **The top layer of the island is all grass.** No dirt or stone patches wear
+  through it; soil and stone start one block down.
 - **Props must not block pathing.** `path.js` only refuses steps of more than
   one block of height; keeping props walkable avoids pockets the person can
   never leave.
-- **Keep the isle sparse.** A few trees, rocks and flowers - counts live in
-  `COUNTS` in `props.js`.
+- **Keep the isle sparse.** A few trees and rocks - counts live in `COUNTS`
+  in `props.js`. There are no flowers; they were removed on request.
 
 ## Commands
 

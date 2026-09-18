@@ -12,17 +12,47 @@
 
     <div id="hud">
       <h1>ESTER</h1>
-      <p class="tag">Sector 0 &middot; Drifting Isle</p>
     </div>
 
-    <div id="action"></div>
+    <!-- Stats for the selected agent. Hidden until one is clicked. -->
+    <div id="agent-panel" hidden>
+      <div class="name">Agent</div>
+
+      <div class="activity">
+        <div class="activity-line">
+          <span class="activity-name">Idle</span>
+          <span class="activity-time"></span>
+        </div>
+        <div class="bar"><span class="fill"></span></div>
+      </div>
+
+      <div class="meters">
+        <div class="meter" data-stat="health"><label>Health</label><div class="bar"><span class="fill"></span></div><span class="value"></span></div>
+        <div class="meter" data-stat="food"><label>Food</label><div class="bar"><span class="fill"></span></div><span class="value"></span></div>
+        <div class="meter" data-stat="water"><label>Water</label><div class="bar"><span class="fill"></span></div><span class="value"></span></div>
+        <div class="meter" data-stat="happiness"><label>Happiness</label><div class="bar"><span class="fill"></span></div><span class="value"></span></div>
+      </div>
+
+      <div class="traits">
+        <div><label>Education</label><span data-trait="education"></span></div>
+        <div><label>Tool</label><span data-trait="tool"></span></div>
+        <div><label>Mastery</label><span data-trait="mastery"></span></div>
+      </div>
+    </div>
+
+    <!-- The current job, floating over the agent's head. -->
+    <div id="action">
+      <span class="text"></span>
+      <div class="bar"><span class="fill"></span></div>
+    </div>
 
     <div id="help">
       <div><b>Drag</b> &mdash; orbit</div>
       <div><b>Wheel</b> / <b>+ -</b> &mdash; zoom</div>
       <div><b>R</b> &mdash; reset view</div>
       <div><b>F</b> &mdash; toggle auto-spin</div>
-      <div><b>Click</b> &mdash; walk there, or work on a tree, rock or flower</div>
+      <div><b>Click the agent</b> &mdash; select it</div>
+      <div><b>Click</b> &mdash; send it there, or set it on a tree or rock</div>
     </div>
 
     <div id="loading">booting ESTER&hellip;</div>

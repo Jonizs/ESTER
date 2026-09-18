@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createIsland, ISLAND_RADIUS } from './island.js';
 import { createSpace } from './space.js';
 import { OrbitCamera } from './orbitCamera.js';
-import { createProps, PROP_KINDS } from './props.js';
+import { createProps } from './props.js';
 import { Person } from './person.js';
 
 const canvas = document.getElementById('viewport');
@@ -52,7 +52,6 @@ function startingCell() {
 function finishProp(prop) {
   prop.gone = true;
   prop.mesh.visible = false;
-  person.action = `Collected a ${PROP_KINDS[prop.kind].label}`;
 }
 
 // --- controls --------------------------------------------------------------
@@ -93,6 +92,9 @@ function handleClick(event) {
   for (const hit of raycaster.intersectObject(scene, true)) {
     let object = hit.object;
     while (object) {
+      // The agent itself: select it and show its stats.
+      if (object.userData.isPerson) { person.setSelected(true); return; }
+
       if (object.userData.propId) {
         const prop = props.find((p) => p.id === object.userData.propId);
         if (prop && !prop.gone) { person.workOn(prop); return; }
@@ -105,27 +107,81 @@ function handleClick(event) {
     const z = Math.round(hit.point.z);
     if (surface.has(`${x},${z}`)) { person.walkTo({ x, z }); return; }
   }
+
+  // Clicked the void: nothing is selected any more.
+  person.setSelected(false);
 }
 
-// --- action label ----------------------------------------------------------
+// --- the job label over the agent's head --------------------------------
 
 const label = document.getElementById('action');
+const labelText = label.querySelector('.text');
+const labelFill = label.querySelector('.fill');
 const labelPos = new THREE.Vector3();
 
 function updateLabel() {
-  label.textContent = person.action;
+  const activity = person.activity;
+
+  // Only actual work is announced - walking about and standing around are not.
+  if (!activity) {
+    label.classList.remove('visible');
+    return;
+  }
+
+  labelText.textContent = activity.action;
+  labelFill.style.width = `${activity.progress * 100}%`;
 
   labelPos.copy(person.pos);
   labelPos.y += 2.1;
   labelPos.project(camera);
 
-  // Hide it when the person is behind the camera or off screen.
+  // Hide it when the agent is behind the camera or off screen.
   const onScreen = labelPos.z < 1 && Math.abs(labelPos.x) < 1.2 && Math.abs(labelPos.y) < 1.2;
   label.classList.toggle('visible', onScreen);
   if (!onScreen) return;
 
   label.style.left = `${(labelPos.x * 0.5 + 0.5) * window.innerWidth}px`;
   label.style.top = `${(-labelPos.y * 0.5 + 0.5) * window.innerHeight}px`;
+}
+
+// --- the selected agent's stats panel ------------------------------------
+
+const panel = document.getElementById('agent-panel');
+const activityName = panel.querySelector('.activity-name');
+const activityTime = panel.querySelector('.activity-time');
+const activityFill = panel.querySelector('.activity .fill');
+const meters = [...panel.querySelectorAll('.meter')].map((el) => ({
+  stat: el.dataset.stat,
+  fill: el.querySelector('.fill'),
+  value: el.querySelector('.value')
+}));
+const traits = [...panel.querySelectorAll('[data-trait]')];
+
+function meterColour(value) {
+  if (value > 60) return '#7ad7ff';
+  if (value > 25) return '#f0c04a';
+  return '#e8646a';
+}
+
+function updatePanel() {
+  panel.hidden = !person.selected;
+  if (panel.hidden) return;
+
+  const activity = person.activity;
+  activityName.textContent = activity ? activity.action : 'Idle';
+  activityTime.textContent = activity ? `${activity.remaining.toFixed(1)}s` : '';
+  activityFill.style.width = `${(activity?.progress ?? 0) * 100}%`;
+
+  for (const meter of meters) {
+    const value = person.stats[meter.stat];
+    meter.fill.style.width = `${value}%`;
+    meter.fill.style.background = meterColour(value);
+    meter.value.textContent = Math.round(value);
+  }
+
+  for (const trait of traits) {
+    trait.textContent = person.stats[trait.dataset.trait] ?? 'None';
+  }
 }
 
 // --- loop ------------------------------------------------------------------
@@ -144,6 +200,7 @@ function frame() {
   person.update(delta, props, finishProp);
   controls.update(delta);
   updateLabel();
+  updatePanel();
 
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

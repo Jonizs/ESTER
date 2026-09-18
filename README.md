@@ -1,8 +1,9 @@
 # ESTER
 
-A voxel island in the void with one inhabitant. Click where they should go, or
-click a tree, rock or flower and they will walk over and work on it. What they
-are doing is written above their head.
+A voxel island in the void with one agent. It does nothing unless told: click
+where it should go, or click a tree or rock and it walks over and works on it.
+Click the agent itself to select it and see its stats. While it is working, the
+job and a progress bar float above its head.
 
 ![stage](https://img.shields.io/badge/stage-prototype-blue)
 
@@ -91,31 +92,34 @@ On Linux/macOS use `./ester.sh` instead of the `.bat` files.
 
 | Input | Action |
 | --- | --- |
-| **Click** a tree, rock or flower | They walk over and work on it |
-| **Click** the ground | They walk there |
+| **Click** the agent | Select it - a ring marks it and its stats open top left |
+| **Click** a tree or rock | It walks over and works on it |
+| **Click** the ground | It walks there |
 | Drag / arrow keys | Orbit the island - unlimited, all axes |
 | Wheel / `+` `-` | Zoom |
 | `R` | Reset the view |
 | `F` | Toggle idle auto-spin |
 | `F11` | Fullscreen (desktop app) |
 
-Left alone for a few seconds, they will find something to do on their own.
-Their current action - walking, chopping wood, breaking stone, picking a
-flower, looking around, resting - is shown on a label that follows them.
+The agent never starts work on its own - left alone it simply waits. Only work
+in progress is announced: a label with the job ("Cutting down a tree", "Picking
+up a rock") and a bar showing how far through it is follows it while it works,
+and nothing is shown while it walks or stands idle.
+
+Selecting the agent opens a panel top left with its current activity and time
+left, its Health, Food, Water and Happiness meters, and its Education, Tool and
+Mastery - all three of which start as None.
 
 ## What's in the scene
 
 - A block island generated from seeded value noise: wobbly coastline, rolling
-  surface relief, and a rocky keel underneath. Buried blocks are culled, and
+  surface relief, and a rocky keel underneath. The top face is grass all over;
   each layer is a single `InstancedMesh`.
-- A handful of trees, rocks and flowers, placed from the same seed, so the
-  isle looks the same every launch.
-- One person, who walks the island on an A* path across its surface.
+- A handful of trees and rocks, placed from the same seed, so the isle looks
+  the same every launch.
+- One agent, who walks the island on an A* path across its surface.
 - The void: a nebula gradient shell and two star layers. Nothing drifts or
   bobs - the scene is deliberately still.
-- The void: a nebula gradient shell, two parallax star layers, a slow belt of
-  tumbling debris, a warm sun with shadows and a cold rim light from below.
-- The island bobs and sways slightly, untethered.
 
 ## Status
 

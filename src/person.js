@@ -4,9 +4,14 @@ import { PROP_KINDS, GROUND_OFFSET } from './props.js';
 
 const WALK_SPEED = 2.2;        // cells per second
 
+// How fast the needs run down, in points per second. Food and water empty in
+// a little under ten minutes of play; happiness drifts slower.
+const DRAIN = { food: 0.18, water: 0.24, happiness: 0.05 };
+
 /**
- * The one inhabitant of the isle. Walks where you click, works whatever you
- * click on, and finds something to do on their own when left alone.
+ * The agent: the one inhabitant of the isle. It only ever does what it is
+ * told - walk where you click, work what you click on - and stands still
+ * otherwise. It never picks up work on its own.
  *
  * `action` is always a plain sentence, because it is shown on screen.
  */
@@ -18,10 +23,21 @@ export class Person {
 
     this.path = [];
     this.task = null;          // { prop, seconds, elapsed }
-    this.action = 'Looking around';
-    this.idleFor = 0;
+    this.action = null;        // only set while actually working
+    this.selected = false;
+
+    this.stats = {
+      health: 100,
+      food: 100,
+      water: 100,
+      happiness: 100,
+      education: null,         // none to start with
+      tool: null,              // none to start with
+      mastery: null            // none to start with
+    };
 
     this.mesh = buildMesh();
+    this.highlight = this.mesh.getObjectByName('selection');
     this.pos = new THREE.Vector3(this.x, this.groundAt(this.x, this.z), this.z);
     this.mesh.position.copy(this.pos);
   }
@@ -29,6 +45,25 @@ export class Person {
   groundAt(x, z) {
     const h = this.surface.get(`${x},${z}`);
     return h === undefined ? this.pos?.y ?? 0 : h + GROUND_OFFSET;
+  }
+
+  /** The work in progress, or null: { action, elapsed, seconds, remaining }.
+   *  Null while walking to the job - only work under way counts. */
+  get activity() {
+    if (!this.task || !this.action) return null;
+    const { seconds, elapsed } = this.task;
+    return {
+      action: this.action,
+      elapsed,
+      seconds,
+      remaining: Math.max(0, seconds - elapsed),
+      progress: Math.min(1, elapsed / seconds)
+    };
+  }
+
+  setSelected(on) {
+    this.selected = on;
+    if (this.highlight) this.highlight.visible = on;
   }
 
   /** Send them to a cell. Returns false if there is no way there. */
@@ -44,27 +79,31 @@ export class Person {
     if (prop.gone) return false;
     if (!this.goTo({ x: prop.x, z: prop.z }, { adjacent: true })) return false;
     this.task = { prop, seconds: PROP_KINDS[prop.kind].seconds, elapsed: 0 };
-    this.action = `Walking to the ${PROP_KINDS[prop.kind].label}`;
+    // Nothing is shown while walking there; the label appears once the work
+    // actually starts.
+    this.action = null;
     return true;
   }
 
   walkTo(cell) {
     if (!this.goTo(cell)) return false;
     this.task = null;
-    this.action = 'Walking';
+    this.action = null;
     return true;
   }
 
   update(dt, props, onFinish) {
+    this._drain(dt);
+
     if (this.path.length > 0) {
       this._step(dt);
-      if (!this.task) this.action = 'Walking';
+      if (!this.task) this.action = null;
       return;
     }
 
     if (this.task) {
       const { prop } = this.task;
-      if (prop.gone) { this.task = null; return; }
+      if (prop.gone) { this.task = null; this.action = null; return; }
 
       this.action = PROP_KINDS[prop.kind].action;
       this.mesh.rotation.y = Math.atan2(prop.x - this.x, prop.z - this.z);
@@ -72,33 +111,24 @@ export class Person {
       this.task.elapsed += dt;
       if (this.task.elapsed >= this.task.seconds) {
         this.task = null;
-        this.idleFor = 0;
-        // Set the fallback first so whatever onFinish says wins.
-        this.action = 'Finished';
+        this.action = null;
         onFinish?.(prop);
       }
       return;
     }
 
-    // Nothing to do: stand about for a moment, then find their own work.
-    this.idleFor += dt;
-    if (this.action !== 'Resting' && this.action !== 'Looking around' && this.idleFor > 1.2) {
-      this.action = 'Looking around';
-    }
-    if (this.idleFor > 4) {
-      this.idleFor = 0;
-      this._chooseSomethingToDo(props);
-    }
+    // Nothing to do. The agent waits for orders - it never finds its own work.
+    this.action = null;
   }
 
-  _chooseSomethingToDo(props) {
-    const available = props.filter((p) => !p.gone);
-    if (available.length === 0) {
-      this.action = 'Resting';
-      return;
-    }
-    const pick = available[Math.floor(Math.random() * available.length)];
-    if (!this.workOn(pick)) this.action = 'Resting';
+  _drain(dt) {
+    const s = this.stats;
+    s.food = Math.max(0, s.food - DRAIN.food * dt);
+    s.water = Math.max(0, s.water - DRAIN.water * dt);
+    s.happiness = Math.max(0, s.happiness - DRAIN.happiness * dt);
+    // Health only slips once something is actually empty.
+    const starving = (s.food === 0 ? 1 : 0) + (s.water === 0 ? 1 : 0);
+    if (starving > 0) s.health = Math.max(0, s.health - 0.5 * starving * dt);
   }
 
   _step(dt) {
@@ -149,6 +179,23 @@ function buildMesh() {
   head.position.y = 1.24;
   head.castShadow = true;
   group.add(head);
+
+  // Selection ring, lying flat on the ground under their feet.
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.44, 0.58, 28),
+    new THREE.MeshBasicMaterial({
+      color: 0x7ad7ff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false
+    })
+  );
+  ring.name = 'selection';
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.02;
+  ring.visible = false;
+  group.add(ring);
 
   group.traverse((o) => { o.userData.isPerson = true; });
   return group;

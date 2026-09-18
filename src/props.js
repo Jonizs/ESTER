@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { rand } from './noise.js';
 
 /**
- * The few things standing on the island: a handful of trees, rocks and
- * flowers. Placement is seeded, so the isle looks the same every launch.
+ * The few things standing on the island: a handful of trees and rocks.
+ * Placement is seeded, so the isle looks the same every launch.
  */
 
 const SEED = 20260918;
@@ -13,12 +13,11 @@ const SEED = 20260918;
 export const GROUND_OFFSET = 0.5;
 
 export const PROP_KINDS = {
-  tree:   { label: 'tree',   action: 'Chopping wood',    seconds: 6 },
-  rock:   { label: 'rock',   action: 'Breaking stone',   seconds: 7 },
-  flower: { label: 'flower', action: 'Picking a flower', seconds: 4 }
+  tree: { label: 'tree', action: 'Cutting down a tree', seconds: 6 },
+  rock: { label: 'rock', action: 'Picking up a rock',   seconds: 7 }
 };
 
-const COUNTS = { tree: 9, rock: 6, flower: 11 };
+const COUNTS = { tree: 9, rock: 6 };
 
 export function createProps(surface, scene) {
   const group = new THREE.Group();
@@ -96,7 +95,7 @@ function buildProp(kind, salt) {
     top.position.y = h + 1.65;
     top.castShadow = true;
     g.add(top);
-  } else if (kind === 'rock') {
+  } else {
     const base = new THREE.Mesh(new THREE.BoxGeometry(1, 0.75, 1), mat(0x8a8f9c, { metalness: 0.08 }));
     base.position.y = 0.37;
     base.castShadow = true;
@@ -106,23 +105,6 @@ function buildProp(kind, salt) {
     cap.position.set(0.22, 0.85, -0.12);
     cap.castShadow = true;
     g.add(cap);
-  } else {
-    // Flower: a short stem with a coloured head.
-    const stem = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.08), mat(0x4f8f4a));
-    stem.position.y = 0.21;
-    g.add(stem);
-
-    const palette = [0xe86a8c, 0xf0c04a, 0xa87fe8, 0xf07a4a, 0xe8e2d0];
-    const head = new THREE.Mesh(
-      new THREE.BoxGeometry(0.3, 0.16, 0.3),
-      mat(palette[Math.floor(rand(salt * 13, 3) * palette.length)], { emissive: 0x120a10 })
-    );
-    head.position.y = 0.5;
-    g.add(head);
-
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.1), mat(0x57a052));
-    leaf.position.set(0.13, 0.24, 0);
-    g.add(leaf);
   }
 
   return g;

@@ -5,7 +5,8 @@ const BLOCK = 1;
 const RADIUS = 15;
 const SEED = 20260917;
 
-// Palette for the isle: turf over soil over stone, bedrock at the keel tip.
+// Palette for the isle: grass all over the top, then soil over stone, with
+// bedrock at the keel tip.
 const LAYERS = {
   grass: { color: 0x4fae78, roughness: 0.88, metalness: 0.0 },
   moss: { color: 0x3a8a5e, roughness: 0.9, metalness: 0.0 },
@@ -119,11 +120,9 @@ export function createIsland() {
 
     let layer;
     if (fromTop === 0) {
-      // Bare patches of earth and stone worn through the turf.
-      const wear = fbm2(x * 0.46, z * 0.46, 2, SEED + 41);
-      if (wear > 0.70) layer = 'dirt';
-      else if (wear < 0.28) layer = 'stone';
-      else layer = 'grass';
+      // The whole surface is turf - no bare patches of earth or stone worn
+      // through it.
+      layer = 'grass';
     } else if (fromTop === 1) {
       layer = 'moss';
     } else if (fromTop <= 3) {

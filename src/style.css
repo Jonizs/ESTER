@@ -26,7 +26,7 @@ html, body {
 
 #viewport.dragging { cursor: grabbing; }
 
-#hud, #help, #loading {
+#hud, #help, #loading, #agent-panel {
   position: fixed;
   user-select: none;
   pointer-events: none;
@@ -44,15 +44,6 @@ html, body {
   font-weight: 600;
   letter-spacing: 0.42em;
   color: var(--ink);
-}
-
-#hud .tag {
-  margin: 6px 0 0;
-  font-size: 12px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--accent);
-  opacity: 0.75;
 }
 
 #help {
@@ -83,22 +74,112 @@ html, body {
   pointer-events: none;
 }
 
-/* The person's current action, tracking them on screen. */
+/* The agent's current job, tracking it on screen: a sentence and a bar
+   showing how far through the work it is. */
 #action {
   position: fixed;
   transform: translate(-50%, -100%);
-  padding: 4px 11px;
-  border-radius: 999px;
+  padding: 5px 11px 7px;
+  border-radius: 10px;
   background: rgba(8, 12, 22, 0.86);
   border: 1px solid rgba(122, 215, 255, 0.35);
   color: var(--ink);
   font-size: 12px;
   letter-spacing: 0.03em;
   white-space: nowrap;
+  min-width: 128px;
+  text-align: center;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.2s ease;
   z-index: 4;
 }
 
 #action.visible { opacity: 1; }
+
+/* Shared meter: a thin track with a fill whose width is set from JS. */
+.bar {
+  height: 5px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: rgba(233, 241, 255, 0.14);
+  overflow: hidden;
+}
+
+.bar .fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* Selected agent's stats, top left under the title. */
+#agent-panel {
+  top: 78px;
+  left: 26px;
+  width: 218px;
+  padding: 12px 14px 13px;
+  border-radius: 12px;
+  background: rgba(8, 12, 22, 0.82);
+  border: 1px solid rgba(122, 215, 255, 0.3);
+  font-size: 12px;
+  z-index: 3;
+}
+
+#agent-panel[hidden] { display: none; }
+
+#agent-panel .name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+#agent-panel .activity {
+  margin-top: 9px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(233, 241, 255, 0.1);
+}
+
+#agent-panel .activity-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#agent-panel .activity-time { color: var(--dim); }
+
+#agent-panel .meters { margin-top: 10px; }
+
+#agent-panel .meter {
+  display: grid;
+  grid-template-columns: 62px 1fr 30px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+#agent-panel .meter .bar { margin-top: 0; }
+
+#agent-panel .meter .value {
+  text-align: right;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+#agent-panel label { color: var(--dim); }
+
+#agent-panel .traits {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(233, 241, 255, 0.1);
+  line-height: 1.7;
+}
+
+#agent-panel .traits div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
