@@ -205,11 +205,15 @@ function buildWorkbench(g, repaired) {
   }
 
   if (!repaired) {
-    // Over it goes, all the way: the tabletop down on the grass and the legs
-    // in the air. Half a turn reads as a collapsed bench at a glance, where
-    // a quarter turn just reads as a board standing on its end. The lean off
-    // square keeps it from looking placed.
-    frame.rotation.z = Math.PI - 0.2;
+    // Over it goes, all the way: the tabletop down flat on the grass and the
+    // legs in the air. Half a turn reads as a collapsed bench at a glance,
+    // where a quarter turn just reads as a board standing on its end.
+    //
+    // Exactly half a turn, with no lean off square - a tilt rests the bench
+    // on one corner of the top and holds the rest of it clear of the ground.
+    // The yaw is what keeps it from looking placed; it turns the bench on the
+    // spot without lifting any of it.
+    frame.rotation.z = Math.PI;
     frame.rotation.y = 0.34;
 
     // Then dropped until whatever is now lowest is resting on the ground,

@@ -137,6 +137,12 @@ with one inhabitant who walks around and works on what is there.
 - **The agent never acts on its own.** It only walks and works when clicked;
   there is no idle "find something to do" behaviour, and reintroducing one was
   explicitly refused.
+- **Work orders need the agent selected first.** Clicking a tree, a rock or
+  the broken bench does nothing at all unless an agent is selected - it says
+  so in `#toast` instead, through `ordersAllowed()` in `main.js`. Opening the
+  *repaired* bench is exempt, because that opens a screen rather than giving
+  an order, and so is the ground click that sends the agent walking, which
+  still works with nothing selected.
 - **`person.action` is user-facing text**, rendered above their head while
   they work, so it must be a readable sentence ("Cutting down a tree"), never
   an internal state name. It is `null` whenever no work is under way - walking
@@ -201,8 +207,12 @@ with one inhabitant who walks around and works on what is there.
   state turns that group half over so the tabletop is down on the grass and
   the legs are in the air - a quarter turn was tried first and reads as a
   board standing on its end, not as a collapsed bench. The frame is then
-  dropped by its measured `Box3`, not by a hand-picked offset, so the tilt
-  can be retuned without it ending up buried or hovering. The snapped leg and
+  dropped by its measured `Box3`, not by a hand-picked offset, so the shape
+  can be retuned without it ending up buried or hovering. The half turn is
+  exact and the only other rotation is yaw: any lean off square rests the
+  bench on one corner of the top and holds the rest of it clear of the
+  ground, which is the opposite of lying flat. Yaw turns it on the spot
+  without lifting any of it. The snapped leg and
   the plank are added outside the frame, so tipping it does not take them
   with it.
 - **The bench's legs are measured off its top, never given their own

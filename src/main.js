@@ -110,7 +110,10 @@ function finishProp(prop) {
  * wood is only spent when the work is finished.
  */
 function useWorkbench(prop) {
+  // Opening the repaired bench is not an order, so it needs no selection -
+  // it is the same as pressing Tab. Repairing it is an order, and does.
   if (prop.repaired) { crafting.open(); return; }
+  if (!ordersAllowed()) return;
   if (person.task?.prop === prop) return;   // already on its way
 
   const cost = PROP_KINDS.workbench.cost;
@@ -275,6 +278,19 @@ canvas.addEventListener('pointerup', (e) => {
   if (started.button === 0) handleClick(e);
 });
 
+/**
+ * Whether a click may give the agent work.
+ *
+ * Nothing is collected by clicking it on its own: an agent has to be selected
+ * first, so a stray click on a tree is never an order. Says why when it
+ * refuses, rather than silently doing nothing.
+ */
+function ordersAllowed() {
+  if (person.selected) return true;
+  toast('Select an agent first, then click what it should work on.');
+  return false;
+}
+
 function handleClick(event) {
   const rect = canvas.getBoundingClientRect();
   pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -291,6 +307,7 @@ function handleClick(event) {
         const prop = props.find((p) => p.id === object.userData.propId);
         if (prop && prop.kind === 'workbench') { useWorkbench(prop); return; }
         if (prop && !prop.gone) {
+          if (!ordersAllowed()) return;
           if (person.workOn(prop)) setTarget(prop);
           return;
         }
