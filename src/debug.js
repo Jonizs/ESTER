@@ -124,7 +124,7 @@ export function createDebug({ renderer, scene, island, props }) {
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       sun.shadow.bias = -0.0001;
       sun.shadow.normalBias = 0;
-      setSide(null);
+      setSide(THREE.FrontSide);
       setMap(4096);
 
       const presets = {
@@ -133,15 +133,17 @@ export function createDebug({ renderer, scene, island, props }) {
         2: 'much stronger depth bias (-0.004)',
         3: 'PCF filtering instead of PCF soft',
         4: 'hard shadows, no filtering',
-        5: 'cast from front faces, normalBias 0.02',
+        5: 'cast from front faces, normalBias 0.02 (this is what ships now)',
         6: 'shadow map 8192',
-        7: 'shadow map 1024 (should make it worse - confirms it is the map)'
+        7: 'shadow map 1024 (should make it worse - confirms it is the map)',
+        8: 'back-face casting: the bright dashes, for comparison'
       };
       if (n === 1) sun.shadow.bias = -0.001;
       if (n === 2) sun.shadow.bias = -0.004;
       if (n === 3) renderer.shadowMap.type = THREE.PCFShadowMap;
       if (n === 4) renderer.shadowMap.type = THREE.BasicShadowMap;
       if (n === 5) { setSide(THREE.FrontSide); sun.shadow.normalBias = 0.02; }
+      if (n === 8) { setSide(null); say('back-face casting - the old leak, for comparison'); }
       if (n === 6) setMap(8192);
       if (n === 7) setMap(1024);
 
@@ -159,7 +161,7 @@ export function createDebug({ renderer, scene, island, props }) {
       fills.forEach((l, i) => { l.intensity = original.fills[i]; });
       sun.intensity = original.sun;
       this.flat(false);
-      scene.traverse((o) => { if (o.material && o.castShadow) o.material.shadowSide = null; });
+      scene.traverse((o) => { if (o.material && o.castShadow) o.material.shadowSide = THREE.FrontSide; });
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       sun.shadow.mapSize.set(4096, 4096);
       if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }

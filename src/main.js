@@ -89,6 +89,22 @@ function finishProp(prop) {
   if (targeted === prop) setTarget(null);
 }
 
+// Fill the shadow map from FRONT faces.
+//
+// Three.js defaults the other way for a FrontSide material: it renders back
+// faces, so the depth stored for a caster is its far side. At the foot of a
+// wall the ground sits at almost exactly the depth where the light leaves the
+// wall block, the comparison goes marginal, and a hairline of ground comes out
+// lit - the bright dash along the bottom of every shaded wall. Front faces
+// store the near surface instead, so a contact is tight.
+//
+// The cost is that a surface can now shadow itself, which is what the sun's
+// normalBias in space.js is for. This does not reproduce in headless
+// Chromium; it was confirmed on hardware with ESTER.debug.try(5).
+scene.traverse((object) => {
+  if (object.material && object.castShadow) object.material.shadowSide = THREE.FrontSide;
+});
+
 // --- controls --------------------------------------------------------------
 
 const settings = createSettings();

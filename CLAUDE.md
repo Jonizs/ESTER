@@ -92,10 +92,8 @@ with one inhabitant who walks around and works on what is there.
   rasteriser can let a sliver of what is behind through, and against a shaded
   wall that is the lit ground beyond - it reads as a bright dash at the foot
   of the wall, one per block. Block centres stay on whole numbers, so nothing
-  else has to know. This does not reproduce headlessly, even though SwiftShader
-  does run 4x MSAA like a real GPU - judge any change to it on real hardware.
-  `src/debug.js` exists for exactly that: `ESTER.debug.flat()` drops all
-  lighting, so anything bright that survives it is geometry, not light.
+  else has to know. Kept because abutting cubes are worth not relying on, but
+  it was not the cause of the bright dashes - that was the shadow side, above.
 - **Per-block shade only ever darkens.** The shade multiplier is capped at 1:
   multiplying a layer colour above it pushed the brightest blocks past what
   the tone mapping holds and they clipped out as hard bright slivers.
@@ -106,14 +104,20 @@ with one inhabitant who walks around and works on what is there.
   blotches on open ground. `island.js` runs two median passes over the
   columns to remove them - check `isolatedPits` is still 0 after touching
   terrain generation.
-- **The sun uses no `shadow.normalBias`, on purpose.** Three.js fills the
-  shadow map from back faces for a FrontSide material (`three.module.js`,
-  `shadowSide[ FrontSide ] = BackSide`), so a surface cannot shadow itself and
-  there is no acne for a normal offset to guard against - measured, 0.06 and 0
-  give the same speckle count. What it did do was push the lookup off the
-  surface at a wall's foot and let a hairline of sun through between a wall
-  and its own shadow, which is what the bright dashes along shaded walls were.
-  Keep `bias` to a whisper for the same reason.
+- **Casters fill the shadow map from their FRONT faces** (`shadowSide` is set
+  on every caster in `main.js`). Three.js defaults the other way for a
+  FrontSide material (`three.module.js`: `shadowSide[ FrontSide ] = BackSide`),
+  which stores the caster's far side. At the foot of a wall the ground sits at
+  almost exactly the depth where the light leaves the wall block, the depth
+  comparison goes marginal, and a hairline of ground comes out lit - that was
+  the bright dash along the bottom of every shaded wall, one per block, that
+  took several wrong guesses to pin down. Front faces store the near surface,
+  so contacts are tight.
+- **Front-face casting is why `normalBias` matters.** With it, a surface can
+  shadow itself, and 0.02 at 4096 is what holds that off. The two settings go
+  together: change one and the dashes or the acne come back. `ESTER.debug`
+  (src/debug.js) exists to check this on hardware - `try(5)` is what ships,
+  `try(8)` puts the old leak back to compare against.
 - **The shadow frustum must cover the isle.** It is +/-26: the isle's bounding
   sphere is about 25 across, and at +/-22 the far corners fell outside the
   shadow map and came out unshadowed. Do not wrap it tighter than the isle.
