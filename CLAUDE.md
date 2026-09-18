@@ -161,8 +161,19 @@ with one inhabitant who walks around and works on what is there.
   in the capture phase and capture listeners fire in the order they were
   added, so this is what lets a panel swallow Esc (with
   `stopImmediatePropagation`) instead of the game pausing behind it.
-- **The panel backdrop takes no clicks.** `#panels` is `pointer-events: none`
-  and only `.panel` takes them back, so the isle stays playable around it.
+- **The panels are a full screen, not a corner box.** The shell is
+  `min(1180px, 94vw)` by `min(780px, 88vh)` with a rail of tabs down the left,
+  and the scrim behind it takes the click that closes it - so the canvas never
+  sees a click while they are open, and no stray order reaches the agent.
+  Under 900px wide the rail drops its labels and the overview stacks.
+- **Only the open tab's page is in the layout.** The pages set their own
+  `display`, which beats the `hidden` attribute, so
+  `#panels [data-tab][hidden] { display: none }` is what actually hides them -
+  without it the empty pages print underneath the overview.
+- **The overview's lists rebuild only when their contents change**, keyed on
+  the item and agent names; every frame after that just writes numbers onto
+  the nodes that are already there. Both keys start `null`, not `''`, so the
+  first pass still builds when the inventory is empty.
 - **Keep the isle sparse.** A few trees and rocks - counts live in `COUNTS`
   in `props.js`. There are no flowers; they were removed on request.
 

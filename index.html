@@ -54,47 +54,92 @@
       <div><b data-help="panelOverview"></b> &mdash; overview &nbsp; <b data-help="panelCrafting"></b> crafting &nbsp; <b data-help="panelQuests"></b> quests &nbsp; <b data-help="panelStages"></b> stages</div>
     </div>
 
-    <!-- Tab / Q / W / E panels. One panel, four pages. -->
+    <!-- Tab / Q / W / E panels: one screen, four pages. Built out by
+         src/panels.js - the rail, the agent cards and the item tiles are all
+         filled in from the game state. -->
     <div id="panels" hidden>
-      <div class="panel">
-        <div class="tabstrip"></div>
+      <div class="scrim"></div>
 
-        <section data-tab="overview">
-          <h3>Inventory</h3>
-          <div id="panel-inventory"></div>
-
-          <h3>Agents</h3>
-          <div id="panel-agents"></div>
-
-          <h3>Progress</h3>
-          <div id="panel-quest" class="line">
-            <label>Quest</label>
-            <div class="bar"><span class="fill"></span></div>
-            <span class="value"></span>
+      <div class="shell">
+        <aside class="rail">
+          <div class="brand">
+            <span class="brand-name">ESTER</span>
+            <span class="brand-sub">colony log</span>
           </div>
-          <div id="panel-stage" class="line">
-            <label>Stage</label>
-            <span class="value"></span>
+
+          <nav class="tabstrip"></nav>
+
+          <button type="button" id="panels-close">
+            <span>Close</span><kbd>Esc</kbd>
+          </button>
+        </aside>
+
+        <div class="content">
+          <header class="content-head">
+            <h2 id="panel-title"></h2>
+            <p id="panel-sub"></p>
+          </header>
+
+          <div class="content-body">
+            <section data-tab="overview" class="overview">
+              <div class="summary">
+                <div class="stat">
+                  <span class="k">Agents</span>
+                  <span class="v" id="sum-agents">0</span>
+                  <span class="sub">on the isle</span>
+                </div>
+                <div class="stat">
+                  <span class="k">Gathered</span>
+                  <span class="v" id="sum-items">0</span>
+                  <span class="sub">items held</span>
+                </div>
+                <div class="stat" id="panel-quest">
+                  <span class="k">Quest progression</span>
+                  <span class="v value">0%</span>
+                  <div class="bar"><span class="fill"></span></div>
+                </div>
+                <div class="stat" id="panel-stage">
+                  <span class="k">Stage</span>
+                  <span class="v small value">None yet</span>
+                  <span class="sub">of the run</span>
+                </div>
+              </div>
+
+              <div class="columns">
+                <div class="column">
+                  <h3>Agents <span class="count" id="agent-count"></span></h3>
+                  <div id="panel-agents" class="agents"></div>
+                </div>
+
+                <div class="column">
+                  <h3>Inventory</h3>
+                  <div id="panel-inventory" class="tiles"></div>
+
+                  <h3>The isle</h3>
+                  <div class="card" id="panel-isle"></div>
+                </div>
+              </div>
+            </section>
+
+            <section data-tab="crafting" class="blank" hidden>
+              <div class="blank-mark" data-mark="crafting"></div>
+              <h3>Nothing to craft yet</h3>
+              <p>Recipes will show up here once there are any. What the agents
+                 gather is waiting in the overview.</p>
+            </section>
+
+            <section data-tab="quests" class="blank" hidden>
+              <div class="blank-mark" data-mark="quests"></div>
+              <h3>The quest book is empty</h3>
+              <p>Quests and their progress will be listed here.</p>
+            </section>
+
+            <section data-tab="stages" class="blank" hidden>
+              <div class="blank-mark" data-mark="stages"></div>
+              <h3>No stages yet</h3>
+              <p>Each stage of the run will be laid out here as they arrive.</p>
+            </section>
           </div>
-        </section>
-
-        <section data-tab="crafting" hidden>
-          <h3>Crafting</h3>
-          <p class="empty">No recipes yet.</p>
-        </section>
-
-        <section data-tab="quests" hidden>
-          <h3>Quest book</h3>
-          <p class="empty">No quests yet.</p>
-        </section>
-
-        <section data-tab="stages" hidden>
-          <h3>Stages</h3>
-          <p class="empty">No stages yet.</p>
-        </section>
-
-        <div class="buttons">
-          <button type="button" id="panels-close">CLOSE</button>
         </div>
       </div>
     </div>

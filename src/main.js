@@ -113,6 +113,7 @@ const panels = createPanels({
   agents,
   inventory,
   progression,
+  props,
   blocked: () => menu.isOpen(),
   onSelect: (agent) => agent.setSelected(true)
 });

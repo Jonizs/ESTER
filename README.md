@@ -107,12 +107,18 @@ On Linux/macOS use `./ester.sh` instead of the `.bat` files.
 | `F` | Toggle idle auto-spin |
 | `F11` | Fullscreen (desktop app) |
 
-The four panels are one window with a tab strip, so `Tab`, `Q`, `W` and `E`
-switch straight between them; pressing the key of the tab already showing
-closes it again. All four keys are rebindable in the pause menu. The isle
-stays playable around the panel - only the panel itself takes clicks. Felling
-a tree yields wood and a rock yields stone, which the overview lists; there is
-nothing to spend them on yet.
+The four panels are one screen with a rail of tabs down the left, so `Tab`,
+`Q`, `W` and `E` switch straight between them; pressing the key of the tab
+already showing closes it again, as does `Esc` or a click outside. All four
+keys are rebindable in the pause menu, and the rail relabels itself when you
+change them.
+
+The overview leads with the headline numbers - agents, items held, quest
+progression and the stage - then lists every agent as a card (what they are
+doing, how far through it they are, their needs and their traits; clicking one
+selects them) beside the inventory and what is still standing on the isle.
+Felling a tree yields wood and a rock yields stone; there is nothing to spend
+them on yet.
 
 The agent never starts work on its own - left alone it simply waits. Only work
 in progress is announced: a label with the job ("Cutting down a tree", "Picking

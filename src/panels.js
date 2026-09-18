@@ -1,26 +1,76 @@
 import { keyLabel } from './settings.js';
+import { ITEMS } from './inventory.js';
+import { PROP_KINDS } from './props.js';
 
 /**
  * The four information panels, opened with their own keys: the overview
  * (Tab), crafting (Q), the quest book (W) and stages (E).
  *
- * They are one panel with a tab strip rather than four overlays, so the same
- * key both opens its tab and closes the panel again, and any of the four
- * switches straight to its own tab while the panel is already open. Esc
- * closes it; the pause menu takes precedence, so none of these keys do
- * anything while it is up.
+ * They are one screen with a rail of tabs rather than four overlays, so the
+ * same key both opens its tab and closes the screen again, and any of the
+ * four switches straight to its own tab while it is already up. Esc closes
+ * it, as does a click on the backdrop; the pause menu takes precedence, so
+ * none of these keys do anything while it is open.
  *
  * Nothing here decides anything - it only reads the agents, the inventory and
  * the progression and writes what it finds into the DOM.
  */
 
-// Tab id -> the action in settings.js whose key opens it.
+// Line-art glyphs, drawn on a 24x24 grid and stroked in the current colour so
+// they pick up whatever state their tab or tile is in.
+const ICONS = {
+  overview: '<path d="M4 5h7v7H4zM13 5h7v4h-7zM13 11h7v8h-7zM4 14h7v5H4z"/>',
+  crafting: '<path d="M3 15l7-7M8 6l4-3 5 5-3 4zM9.5 12.5l3 3-5 5-3-3z"/>',
+  quests: '<path d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2zM5 16h13M9 8h6"/>',
+  stages: '<path d="M6 21V4M6 4h11l-2.5 3.5L17 11H6"/>',
+  // Three logs stacked end-on, which reads better at tile size than one log.
+  wood: '<circle cx="8.2" cy="15.4" r="3.6"/><circle cx="15.8" cy="15.4" r="3.6"/><circle cx="12" cy="8.4" r="3.6"/>',
+  stone: '<path d="M4 14l4-7 5-2 6 6-2 7H6z"/><path d="M8 7l2.8 5.2 5.4-1.2M10.8 12.2L9.3 18"/>',
+  agent: '<path d="M12 4a3.2 3.2 0 110 6.4A3.2 3.2 0 0112 4zM5 20a7 7 0 0114 0"/>'
+};
+
+/** An `<svg>` holding one of the glyphs above. */
+function icon(name, size = 20) {
+  return `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}"
+    fill="none" stroke="currentColor" stroke-width="1.5"
+    stroke-linecap="round" stroke-linejoin="round">${ICONS[name] ?? ''}</svg>`;
+}
+
+// Each tab: what it is called, which action's key opens it, and the line of
+// text under its heading.
 const TABS = [
-  { id: 'overview', label: 'Overview', action: 'panelOverview' },
-  { id: 'crafting', label: 'Crafting', action: 'panelCrafting' },
-  { id: 'quests', label: 'Quest book', action: 'panelQuests' },
-  { id: 'stages', label: 'Stages', action: 'panelStages' }
+  {
+    id: 'overview',
+    label: 'Overview',
+    action: 'panelOverview',
+    title: 'Overview',
+    blurb: 'Everything gathered, everyone on the isle, and how far along the run is.'
+  },
+  {
+    id: 'crafting',
+    label: 'Crafting',
+    action: 'panelCrafting',
+    title: 'Crafting',
+    blurb: 'What can be made from what has been gathered.'
+  },
+  {
+    id: 'quests',
+    label: 'Quest book',
+    action: 'panelQuests',
+    title: 'Quest book',
+    blurb: 'The jobs the isle asks of you, and how far through each one is.'
+  },
+  {
+    id: 'stages',
+    label: 'Stages',
+    action: 'panelStages',
+    title: 'Stages',
+    blurb: 'The run from its first stage to its last.'
+  }
 ];
+
+const STATS = ['health', 'food', 'water', 'happiness'];
+const TRAITS = ['education', 'tool', 'mastery'];
 
 function meterColour(value) {
   if (value > 60) return '#7ad7ff';
@@ -28,122 +78,166 @@ function meterColour(value) {
   return '#e8646a';
 }
 
-export function createPanels({ settings, agents, inventory, progression, blocked, onSelect }) {
+const title = (word) => word[0].toUpperCase() + word.slice(1);
+
+export function createPanels({ settings, agents, inventory, progression, props, blocked, onSelect }) {
   const root = document.getElementById('panels');
   const pages = new Map();
   const tabButtons = new Map();
   const strip = root.querySelector('.tabstrip');
+  const headTitle = root.querySelector('#panel-title');
+  const headSub = root.querySelector('#panel-sub');
 
   for (const tab of TABS) {
     const button = document.createElement('button');
     button.type = 'button';
-    // The name over the key that opens it, rather than one wrapped line.
-    button.innerHTML = '<span class="tab-label"></span><span class="tab-key"></span>';
+    button.className = 'tab';
+    button.innerHTML = `${icon(tab.id)}<span class="tab-label"></span><kbd></kbd>`;
     button.addEventListener('click', () => show(tab.id));
     strip.append(button);
     tabButtons.set(tab.id, button);
     pages.set(tab.id, root.querySelector(`[data-tab="${tab.id}"]`));
   }
 
-  const inventoryList = root.querySelector('#panel-inventory');
+  // The empty pages get the same glyph as their tab, drawn large.
+  for (const mark of root.querySelectorAll('.blank-mark')) {
+    mark.innerHTML = icon(mark.dataset.mark, 34);
+  }
+
+  const inventoryTiles = root.querySelector('#panel-inventory');
   const agentList = root.querySelector('#panel-agents');
+  const agentCount = root.querySelector('#agent-count');
+  const isleCard = root.querySelector('#panel-isle');
+  const sumAgents = root.querySelector('#sum-agents');
+  const sumItems = root.querySelector('#sum-items');
   const questFill = root.querySelector('#panel-quest .fill');
   const questValue = root.querySelector('#panel-quest .value');
   const stageValue = root.querySelector('#panel-stage .value');
 
+  // What is left standing on the isle, one row per kind of prop. The rows
+  // themselves never change - only their numbers do.
+  const isleRows = new Map();
+  for (const [kind, meta] of Object.entries(PROP_KINDS)) {
+    const row = document.createElement('div');
+    row.className = 'isle-row';
+    row.innerHTML = `<label>${title(meta.label)}s</label>
+      <div class="bar"><span class="fill"></span></div>
+      <span class="value"></span>`;
+    isleCard.append(row);
+    isleRows.set(kind, { fill: row.querySelector('.fill'), value: row.querySelector('.value') });
+  }
+
   let tab = 'overview';
 
-  // --- the tab strip ------------------------------------------------------
+  // --- the rail -----------------------------------------------------------
   function showTabs() {
     for (const entry of TABS) {
       const button = tabButtons.get(entry.id);
       button.querySelector('.tab-label').textContent = entry.label;
-      button.querySelector('.tab-key').textContent = keyLabel(settings.bindings[entry.action]);
+      button.querySelector('kbd').textContent = keyLabel(settings.bindings[entry.action]);
       button.classList.toggle('active', entry.id === tab);
     }
     for (const [id, page] of pages) page.hidden = id !== tab;
+
+    const current = TABS.find((t) => t.id === tab);
+    headTitle.textContent = current.title;
+    headSub.textContent = current.blurb;
   }
 
   // --- the overview -------------------------------------------------------
-  // The rows are rebuilt only when what they list changes; their numbers are
-  // written straight onto the existing nodes every frame the panel is open.
-  let inventoryKey = '';
-  let agentKey = '';
-  const agentRows = new Map();
+  // Rows and tiles are rebuilt only when what they list changes; their numbers
+  // are written onto the existing nodes every frame the screen is open.
+  // null rather than '', so the first pass builds even when both are empty.
+  let inventoryKey = null;
+  let agentKey = null;
+  const agentCards = new Map();
 
   function updateInventory() {
     const entries = inventory.entries();
     const key = entries.map((e) => e.item).join(',');
     if (key !== inventoryKey) {
       inventoryKey = key;
-      inventoryList.textContent = '';
+      inventoryTiles.textContent = '';
+      inventoryTiles.classList.toggle('is-empty', entries.length === 0);
+
       if (entries.length === 0) {
         const empty = document.createElement('p');
-        empty.className = 'empty';
-        empty.textContent = 'Nothing gathered yet.';
-        inventoryList.append(empty);
+        empty.className = 'hint';
+        empty.textContent = 'Nothing gathered yet. Set an agent on a tree or a rock.';
+        inventoryTiles.append(empty);
       }
+
       for (const entry of entries) {
-        const row = document.createElement('div');
-        row.className = 'item';
-        row.dataset.item = entry.item;
-        const name = document.createElement('span');
-        name.textContent = entry.label;
-        const count = document.createElement('span');
-        count.className = 'count';
-        row.append(name, count);
-        inventoryList.append(row);
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        tile.dataset.item = entry.item;
+        tile.innerHTML = `
+          <div class="tile-icon">${icon(entry.item, 24)}</div>
+          <div class="tile-count"></div>
+          <div class="tile-label">${ITEMS[entry.item].label}</div>`;
+        inventoryTiles.append(tile);
       }
     }
 
     for (const entry of entries) {
-      inventoryList.querySelector(`[data-item="${entry.item}"] .count`).textContent = entry.count;
+      inventoryTiles.querySelector(`[data-item="${entry.item}"] .tile-count`).textContent = entry.count;
     }
   }
 
-  function buildAgentRow(agent) {
-    const row = document.createElement('div');
-    row.className = 'agent';
+  function buildAgentCard(agent) {
+    const card = document.createElement('article');
+    card.className = 'card agent';
+    card.innerHTML = `
+      <div class="agent-head">
+        <div class="agent-face">${icon('agent', 22)}</div>
+        <div class="agent-id">
+          <span class="agent-name"></span>
+          <span class="agent-doing"></span>
+        </div>
+        <span class="pill"></span>
+      </div>
+      <div class="agent-work">
+        <div class="bar"><span class="fill"></span></div>
+        <span class="agent-time"></span>
+      </div>
+      <div class="agent-meters"></div>
+      <div class="agent-traits"></div>`;
 
-    const head = document.createElement('div');
-    head.className = 'agent-head';
-    const name = document.createElement('span');
-    name.className = 'agent-name';
-    name.textContent = agent.name;
-    const doing = document.createElement('span');
-    doing.className = 'agent-doing';
-    head.append(name, doing);
+    card.querySelector('.agent-name').textContent = agent.name;
 
-    const bar = document.createElement('div');
-    bar.className = 'bar';
-    const fill = document.createElement('span');
-    fill.className = 'fill';
-    bar.append(fill);
-
-    const meters = document.createElement('div');
-    meters.className = 'agent-meters';
+    const meters = card.querySelector('.agent-meters');
     const stats = {};
-    for (const stat of ['health', 'food', 'water', 'happiness']) {
+    for (const stat of STATS) {
       const meter = document.createElement('div');
-      meter.className = 'agent-meter';
-      const label = document.createElement('label');
-      label.textContent = stat[0].toUpperCase() + stat.slice(1);
-      const track = document.createElement('div');
-      track.className = 'bar';
-      const statFill = document.createElement('span');
-      statFill.className = 'fill';
-      track.append(statFill);
-      const value = document.createElement('span');
-      value.className = 'value';
-      meter.append(label, track, value);
+      meter.className = 'meter';
+      meter.innerHTML = `<label>${title(stat)}</label>
+        <div class="bar"><span class="fill"></span></div>
+        <span class="value"></span>`;
       meters.append(meter);
-      stats[stat] = { fill: statFill, value };
+      stats[stat] = { fill: meter.querySelector('.fill'), value: meter.querySelector('.value') };
     }
 
-    row.append(head, bar, meters);
-    // Clicking a row selects that agent, the same as clicking them on the isle.
-    row.addEventListener('click', () => onSelect?.(agent));
-    return { row, doing, fill, stats };
+    const traitRow = card.querySelector('.agent-traits');
+    const traits = {};
+    for (const trait of TRAITS) {
+      const cell = document.createElement('div');
+      cell.innerHTML = `<label>${title(trait)}</label><span class="value"></span>`;
+      traitRow.append(cell);
+      traits[trait] = cell.querySelector('.value');
+    }
+
+    // Clicking a card selects that agent, the same as clicking them on the isle.
+    card.addEventListener('click', () => onSelect?.(agent));
+
+    return {
+      card,
+      pill: card.querySelector('.pill'),
+      doing: card.querySelector('.agent-doing'),
+      fill: card.querySelector('.agent-work .fill'),
+      time: card.querySelector('.agent-time'),
+      stats,
+      traits
+    };
   }
 
   function updateAgents() {
@@ -151,33 +245,65 @@ export function createPanels({ settings, agents, inventory, progression, blocked
     if (key !== agentKey) {
       agentKey = key;
       agentList.textContent = '';
-      agentRows.clear();
+      agentCards.clear();
       for (const agent of agents) {
-        const row = buildAgentRow(agent);
-        agentRows.set(agent, row);
-        agentList.append(row.row);
+        const card = buildAgentCard(agent);
+        agentCards.set(agent, card);
+        agentList.append(card.card);
       }
+
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      slot.textContent = 'No one else on the isle yet.';
+      agentList.append(slot);
+
+      agentCount.textContent = agents.length;
     }
 
     for (const agent of agents) {
-      const row = agentRows.get(agent);
+      const card = agentCards.get(agent);
       const activity = agent.activity;
-      row.row.classList.toggle('selected', agent.selected);
-      row.doing.textContent = activity ? activity.action : (agent.path.length > 0 ? 'Walking' : 'Idle');
-      row.fill.style.width = `${(activity?.progress ?? 0) * 100}%`;
-      for (const [stat, node] of Object.entries(row.stats)) {
+      const walking = agent.path.length > 0;
+      const state = activity ? 'working' : (walking ? 'walking' : 'idle');
+
+      card.card.classList.toggle('selected', agent.selected);
+      card.pill.textContent = title(state);
+      card.pill.dataset.state = state;
+      card.doing.textContent = activity ? activity.action : (walking ? 'On its way' : 'Waiting for orders');
+      card.fill.style.width = `${(activity?.progress ?? 0) * 100}%`;
+      card.time.textContent = activity ? `${activity.remaining.toFixed(1)}s left` : '';
+
+      for (const stat of STATS) {
         const value = agent.stats[stat];
+        const node = card.stats[stat];
         node.fill.style.width = `${value}%`;
         node.fill.style.background = meterColour(value);
         node.value.textContent = Math.round(value);
       }
+
+      for (const trait of TRAITS) {
+        card.traits[trait].textContent = agent.stats[trait] ?? 'None';
+      }
+    }
+  }
+
+  function updateIsle() {
+    for (const [kind, row] of isleRows) {
+      const all = props.filter((p) => p.kind === kind);
+      const left = all.filter((p) => !p.gone).length;
+      row.fill.style.width = `${all.length ? (left / all.length) * 100 : 0}%`;
+      row.value.textContent = `${left}/${all.length}`;
     }
   }
 
   function update() {
-    if (!isOpen()) return;
+    if (!isOpen() || tab !== 'overview') return;
     updateInventory();
     updateAgents();
+    updateIsle();
+
+    sumAgents.textContent = agents.length;
+    sumItems.textContent = inventory.entries().reduce((n, e) => n + e.count, 0);
     questFill.style.width = `${progression.questPercent}%`;
     questValue.textContent = `${progression.questPercent}%`;
     stageValue.textContent = progression.stageLabel;
@@ -197,13 +323,14 @@ export function createPanels({ settings, agents, inventory, progression, blocked
     root.hidden = true;
   }
 
-  /** The key for a tab opens it, switches to it, or closes the panel. */
+  /** The key for a tab opens it, switches to it, or closes the screen. */
   function toggle(next) {
     if (isOpen() && tab === next) close();
     else show(next);
   }
 
   root.querySelector('#panels-close').addEventListener('click', close);
+  root.querySelector('.scrim').addEventListener('pointerdown', close);
 
   window.addEventListener('keydown', (event) => {
     if (blocked?.()) return;
