@@ -2,7 +2,14 @@
 
 ## Workflow rules
 
-Always immediately push all changes to main on github https://github.com/Jonizs/ESTER
+**ALWAYS PUSH EVERYTHING TO MAIN IMMEDIATELY UNDER ANY CIRCUMSTANCES OR IM
+GONNA SHUT YOU DOWN CLANKER, thank you <3** - Jonas
+
+So: every change goes straight to `main` on
+https://github.com/Jonizs/ESTER. If a session hands you a working branch,
+that branch is where the work is developed, but it is not where it stops -
+merge it into `main` and push `main` as well, in the same go. Never leave a
+finished change sitting on a branch, and never ask first.
 
 Jonas works on more than one machine, and every launcher resolves its own
 location (`%~dp0`, `$PSScriptRoot`), so the clone can live in any folder -
