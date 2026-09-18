@@ -14,10 +14,21 @@ export const GROUND_OFFSET = 0.5;
 
 export const PROP_KINDS = {
   tree: { label: 'tree', action: 'Cutting down a tree', seconds: 6, yield: { item: 'wood', amount: 3 } },
-  rock: { label: 'rock', action: 'Picking up a rock',   seconds: 7, yield: { item: 'stone', amount: 2 } }
+  rock: { label: 'rock', action: 'Picking up a rock',   seconds: 7, yield: { item: 'stone', amount: 2 } },
+  // The workbench is not harvested - it is repaired once, and then it is a
+  // door into the crafting screen rather than a job.
+  workbench: {
+    label: 'workbench',
+    action: 'Repairing the workbench',
+    seconds: 8,
+    cost: { item: 'wood', amount: 10 }
+  }
 };
 
 const COUNTS = { tree: 9, rock: 6 };
+
+/** Where the broken workbench stands: the middle of the isle. */
+export const WORKBENCH_CELL = { x: 0, z: 0 };
 
 // The tint a prop takes on once the agent has been set on it, until it
 // arrives. Every prop builds its own materials, so this is safe to mutate.
@@ -52,6 +63,11 @@ export function createProps(surface, scene) {
     .map((key) => key.split(',').map(Number))
     .filter(([x, z]) => Math.hypot(x, z) > 2.5);
 
+  // The workbench goes down first, in the middle, so the scatter below can
+  // never land on top of it - the trees and rocks already keep clear of the
+  // centre, but the bench is what the run starts at and must be reachable.
+  const bench = addWorkbench(surface, group, props);
+
   let salt = 0;
   for (const [kind, count] of Object.entries(COUNTS)) {
     for (let i = 0; i < count; i++) {
@@ -62,8 +78,13 @@ export function createProps(surface, scene) {
         if (!pick) continue;
         const key = `${pick[0]},${pick[1]}`;
         if (taken.has(key)) continue;
-        // Keep props apart so the isle reads as sparse, not as a thicket.
-        const tooClose = props.some((p) => Math.hypot(p.x - pick[0], p.z - pick[1]) < 2.2);
+        // Keep props apart so the isle reads as sparse, not as a thicket -
+        // and keep a wider clearing around the workbench, so the thing the
+        // run starts at is not hidden behind a tree from half the angles.
+        const tooClose = props.some((p) => {
+          const gap = p.kind === 'workbench' ? 3.6 : 2.2;
+          return Math.hypot(p.x - pick[0], p.z - pick[1]) < gap;
+        });
         if (tooClose) continue;
         taken.add(key);
         cell = pick;
@@ -82,7 +103,116 @@ export function createProps(surface, scene) {
     }
   }
 
-  return { group, props };
+  return { group, props, workbench: bench };
+}
+
+/**
+ * The broken workbench in the middle of the isle. It is an ordinary prop as
+ * far as clicking and pathing go, so `props` carries it; what is different is
+ * that finishing the work repairs it instead of removing it, and once it is
+ * repaired clicking it opens the crafting screen.
+ */
+function addWorkbench(surface, group, props) {
+  // The middle cell if the isle has one, otherwise the nearest that exists.
+  let cell = null;
+  let best = Infinity;
+  for (const key of surface.keys()) {
+    const [x, z] = key.split(',').map(Number);
+    const d = Math.hypot(x - WORKBENCH_CELL.x, z - WORKBENCH_CELL.z);
+    if (d < best) { best = d; cell = { x, z }; }
+  }
+  if (!cell) return null;
+
+  const mesh = new THREE.Group();
+  mesh.position.set(cell.x, surface.get(`${cell.x},${cell.z}`) + GROUND_OFFSET, cell.z);
+  group.add(mesh);
+
+  const prop = {
+    id: 'workbench',
+    kind: 'workbench',
+    x: cell.x,
+    z: cell.z,
+    mesh,
+    gone: false,
+    repaired: false
+  };
+
+  setWorkbenchState(prop, false);
+  props.push(prop);
+  return prop;
+}
+
+/** Swap the bench between its broken and its repaired build. */
+export function setWorkbenchState(prop, repaired) {
+  prop.repaired = repaired;
+  const mesh = prop.mesh;
+  for (const child of [...mesh.children]) mesh.remove(child);
+  buildWorkbench(mesh, repaired);
+  // Everything under it answers to the same prop id, so a click anywhere on
+  // the bench finds it.
+  mesh.userData.propId = prop.id;
+  mesh.traverse((o) => { o.userData.propId = prop.id; });
+}
+
+function buildWorkbench(g, repaired) {
+  const wood = repaired ? 0x8a5f37 : 0x4f3d2c;
+  const trim = repaired ? 0x9c6c3f : 0x584431;
+
+  const top = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.16, 0.95),
+    mat(wood, repaired ? { emissive: 0x1a0d04, emissiveIntensity: 1 } : {})
+  );
+  top.position.y = 0.86;
+  // A broken bench is a bench that has given way on one side.
+  if (!repaired) { top.rotation.z = -0.17; top.position.y = 0.72; top.position.x = -0.06; }
+  top.castShadow = true;
+  g.add(top);
+
+  // Four legs when it is whole; the front-left one is snapped off when it
+  // is not, which is what makes the top tilt.
+  const legs = repaired
+    ? [[-0.6, -0.34], [0.6, -0.34], [-0.6, 0.34], [0.6, 0.34]]
+    : [[0.6, -0.34], [0.6, 0.34], [-0.6, 0.34]];
+  for (const [x, z] of legs) {
+    const h = repaired ? 0.78 : 0.7;
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, h, 0.15), mat(trim));
+    leg.position.set(x, h / 2, z);
+    leg.castShadow = true;
+    g.add(leg);
+  }
+
+  if (repaired) {
+    // A vice and a lamp, so a working bench reads as one at a glance.
+    const vice = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.3), mat(0x8a8f9c, { metalness: 0.3 }));
+    vice.position.set(0.5, 1.05, 0);
+    vice.castShadow = true;
+    g.add(vice);
+
+    const lamp = new THREE.Mesh(
+      new THREE.BoxGeometry(0.26, 0.26, 0.26),
+      new THREE.MeshStandardMaterial({
+        color: 0x7ad7ff,
+        emissive: 0x2f9bd6,
+        emissiveIntensity: 1.6,
+        roughness: 0.4
+      })
+    );
+    lamp.position.set(-0.45, 1.08, 0);
+    g.add(lamp);
+  } else {
+    // The snapped leg and a plank, lying where they fell.
+    const shard = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.62, 0.15), mat(trim));
+    shard.position.set(-0.62, 0.08, -0.52);
+    shard.rotation.z = Math.PI / 2;
+    shard.castShadow = true;
+    g.add(shard);
+
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.28), mat(wood));
+    plank.position.set(0.15, 0.06, 0.66);
+    plank.rotation.y = 0.5;
+    plank.castShadow = true;
+    g.add(plank);
+  }
 }
 
 function mat(color, opts = {}) {

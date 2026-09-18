@@ -1,40 +1,21 @@
 import { keyLabel } from './settings.js';
 import { ITEMS } from './inventory.js';
-import { PROP_KINDS } from './props.js';
+import { icon } from './icons.js';
 
 /**
- * The four information panels, opened with their own keys: the overview
- * (Tab), crafting (Q), the quest book (W) and stages (E).
+ * The information panels, opened with their own keys: the overview (Tab), the
+ * quest book (W) and stages (E). Crafting is not among them - it lives on the
+ * workbench out on the isle (src/crafting.js).
  *
- * They are one screen with a rail of tabs rather than four overlays, so the
- * same key both opens its tab and closes the screen again, and any of the
- * four switches straight to its own tab while it is already up. Esc closes
- * it, as does a click on the backdrop; the pause menu takes precedence, so
- * none of these keys do anything while it is open.
+ * They are one screen with a rail of tabs rather than separate overlays, so
+ * the same key both opens its tab and closes the screen again, and any of them
+ * switches straight to its own tab while it is already up. Esc closes it, as
+ * does a click on the backdrop; the pause menu takes precedence, so none of
+ * these keys do anything while it is open.
  *
  * Nothing here decides anything - it only reads the agents, the inventory and
  * the progression and writes what it finds into the DOM.
  */
-
-// Line-art glyphs, drawn on a 24x24 grid and stroked in the current colour so
-// they pick up whatever state their tab or tile is in.
-const ICONS = {
-  overview: '<path d="M4 5h7v7H4zM13 5h7v4h-7zM13 11h7v8h-7zM4 14h7v5H4z"/>',
-  crafting: '<path d="M3 15l7-7M8 6l4-3 5 5-3 4zM9.5 12.5l3 3-5 5-3-3z"/>',
-  quests: '<path d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2zM5 16h13M9 8h6"/>',
-  stages: '<path d="M6 21V4M6 4h11l-2.5 3.5L17 11H6"/>',
-  // Three logs stacked end-on, which reads better at tile size than one log.
-  wood: '<circle cx="8.2" cy="15.4" r="3.6"/><circle cx="15.8" cy="15.4" r="3.6"/><circle cx="12" cy="8.4" r="3.6"/>',
-  stone: '<path d="M4 14l4-7 5-2 6 6-2 7H6z"/><path d="M8 7l2.8 5.2 5.4-1.2M10.8 12.2L9.3 18"/>',
-  agent: '<path d="M12 4a3.2 3.2 0 110 6.4A3.2 3.2 0 0112 4zM5 20a7 7 0 0114 0"/>'
-};
-
-/** An `<svg>` holding one of the glyphs above. */
-function icon(name, size = 20) {
-  return `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}"
-    fill="none" stroke="currentColor" stroke-width="1.5"
-    stroke-linecap="round" stroke-linejoin="round">${ICONS[name] ?? ''}</svg>`;
-}
 
 // Each tab: what it is called, which action's key opens it, and the line of
 // text under its heading.
@@ -45,13 +26,6 @@ const TABS = [
     action: 'panelOverview',
     title: 'Overview',
     blurb: 'Everything gathered, everyone on the isle, and how far along the run is.'
-  },
-  {
-    id: 'crafting',
-    label: 'Crafting',
-    action: 'panelCrafting',
-    title: 'Crafting',
-    blurb: 'What can be made from what has been gathered.'
   },
   {
     id: 'quests',
@@ -80,7 +54,7 @@ function meterColour(value) {
 
 const title = (word) => word[0].toUpperCase() + word.slice(1);
 
-export function createPanels({ settings, agents, inventory, progression, props, blocked, onSelect }) {
+export function createPanels({ settings, agents, inventory, progression, blocked, onSelect }) {
   const root = document.getElementById('panels');
   const pages = new Map();
   const tabButtons = new Map();
@@ -107,25 +81,11 @@ export function createPanels({ settings, agents, inventory, progression, props, 
   const inventoryTiles = root.querySelector('#panel-inventory');
   const agentList = root.querySelector('#panel-agents');
   const agentCount = root.querySelector('#agent-count');
-  const isleCard = root.querySelector('#panel-isle');
   const sumAgents = root.querySelector('#sum-agents');
   const sumItems = root.querySelector('#sum-items');
   const questFill = root.querySelector('#panel-quest .fill');
   const questValue = root.querySelector('#panel-quest .value');
   const stageValue = root.querySelector('#panel-stage .value');
-
-  // What is left standing on the isle, one row per kind of prop. The rows
-  // themselves never change - only their numbers do.
-  const isleRows = new Map();
-  for (const [kind, meta] of Object.entries(PROP_KINDS)) {
-    const row = document.createElement('div');
-    row.className = 'isle-row';
-    row.innerHTML = `<label>${title(meta.label)}s</label>
-      <div class="bar"><span class="fill"></span></div>
-      <span class="value"></span>`;
-    isleCard.append(row);
-    isleRows.set(kind, { fill: row.querySelector('.fill'), value: row.querySelector('.value') });
-  }
 
   let tab = 'overview';
 
@@ -287,20 +247,10 @@ export function createPanels({ settings, agents, inventory, progression, props, 
     }
   }
 
-  function updateIsle() {
-    for (const [kind, row] of isleRows) {
-      const all = props.filter((p) => p.kind === kind);
-      const left = all.filter((p) => !p.gone).length;
-      row.fill.style.width = `${all.length ? (left / all.length) * 100 : 0}%`;
-      row.value.textContent = `${left}/${all.length}`;
-    }
-  }
-
   function update() {
     if (!isOpen() || tab !== 'overview') return;
     updateInventory();
     updateAgents();
-    updateIsle();
 
     sumAgents.textContent = agents.length;
     sumItems.textContent = inventory.entries().reduce((n, e) => n + e.count, 0);

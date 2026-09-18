@@ -17,7 +17,6 @@ export const ACTIONS = [
   { id: 'resetView', label: 'Reset view', key: 'r' },
   { id: 'autoSpin', label: 'Toggle auto-spin', key: 'f' },
   { id: 'panelOverview', label: 'Overview', key: 'Tab' },
-  { id: 'panelCrafting', label: 'Crafting', key: 'q' },
   { id: 'panelQuests', label: 'Quest book', key: 'w' },
   { id: 'panelStages', label: 'Stages', key: 'e' }
 ];

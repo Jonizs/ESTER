@@ -51,16 +51,18 @@
       <div><b>Click the agent</b> &mdash; select it</div>
       <div><b>Right click</b> &mdash; deselect</div>
       <div><b>Click</b> &mdash; send it there, or set it on a tree or rock</div>
-      <div><b data-help="panelOverview"></b> &mdash; overview &nbsp; <b data-help="panelCrafting"></b> crafting &nbsp; <b data-help="panelQuests"></b> quests &nbsp; <b data-help="panelStages"></b> stages</div>
+      <div><b>Click the workbench</b> &mdash; crafting</div>
+      <div><b data-help="panelOverview"></b> &mdash; overview &nbsp; <b data-help="panelQuests"></b> quests &nbsp; <b data-help="panelStages"></b> stages</div>
     </div>
 
-    <!-- Tab / Q / W / E panels: one screen, four pages. Built out by
+    <!-- Tab / W / E panels: one screen, three pages. Built out by
          src/panels.js - the rail, the agent cards and the item tiles are all
-         filled in from the game state. -->
+         filled in from the game state. Crafting is not here; it is opened by
+         clicking the workbench on the isle. -->
     <div id="panels" hidden>
       <div class="scrim"></div>
 
-      <div class="shell">
+      <div class="shell starfield">
         <aside class="rail">
           <div class="brand">
             <span class="brand-name">ESTER</span>
@@ -114,18 +116,8 @@
                 <div class="column">
                   <h3>Inventory</h3>
                   <div id="panel-inventory" class="tiles"></div>
-
-                  <h3>The isle</h3>
-                  <div class="card" id="panel-isle"></div>
                 </div>
               </div>
-            </section>
-
-            <section data-tab="crafting" class="blank" hidden>
-              <div class="blank-mark" data-mark="crafting"></div>
-              <h3>Nothing to craft yet</h3>
-              <p>Recipes will show up here once there are any. What the agents
-                 gather is waiting in the overview.</p>
             </section>
 
             <section data-tab="quests" class="blank" hidden>
@@ -144,8 +136,43 @@
       </div>
     </div>
 
+    <!-- The crafting screen. No key opens it - the repaired workbench on the
+         isle does, through src/crafting.js. -->
+    <div id="crafting" hidden>
+      <div class="scrim"></div>
+
+      <div class="shell starfield">
+        <header class="craft-head">
+          <div>
+            <h2>Crafting</h2>
+            <p>At the workbench, out in the middle of the isle.</p>
+          </div>
+          <button type="button" id="crafting-close">
+            <span>Close</span><kbd>Esc</kbd>
+          </button>
+        </header>
+
+        <div class="craft-body">
+          <div class="blank">
+            <div class="blank-mark" data-mark="crafting"></div>
+            <h3>Nothing to craft yet</h3>
+            <p>Recipes will show up here once there are any. The bench is
+               standing and ready for them.</p>
+          </div>
+
+          <div class="craft-stock">
+            <h3>On the bench</h3>
+            <div id="craft-stock" class="tiles"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- A line at the top of the screen for things a click could not do. -->
+    <div id="toast"></div>
+
     <div id="menu" hidden>
-      <div class="panel">
+      <div class="panel starfield">
         <section data-page="main">
           <h2>Paused</h2>
 

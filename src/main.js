@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import { createIsland, ISLAND_RADIUS } from './island.js';
 import { createSpace } from './space.js';
 import { OrbitCamera } from './orbitCamera.js';
-import { createProps, setPropHighlight, GROUND_OFFSET, PROP_KINDS } from './props.js';
+import { createProps, setPropHighlight, setWorkbenchState, GROUND_OFFSET, PROP_KINDS } from './props.js';
 import { Person } from './person.js';
 import { createMarkers } from './markers.js';
 import { createSettings, keyLabel } from './settings.js';
 import { createMenu } from './menu.js';
 import { createPanels } from './panels.js';
+import { createCrafting } from './crafting.js';
 import { createInventory } from './inventory.js';
 import { createProgression } from './progression.js';
 import { createDebug } from './debug.js';
@@ -37,7 +38,7 @@ const island = createIsland();
 scene.add(island);
 
 const surface = island.userData.surface;
-const { props } = createProps(surface, scene);
+const { props, workbench } = createProps(surface, scene);
 
 // --- the person ------------------------------------------------------------
 
@@ -82,11 +83,43 @@ function updateTarget() {
 }
 
 function finishProp(prop) {
+  if (targeted === prop) setTarget(null);
+
+  // The bench is repaired rather than carried off: it stays standing, gets
+  // its missing leg back, and from then on it is the way into crafting.
+  if (prop.kind === 'workbench') {
+    const cost = PROP_KINDS.workbench.cost;
+    inventory.take(cost.item, cost.amount);
+    setWorkbenchState(prop, true);
+    prop.mesh.traverse((o) => {
+      if (o.material && o.castShadow) o.material.shadowSide = THREE.FrontSide;
+    });
+    toast('The workbench is whole again. Click it to craft.');
+    return;
+  }
+
   const gathered = PROP_KINDS[prop.kind].yield;
   if (gathered) inventory.add(gathered.item, gathered.amount);
   prop.gone = true;
   prop.mesh.visible = false;
-  if (targeted === prop) setTarget(null);
+}
+
+/**
+ * A click on the workbench. Repaired, it opens crafting; broken, it is a job
+ * like any other - but only once there is the wood to pay for it, and the
+ * wood is only spent when the work is finished.
+ */
+function useWorkbench(prop) {
+  if (prop.repaired) { crafting.open(); return; }
+  if (person.task?.prop === prop) return;   // already on its way
+
+  const cost = PROP_KINDS.workbench.cost;
+  const held = inventory.count(cost.item);
+  if (held < cost.amount) {
+    toast(`The workbench needs ${cost.amount} wood to repair - ${held} gathered.`);
+    return;
+  }
+  if (person.workOn(prop)) setTarget(prop);
 }
 
 // Fill the shadow map from FRONT faces.
@@ -129,9 +162,17 @@ const panels = createPanels({
   agents,
   inventory,
   progression,
-  props,
-  blocked: () => menu.isOpen(),
+  blocked: () => menu.isOpen() || crafting.isOpen(),
   onSelect: (agent) => agent.setSelected(true)
+});
+
+// Crafting is a screen of its own, reached by clicking the repaired bench
+// rather than by a key. Built before the menu for the same reason the panels
+// are: its Esc handler has to run first.
+const crafting = createCrafting({
+  inventory,
+  blocked: () => menu.isOpen(),
+  onOpen: () => panels.close()
 });
 
 const menu = createMenu({
@@ -163,12 +204,25 @@ function leaveGame() {
   document.getElementById('menu').querySelector('#menu-leave').textContent = 'CLOSE THIS TAB TO LEAVE';
 }
 
+// --- passing notices ------------------------------------------------------
+
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+
+/** A short line at the top of the screen, for things a click could not do. */
+function toast(text) {
+  toastEl.textContent = text;
+  toastEl.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('visible'), 3200);
+}
+
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let press = null;
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (menu.isOpen()) return;
+  if (menu.isOpen() || crafting.isOpen()) return;
   press = { x: e.clientX, y: e.clientY, t: performance.now(), button: e.button };
 });
 
@@ -199,6 +253,7 @@ function handleClick(event) {
 
       if (object.userData.propId) {
         const prop = props.find((p) => p.id === object.userData.propId);
+        if (prop && prop.kind === 'workbench') { useWorkbench(prop); return; }
         if (prop && !prop.gone) {
           if (person.workOn(prop)) setTarget(prop);
           return;
@@ -317,6 +372,7 @@ function frame() {
   updateLabel();
   updatePanel();
   panels.update();
+  crafting.update();
 
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
@@ -331,6 +387,6 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, surface, markers, menu, panels, inventory, progression, settings, raycaster, THREE };
+window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, workbench, surface, markers, menu, panels, crafting, inventory, progression, settings, raycaster, THREE };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 Object.defineProperty(window.ESTER, 'targeted', { get: () => targeted });

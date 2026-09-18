@@ -47,12 +47,14 @@ with one inhabitant who walks around and works on what is there.
   - `src/space.js` - nebula shell, stars and lighting.
   - `src/orbitCamera.js` - quaternion orbit camera.
   - `src/noise.js` - deterministic value noise.
-  - `src/props.js` - the few trees and rocks, and the yellow target tint.
+  - `src/props.js` - the few trees and rocks, the broken workbench in the
+    middle, and the yellow target tint.
   - `src/markers.js` - the ground-click wave, pooled expanding rings.
   - `src/settings.js` - camera speed and keybinds, held in memory only.
   - `src/menu.js` - the Esc pause menu and its keybind page.
-  - `src/panels.js` - the Tab/Q/W/E panels: overview, crafting, quest book,
-    stages.
+  - `src/panels.js` - the Tab/W/E panels: overview, quest book, stages.
+  - `src/crafting.js` - the crafting screen, opened from the workbench.
+  - `src/icons.js` - the line-art glyphs the panels and crafting both draw.
   - `src/inventory.js` - what has been gathered, and the item list.
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
@@ -156,11 +158,27 @@ with one inhabitant who walks around and works on what is there.
   height before the edge going up, and holds it until past the edge going
   down. If you retune those curves, check the agent stays above the taller of
   the two faces while it is still over it.
-- **The panels are one panel with four tabs**, not four overlays - Tab, Q, W
+- **The panels are one panel with three tabs**, not three overlays - Tab, W
   and E each open their own tab, and pressing the key of the tab already
-  showing closes the whole thing. All four are ordinary rebindable actions in
+  showing closes the whole thing. All three are ordinary rebindable actions in
   `settings.js`, so the panel reads its keys from `settings.bindings` rather
   than hard-coding them.
+- **Crafting is not one of them and has no key.** It is its own overlay
+  (`src/crafting.js`, `#crafting`), and the only way in is to click the
+  workbench standing in the middle of the isle. Opening it closes the panels,
+  so the two are never up together.
+- **The workbench starts broken and costs 10 wood.** It is an ordinary prop as
+  far as clicking, highlighting and pathing go - `props` carries it - but
+  finishing the work repairs it instead of removing it, so it is never
+  `gone`, and its mesh is rebuilt in place by `setWorkbenchState`. The wood is
+  only spent when the work finishes, not when it is ordered, and a click with
+  too little wood puts a line in `#toast` rather than sending the agent. Props
+  keep a wider berth from the bench (3.6 cells rather than 2.2) so it is not
+  hidden behind a tree, and the agent's starting cell is chosen off the same
+  `props` list, so it never starts standing on it.
+- **A repaired bench needs its shadowSide set again.** `setWorkbenchState`
+  builds fresh materials, and the front-face casting the rest of the scene got
+  once at boot has to be applied to them - `finishProp` in `main.js` does it.
 - **The panels are built before the menu in `main.js`.** Both listen for Esc
   in the capture phase and capture listeners fire in the order they were
   added, so this is what lets a panel swallow Esc (with
@@ -180,6 +198,18 @@ with one inhabitant who walks around and works on what is there.
   first pass still builds when the inventory is empty.
 - **Keep the isle sparse.** A few trees and rocks - counts live in `COUNTS`
   in `props.js`. There are no flowers; they were removed on request.
+- **The overview's right column is the inventory and nothing else.** The card
+  that counted how many trees and rocks were left standing was removed on
+  request; the tiles now take the whole column down to the bottom of the page
+  (`align-content: start` keeps them packed at the top of that space).
+- **The UI is cosmic, and it is all one recipe.** Every pane - the panels, the
+  crafting screen, the pause menu - is a dark surface with the `--nebula`
+  wash behind it, a drifting `--stars` tile over that from the shared
+  `.starfield` class, and an ice-blue edge. The star layer is an absolutely
+  positioned `::before`, so anything sitting on such a surface needs
+  `position: relative; z-index: 1` or the stars paint over it. Colours come
+  from the variables in `:root` (`--accent` ice blue, `--accent-2` violet,
+  `--accent-3` rose) - do not reintroduce flat greys.
 
 ## Commands
 

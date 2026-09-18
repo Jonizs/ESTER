@@ -26,6 +26,13 @@ export function createInventory() {
       counts.set(item, this.count(item) + amount);
     },
 
+    /** Spend items. Returns false, changing nothing, if there are too few. */
+    take(item, amount = 1) {
+      if (this.count(item) < amount) return false;
+      counts.set(item, this.count(item) - amount);
+      return true;
+    },
+
     /** Only what is actually held, for the panel: [{ item, label, count }]. */
     entries() {
       return Object.keys(ITEMS)
