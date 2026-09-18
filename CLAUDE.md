@@ -4,12 +4,21 @@
 
 Always immediately push all changes to main on github https://github.com/Jonizs/ESTER
 
-The working copy on Jonas's machine lives at `C:\Users\jonas\Desktop\ESTER`.
-Claude runs in a remote container and cannot write to that folder directly, so
-after every push tell Jonas to double-click `UPDATE.bat` there - it pulls
-origin/main, installs any new dependencies and rebuilds. If `WATCH.bat` is
-already running in that folder it picks the push up on its own within ~10
-seconds, so there is nothing to tell him.
+Jonas works on more than one machine, and every launcher resolves its own
+location (`%~dp0`, `$PSScriptRoot`), so the clone can live in any folder -
+nothing is tied to a particular path. Known clones so far:
+
+- `C:\Users\jonas\Desktop\ESTER`
+- `C:\Users\TEMP.KVDG.034\Desktop\ester`
+
+Claude runs in a remote container and cannot write to any of them, so after
+every push tell Jonas to double-click `UPDATE.bat` in whichever clone he is
+using - it pulls origin/main, installs any new dependencies and rebuilds. If
+`WATCH.bat` is running there it picks the push up on its own within ~10
+seconds. A fresh machine needs `git clone` once, then `SETUP.bat`.
+
+Saved colonies live in the browser/Electron profile of the machine they were
+played on, so they do not travel between clones.
 
 ## LAZER prototype
 

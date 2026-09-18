@@ -23,7 +23,7 @@
   powershell -ExecutionPolicy Bypass -File scripts\watch-pull.ps1
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File scripts\watch-pull.ps1 -Path C:\Users\jonas\Desktop\ESTER -IntervalSeconds 30
+  powershell -ExecutionPolicy Bypass -File scripts\watch-pull.ps1 -Path C:\path\to\ESTER -IntervalSeconds 30
 #>
 
 [CmdletBinding()]
