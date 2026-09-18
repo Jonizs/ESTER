@@ -44,16 +44,24 @@ To update later, either:
   every 10 seconds and pulls, installs and rebuilds automatically whenever
   something new lands on `main`. Ctrl+C or close the window to stop.
 
+If the game is open when something lands, `WATCH.bat` closes it and reopens it
+on the new build, so a push reaches the screen on its own. It spots both ways
+of running it: the packaged `dist-exe\ESTER.exe` and Electron started from this
+folder (`ESTER.bat`, `npm start`). The packaged executable keeps its own copy of
+the bundle inside it, so when that one is running the watcher repackages it with
+`npm run build:exe` rather than just rebuilding `dist\` - that takes about a
+minute, and the window is shut for it.
+
 `WATCH.bat` only ever fast-forwards. If the folder has uncommitted edits or
 local commits that differ from `origin/main`, it says so and waits rather than
-touching your work. After it rebuilds, restart the game window to see the
-changes.
+touching your work.
 
 Options, if you want to run the watcher by hand:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\watch-pull.ps1 -IntervalSeconds 30
 powershell -ExecutionPolicy Bypass -File scripts\watch-pull.ps1 -NoBuild
+powershell -ExecutionPolicy Bypass -File scripts\watch-pull.ps1 -NoRestart
 ```
 
 ## Running it from source

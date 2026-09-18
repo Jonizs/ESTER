@@ -15,7 +15,9 @@ Claude runs in a remote container and cannot write to any of them, so after
 every push tell Jonas to double-click `UPDATE.bat` in whichever clone he is
 using - it pulls origin/main, installs any new dependencies and rebuilds. If
 `WATCH.bat` is running there it picks the push up on its own within ~10
-seconds. A fresh machine needs `git clone` once, then `SETUP.bat`.
+seconds, and restarts the game on the new build if it is open - including
+repackaging `dist-exe\ESTER.exe` when that is what is running, since the
+packaged app carries its own copy of `dist/`. A fresh machine needs `git clone` once, then `SETUP.bat`.
 
 Nothing in the game is saved to disk, so there is no state to move between
 machines.
