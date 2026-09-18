@@ -10,10 +10,6 @@
   <body>
     <canvas id="viewport"></canvas>
 
-    <div id="hud">
-      <h1>ESTER</h1>
-    </div>
-
     <!-- Stats for the selected agent. Hidden until one is clicked. -->
     <div id="agent-panel" hidden>
       <div class="name">Agent</div>
@@ -48,12 +44,44 @@
 
     <div id="help">
       <div><b>Drag</b> &mdash; orbit</div>
-      <div><b>Wheel</b> / <b>+ -</b> &mdash; zoom</div>
-      <div><b>R</b> &mdash; reset view</div>
-      <div><b>F</b> &mdash; toggle auto-spin</div>
+      <div><b>Wheel</b> / <b data-help="zoomIn"></b> <b data-help="zoomOut"></b> &mdash; zoom</div>
+      <div><b>Esc</b> &mdash; menu</div>
+      <div><b data-help="resetView"></b> &mdash; reset view</div>
+      <div><b data-help="autoSpin"></b> &mdash; toggle auto-spin</div>
       <div><b>Click the agent</b> &mdash; select it</div>
       <div><b>Right click</b> &mdash; deselect</div>
       <div><b>Click</b> &mdash; send it there, or set it on a tree or rock</div>
+    </div>
+
+    <div id="menu" hidden>
+      <div class="panel">
+        <section data-page="main">
+          <h2>Paused</h2>
+
+          <label class="setting" for="camera-speed">
+            <span>Camera speed</span>
+            <input id="camera-speed" type="range" />
+            <span id="camera-speed-value" class="value"></span>
+          </label>
+
+          <div class="buttons">
+            <button type="button" id="menu-keybinds">KEYBINDS</button>
+            <button type="button" id="menu-defaults">RESET TO DEFAULTS</button>
+            <button type="button" id="menu-resume">RESUME</button>
+            <button type="button" id="menu-leave" class="danger">LEAVE GAME</button>
+          </div>
+        </section>
+
+        <section data-page="keybinds" hidden>
+          <h2>Keybinds</h2>
+          <p class="hint">Click a key to rebind it. Esc goes back.</p>
+          <div id="keybind-list"></div>
+          <div class="keybind fixed"><span>Menu</span><span class="key">Esc</span></div>
+          <div class="buttons">
+            <button type="button" id="menu-back">BACK</button>
+          </div>
+        </section>
+      </div>
     </div>
 
     <div id="loading">booting ESTER&hellip;</div>

@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 
 const isDev = process.env.ESTER_DEV === '1';
 
@@ -16,7 +16,8 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      backgroundThrottling: false
+      backgroundThrottling: false,
+      preload: path.join(__dirname, 'preload.cjs')
     }
   });
 
@@ -37,6 +38,9 @@ function createWindow() {
     if (input.key === 'Escape' && win.isFullScreen()) win.setFullScreen(false);
   });
 }
+
+// LEAVE GAME in the pause menu.
+ipcMain.on('ester:quit', () => app.quit());
 
 app.whenReady().then(() => {
   createWindow();

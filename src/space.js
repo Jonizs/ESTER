@@ -65,7 +65,7 @@ export function createSpace(scene) {
   const sun = new THREE.DirectionalLight(0xfff0d4, 2.4);
   sun.position.set(48, 62, 34);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(4096, 4096);
 
   // The frustum is wrapped tightly around the isle. At +/-40 most of the
   // shadow map was spent on empty void, leaving too few texels on the ground.
@@ -79,9 +79,12 @@ export function createSpace(scene) {
   // Blocky geometry self-shadows badly with a depth bias alone - it showed up
   // as hard dark half-quad triangles across flat ground. normalBias offsets
   // the lookup along the surface normal instead, which suits unit cubes.
-  sun.shadow.bias = -0.0002;
-  sun.shadow.normalBias = 0.06;
-  sun.shadow.radius = 2.5;
+  // At 4096 a texel is half the size, so the same protection needs about half
+  // the world-space offset - and a smaller offset leaks less light back in
+  // where a wall meets the ground.
+  sun.shadow.bias = -0.0003;
+  sun.shadow.normalBias = 0.03;
+  sun.shadow.radius = 2;
   scene.add(sun);
 
   // Cool bounce from the void below, so the underside is not pitch black.

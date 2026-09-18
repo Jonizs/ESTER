@@ -96,6 +96,7 @@ On Linux/macOS use `./ester.sh` instead of the `.bat` files.
 | **Click** a tree or rock | It walks over and works on it - the target glows yellow until it arrives |
 | **Click** the ground | It walks there - a green wave pulses where you clicked |
 | **Right click** | Deselect the agent |
+| `Esc` | Pause menu: camera speed, keybinds, leave game |
 | Drag / arrow keys | Orbit the island - unlimited, all axes |
 | Wheel / `+` `-` | Zoom |
 | `R` | Reset the view |

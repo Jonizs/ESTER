@@ -49,9 +49,12 @@ with one inhabitant who walks around and works on what is there.
   - `src/noise.js` - deterministic value noise.
   - `src/props.js` - the few trees and rocks, and the yellow target tint.
   - `src/markers.js` - the ground-click wave, pooled expanding rings.
+  - `src/settings.js` - camera speed and keybinds, held in memory only.
+  - `src/menu.js` - the Esc pause menu and its keybind page.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
   - `src/path.js` - A* across the surface cells.
-- **Desktop shell:** `electron/main.cjs`.
+- **Desktop shell:** `electron/main.cjs`, with `electron/preload.cjs`
+  exposing just `window.ester.quit()` for the menu's LEAVE GAME.
 - **Web deploy:** `.github/workflows/deploy-pages.yml` builds and publishes
   `dist/` to GitHub Pages on every push to `main`
   (https://jonizs.github.io/ESTER/). Vite's `base` is `'./'` so the same
@@ -75,6 +78,14 @@ with one inhabitant who walks around and works on what is there.
   so keying bedrock off `bottom` painted the whole island body bedrock and
   produced zero stone. Bedrock is now limited to the deepest few blocks of
   the whole isle; everything under the soil is stone.
+- **The camera keeps itself out of the ground.** The orbit target sits inside
+  the isle, so this cannot be a ray cast outward from it - that hits terrain
+  immediately. `_clearOfBlocks` in `orbitCamera.js` samples the camera's own
+  position against `island.userData.isSolid` and walks the distance out until
+  it is clear, leaving `targetDistance` alone so the zoom springs back.
+- **Per-block shade only ever darkens.** The shade multiplier is capped at 1:
+  multiplying a layer colour above it pushed the brightest blocks past what
+  the tone mapping holds and they clipped out as hard bright slivers.
 - **Keep the fill lights near neutral.** Saturated blue rim and ambient
   light stains the flanks and the stone stops reading as stone.
 - **Keep the heightmap free of single-cell pits.** Rounding the noise creates

@@ -165,7 +165,10 @@ export function createIsland() {
       mesh.setMatrixAt(i, matrix);
 
       // Per-block shade variation so flat faces do not read as one slab.
-      const shade = 0.86 + 0.28 * rand(Math.imul(cell.x, 73856093) ^ Math.imul(cell.y, 19349663) ^ Math.imul(cell.z, 83492791), SEED);
+      // It only ever darkens: multiplying a layer colour above 1 pushed the
+      // brightest blocks past what the tone mapping can hold, and they clipped
+      // out as hard bright slivers against their neighbours.
+      const shade = 0.90 + 0.10 * rand(Math.imul(cell.x, 73856093) ^ Math.imul(cell.y, 19349663) ^ Math.imul(cell.z, 83492791), SEED);
       tint.setHex(spec.color).multiplyScalar(shade);
       mesh.setColorAt(i, tint);
     });
@@ -180,6 +183,15 @@ export function createIsland() {
     .filter(([name]) => !name.endsWith(CORE_SUFFIX))
     .reduce((n, [, list]) => n + list.length, 0);
   group.userData.surface = surface;
+
+  // Is this block coordinate inside the isle? Every column is solid from its
+  // bottom to its top, so the columns map answers it without a voxel set.
+  // The camera uses it to keep itself out of the ground.
+  group.userData.isSolid = (x, y, z) => {
+    const column = columns.get(`${x},${z}`);
+    return !!column && y >= column.bottom && y <= column.top;
+  };
+
   return group;
 }
 

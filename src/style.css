@@ -26,24 +26,11 @@ html, body {
 
 #viewport.dragging { cursor: grabbing; }
 
-#hud, #help, #loading, #agent-panel {
+#help, #loading, #agent-panel {
   position: fixed;
   user-select: none;
   pointer-events: none;
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
-}
-
-#hud {
-  top: 22px;
-  left: 26px;
-}
-
-#hud h1 {
-  margin: 0;
-  font-size: 30px;
-  font-weight: 600;
-  letter-spacing: 0.42em;
-  color: var(--ink);
 }
 
 #help {
@@ -116,7 +103,7 @@ html, body {
 
 /* Selected agent's stats, top left under the title. */
 #agent-panel {
-  top: 78px;
+  top: 22px;
   left: 26px;
   width: 218px;
   padding: 12px 14px 13px;
@@ -182,4 +169,128 @@ html, body {
   display: flex;
   justify-content: space-between;
   gap: 8px;
+}
+
+/* --- pause menu ---------------------------------------------------------- */
+
+#menu {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgba(4, 5, 10, 0.72);
+  backdrop-filter: blur(3px);
+  user-select: none;
+}
+
+#menu[hidden] { display: none; }
+
+#menu .panel {
+  width: 340px;
+  padding: 22px 24px 24px;
+  border-radius: 14px;
+  background: rgba(8, 12, 22, 0.94);
+  border: 1px solid rgba(122, 215, 255, 0.3);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+}
+
+#menu h2 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+#menu .hint {
+  margin: -8px 0 14px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+#menu .setting {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+#menu .setting .value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+#menu .setting input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+#menu .buttons {
+  display: grid;
+  gap: 8px;
+}
+
+#menu button {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(122, 215, 255, 0.28);
+  background: rgba(122, 215, 255, 0.08);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+
+#menu button:hover { background: rgba(122, 215, 255, 0.18); }
+
+#menu button.danger {
+  border-color: rgba(232, 100, 106, 0.4);
+  background: rgba(232, 100, 106, 0.1);
+}
+
+#menu button.danger:hover { background: rgba(232, 100, 106, 0.22); }
+
+#menu .keybind {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+#menu .keybind .key {
+  min-width: 78px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(233, 241, 255, 0.18);
+  background: rgba(233, 241, 255, 0.06);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  cursor: pointer;
+}
+
+#menu .keybind .key.listening {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#menu .keybind.fixed {
+  margin-bottom: 16px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(233, 241, 255, 0.1);
+}
+
+#menu .keybind.fixed .key {
+  cursor: default;
+  opacity: 0.6;
 }

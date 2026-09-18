@@ -5,6 +5,8 @@ import { OrbitCamera } from './orbitCamera.js';
 import { createProps, setPropHighlight, GROUND_OFFSET } from './props.js';
 import { Person } from './person.js';
 import { createMarkers } from './markers.js';
+import { createSettings, keyLabel } from './settings.js';
+import { createMenu } from './menu.js';
 
 const canvas = document.getElementById('viewport');
 
@@ -77,20 +79,56 @@ function finishProp(prop) {
 
 // --- controls --------------------------------------------------------------
 
+const settings = createSettings();
+
 const controls = new OrbitCamera(camera, canvas, {
   target: new THREE.Vector3(0, 1, 0),
   distance: ISLAND_RADIUS * 2.1,
   minDistance: ISLAND_RADIUS * 0.5,
   maxDistance: ISLAND_RADIUS * 14,
   autoSpin: false,
-  pitch: 0.5
+  pitch: 0.5,
+  isSolid: island.userData.isSolid,
+  settings
 });
+
+// --- pause menu ------------------------------------------------------------
+
+const menu = createMenu({
+  settings,
+  controls,
+  onLeave: leaveGame,
+  onChange: showBindingsInHelp
+});
+
+// The corner hints name whatever the keys are bound to now, so rebinding
+// something does not leave the help lying about it.
+function showBindingsInHelp() {
+  for (const slot of document.querySelectorAll('#help [data-help]')) {
+    slot.textContent = keyLabel(settings.bindings[slot.dataset.help]);
+  }
+}
+
+showBindingsInHelp();
+
+// The menu owns the keyboard while it is open.
+controls.keyboardBlocked = () => menu.isOpen();
+
+function leaveGame() {
+  // The desktop build can actually quit; in a browser tab all that can be
+  // done is close the window, which only works if the page opened it.
+  if (window.ester?.quit) { window.ester.quit(); return; }
+  window.close();
+  // Still here, so the browser refused: say so rather than do nothing.
+  document.getElementById('menu').querySelector('#menu-leave').textContent = 'CLOSE THIS TAB TO LEAVE';
+}
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let press = null;
 
 canvas.addEventListener('pointerdown', (e) => {
+  if (menu.isOpen()) return;
   press = { x: e.clientX, y: e.clientY, t: performance.now(), button: e.button };
 });
 
@@ -250,5 +288,5 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { scene, camera, renderer, controls, island, person, props, surface, markers, raycaster, THREE };
+window.ESTER = { scene, camera, renderer, controls, island, person, props, surface, markers, menu, settings, raycaster, THREE };
 Object.defineProperty(window.ESTER, 'targeted', { get: () => targeted });
