@@ -88,8 +88,10 @@ with one inhabitant who walks around and works on what is there.
   rasteriser can let a sliver of what is behind through, and against a shaded
   wall that is the lit ground beyond - it reads as a bright dash at the foot
   of the wall, one per block. Block centres stay on whole numbers, so nothing
-  else has to know. This does not reproduce headlessly: SwiftShader does not
-  show it, so judge any change to it on a real GPU.
+  else has to know. This does not reproduce headlessly, even though SwiftShader
+  does run 4x MSAA like a real GPU - judge any change to it on real hardware.
+  `src/debug.js` exists for exactly that: `ESTER.debug.flat()` drops all
+  lighting, so anything bright that survives it is geometry, not light.
 - **Per-block shade only ever darkens.** The shade multiplier is capped at 1:
   multiplying a layer colour above it pushed the brightest blocks past what
   the tone mapping holds and they clipped out as hard bright slivers.

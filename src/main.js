@@ -7,6 +7,7 @@ import { Person } from './person.js';
 import { createMarkers } from './markers.js';
 import { createSettings, keyLabel } from './settings.js';
 import { createMenu } from './menu.js';
+import { createDebug } from './debug.js';
 
 const canvas = document.getElementById('viewport');
 
@@ -289,4 +290,5 @@ console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props
 
 // Handle for the devtools console (F12) and for automated testing.
 window.ESTER = { scene, camera, renderer, controls, island, person, props, surface, markers, menu, settings, raycaster, THREE };
+window.ESTER.debug = createDebug({ renderer, scene, island, props });
 Object.defineProperty(window.ESTER, 'targeted', { get: () => targeted });
