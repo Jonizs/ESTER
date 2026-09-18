@@ -60,6 +60,11 @@ island adrift in the void.
   - `input.js` - selection, right-click designation, build placement.
   - `ui.js` - the HUD (plain DOM over the canvas).
 - **Desktop shell:** `electron/main.cjs`.
+- **Web deploy:** `.github/workflows/deploy-pages.yml` builds and publishes
+  `dist/` to GitHub Pages on every push to `main`
+  (https://jonizs.github.io/ESTER/). Vite's `base` is `'./'` so the same
+  bundle works from the Pages subpath and from `file://` inside Electron -
+  do not change it to an absolute path.
 
 ## Simulation rules that are easy to break
 

@@ -6,6 +6,15 @@ study and fight. Every seventh day something comes for them.
 
 ![stage](https://img.shields.io/badge/stage-prototype-blue)
 
+## Play in the browser
+
+The game is deployed to GitHub Pages on every push to `main`:
+
+**https://jonizs.github.io/ESTER/**
+
+It is the same build as the desktop app - colonies save to that browser's
+local storage, so a browser colony and a desktop colony are separate saves.
+
 ## Getting started on Windows
 
 Open PowerShell and clone the repo somewhere you keep projects (not
