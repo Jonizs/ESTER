@@ -67,23 +67,27 @@ export function createSpace(scene) {
   sun.castShadow = true;
   sun.shadow.mapSize.set(4096, 4096);
 
-  // The frustum is wrapped tightly around the isle. At +/-40 most of the
-  // shadow map was spent on empty void, leaving too few texels on the ground.
+  // The frustum is wrapped around the isle. At +/-40 most of the shadow map
+  // was spent on empty void, leaving too few texels on the ground - but +/-22
+  // was tighter than the isle itself: its bounding sphere is about 25 across,
+  // so the far corners fell outside the map and came out unshadowed.
   sun.shadow.camera.near = 40;
   sun.shadow.camera.far = 140;
-  sun.shadow.camera.left = -22;
-  sun.shadow.camera.right = 22;
-  sun.shadow.camera.top = 22;
-  sun.shadow.camera.bottom = -22;
+  sun.shadow.camera.left = -26;
+  sun.shadow.camera.right = 26;
+  sun.shadow.camera.top = 26;
+  sun.shadow.camera.bottom = -26;
 
-  // Blocky geometry self-shadows badly with a depth bias alone - it showed up
-  // as hard dark half-quad triangles across flat ground. normalBias offsets
-  // the lookup along the surface normal instead, which suits unit cubes.
-  // At 4096 a texel is half the size, so the same protection needs about half
-  // the world-space offset - and a smaller offset leaks less light back in
-  // where a wall meets the ground.
-  sun.shadow.bias = -0.0003;
-  sun.shadow.normalBias = 0.03;
+  // No normalBias. Three.js already fills the shadow map from back faces for
+  // a FrontSide material, so a surface cannot shadow itself and there is no
+  // acne for a normal offset to protect against - measuring it confirmed that
+  // dropping it from 0.06 to 0 leaves acne unchanged. What it did do was push
+  // the shadow lookup off the surface at a wall's foot, letting a hairline of
+  // sunlight through between the wall and its own shadow: the bright dashes
+  // along the bottom of every shaded wall. Keep the depth bias to a whisper
+  // for the same reason.
+  sun.shadow.bias = -0.0001;
+  sun.shadow.normalBias = 0;
   sun.shadow.radius = 2;
   scene.add(sun);
 

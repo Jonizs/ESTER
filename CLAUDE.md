@@ -102,10 +102,17 @@ with one inhabitant who walks around and works on what is there.
   blotches on open ground. `island.js` runs two median passes over the
   columns to remove them - check `isolatedPits` is still 0 after touching
   terrain generation.
-- **Blocky geometry needs `shadow.normalBias`.** With a depth bias alone the
-  island self-shadows into dark half-quad triangles. The sun uses
-  `normalBias: 0.06` and a frustum wrapped tightly around the isle; widening
-  that frustum wastes shadow texels and the acne comes back.
+- **The sun uses no `shadow.normalBias`, on purpose.** Three.js fills the
+  shadow map from back faces for a FrontSide material (`three.module.js`,
+  `shadowSide[ FrontSide ] = BackSide`), so a surface cannot shadow itself and
+  there is no acne for a normal offset to guard against - measured, 0.06 and 0
+  give the same speckle count. What it did do was push the lookup off the
+  surface at a wall's foot and let a hairline of sun through between a wall
+  and its own shadow, which is what the bright dashes along shaded walls were.
+  Keep `bias` to a whisper for the same reason.
+- **The shadow frustum must cover the isle.** It is +/-26: the isle's bounding
+  sphere is about 25 across, and at +/-22 the far corners fell outside the
+  shadow map and came out unshadowed. Do not wrap it tighter than the isle.
 
 - **Nothing in the scene drifts.** The island does not bob or rotate, the
   stars do not turn, and there is no debris belt. Idle motion was removed on
