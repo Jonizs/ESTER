@@ -95,6 +95,7 @@ On Linux/macOS use `./ester.sh` instead of the `.bat` files.
 | **Click** the agent | Select it - a ring marks it and its stats open top left |
 | **Click** a tree or rock | It walks over and works on it |
 | **Click** the ground | It walks there |
+| **Right click** | Deselect the agent |
 | Drag / arrow keys | Orbit the island - unlimited, all axes |
 | Wheel / `+` `-` | Zoom |
 | `R` | Reset the view |
@@ -108,7 +109,7 @@ and nothing is shown while it walks or stands idle.
 
 Selecting the agent opens a panel top left with its current activity and time
 left, its Health, Food, Water and Happiness meters, and its Education, Tool and
-Mastery - all three of which start as None.
+Mastery - all three of which start as None. Right click anywhere to deselect.
 
 ## What's in the scene
 

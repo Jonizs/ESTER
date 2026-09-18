@@ -70,17 +70,20 @@ const pointer = new THREE.Vector2();
 let press = null;
 
 canvas.addEventListener('pointerdown', (e) => {
-  press = { x: e.clientX, y: e.clientY, t: performance.now() };
+  press = { x: e.clientX, y: e.clientY, t: performance.now(), button: e.button };
 });
 
 canvas.addEventListener('pointerup', (e) => {
   const started = press;
   press = null;
-  if (!started) return;
+  if (!started || e.button !== started.button) return;
   // Anything more than a nudge was the camera being dragged, not a click.
   if (Math.hypot(e.clientX - started.x, e.clientY - started.y) > 6) return;
   if (performance.now() - started.t > 500) return;
-  handleClick(e);
+
+  // Right click clears the selection, wherever it lands.
+  if (started.button === 2) { person.setSelected(false); return; }
+  if (started.button === 0) handleClick(e);
 });
 
 function handleClick(event) {
