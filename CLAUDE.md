@@ -57,6 +57,20 @@ with one inhabitant who walks around and works on what is there.
 
 ## Rules that are easy to break
 
+- **The ground is `y + 0.5`, not `y + 1`.** Island blocks are unit cubes
+  *centred* on their cell coordinate, so a column whose top block is at `y`
+  has its walkable face half a block higher. Use `GROUND_OFFSET` from
+  `props.js`; `y + 1` leaves everything hovering.
+- **Keep the heightmap free of single-cell pits.** Rounding the noise creates
+  one-block dents whose walls face away from the sun and read as hard dark
+  blotches on open ground. `island.js` runs two median passes over the
+  columns to remove them - check `isolatedPits` is still 0 after touching
+  terrain generation.
+- **Blocky geometry needs `shadow.normalBias`.** With a depth bias alone the
+  island self-shadows into dark half-quad triangles. The sun uses
+  `normalBias: 0.06` and a frustum wrapped tightly around the isle; widening
+  that frustum wastes shadow texels and the acne comes back.
+
 - **Nothing in the scene drifts.** The island does not bob or rotate, the
   stars do not turn, and there is no debris belt. Idle motion was removed on
   request - do not reintroduce it.

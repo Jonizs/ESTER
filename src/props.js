@@ -8,6 +8,10 @@ import { rand } from './noise.js';
 
 const SEED = 20260918;
 
+// Island blocks are unit cubes centred on their cell, so their top face - the
+// ground everything stands on - is half a block above the cell's y.
+export const GROUND_OFFSET = 0.5;
+
 export const PROP_KINDS = {
   tree:   { label: 'tree',   action: 'Chopping wood',    seconds: 6 },
   rock:   { label: 'rock',   action: 'Breaking stone',   seconds: 7 },
@@ -49,7 +53,7 @@ export function createProps(surface, scene) {
 
       const [x, z] = cell;
       const mesh = buildProp(kind, salt);
-      mesh.position.set(x, surface.get(`${x},${z}`) + 1, z);
+      mesh.position.set(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
       group.add(mesh);
 
       const prop = { id: `${kind}${i}`, kind, x, z, mesh, gone: false };

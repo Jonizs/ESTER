@@ -31,7 +31,8 @@ export function createIsland() {
   // "x,z" -> y of the topmost block: the ground anything on the isle stands on.
   const surface = new Map();
 
-  // --- Pass 1: decide which cells are solid -------------------------------
+  // --- Pass 1: height of each column --------------------------------------
+  const columns = new Map();
   for (let x = -RADIUS; x <= RADIUS; x++) {
     for (let z = -RADIUS; z <= RADIUS; z++) {
       const dist = Math.hypot(x, z);
@@ -56,12 +57,36 @@ export function createIsland() {
       const jitter = fbm2(x * 0.19, z * 0.19, 2, SEED + 23);
       const bottom = -Math.round(1 + bulk * 11 + jitter * 2);
 
-      surface.set(`${x},${z}`, top);
+      columns.set(`${x},${z}`, { x, z, top, bottom });
+    }
+  }
 
-      for (let y = bottom; y <= top; y++) {
-        filled.add(key(x, y, z));
-        cells.push({ x, y, z, top, bottomOf: bottom });
+  // --- Pass 1b: flatten out single-cell pits and spikes --------------------
+  // Rounding the noise leaves isolated one-block dents. Their side walls face
+  // away from the sun and read as hard dark blotches on otherwise open ground,
+  // so a median pass over each column's neighbourhood smooths them away while
+  // leaving the broad hills and ridges intact.
+  for (let pass = 0; pass < 2; pass++) {
+    const smoothed = new Map();
+    for (const [cellKey, column] of columns) {
+      const heights = [column.top];
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const neighbour = columns.get(`${column.x + dx},${column.z + dz}`);
+        if (neighbour) heights.push(neighbour.top);
       }
+      heights.sort((a, b) => a - b);
+      smoothed.set(cellKey, heights[Math.floor(heights.length / 2)]);
+    }
+    for (const [cellKey, top] of smoothed) columns.get(cellKey).top = top;
+  }
+
+  // --- Pass 1c: stack the blocks ------------------------------------------
+  for (const { x, z, top, bottom } of columns.values()) {
+    surface.set(`${x},${z}`, top);
+
+    for (let y = bottom; y <= top; y++) {
+      filled.add(key(x, y, z));
+      cells.push({ x, y, z, top, bottomOf: bottom });
     }
   }
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { findPath } from './path.js';
-import { PROP_KINDS } from './props.js';
+import { PROP_KINDS, GROUND_OFFSET } from './props.js';
 
 const WALK_SPEED = 2.2;        // cells per second
 
@@ -28,7 +28,7 @@ export class Person {
 
   groundAt(x, z) {
     const h = this.surface.get(`${x},${z}`);
-    return h === undefined ? this.pos?.y ?? 0 : h + 1;
+    return h === undefined ? this.pos?.y ?? 0 : h + GROUND_OFFSET;
   }
 
   /** Send them to a cell. Returns false if there is no way there. */

@@ -66,13 +66,22 @@ export function createSpace(scene) {
   sun.position.set(48, 62, 34);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 220;
-  sun.shadow.camera.left = -40;
-  sun.shadow.camera.right = 40;
-  sun.shadow.camera.top = 40;
-  sun.shadow.camera.bottom = -40;
-  sun.shadow.bias = -0.0008;
+
+  // The frustum is wrapped tightly around the isle. At +/-40 most of the
+  // shadow map was spent on empty void, leaving too few texels on the ground.
+  sun.shadow.camera.near = 40;
+  sun.shadow.camera.far = 140;
+  sun.shadow.camera.left = -22;
+  sun.shadow.camera.right = 22;
+  sun.shadow.camera.top = 22;
+  sun.shadow.camera.bottom = -22;
+
+  // Blocky geometry self-shadows badly with a depth bias alone - it showed up
+  // as hard dark half-quad triangles across flat ground. normalBias offsets
+  // the lookup along the surface normal instead, which suits unit cubes.
+  sun.shadow.bias = -0.0002;
+  sun.shadow.normalBias = 0.06;
+  sun.shadow.radius = 2.5;
   scene.add(sun);
 
   // Cool bounce from the void below, so the underside is not pitch black.
@@ -85,8 +94,10 @@ export function createSpace(scene) {
   underglow.position.set(0, -50, 8);
   scene.add(underglow);
 
-  scene.add(new THREE.HemisphereLight(0x8fb6ff, 0x1a2444, 0.6));
-  scene.add(new THREE.AmbientLight(0x243056, 0.6));
+  // Fill, so the block faces turned away from the sun read as shaded stone
+  // rather than as black holes in the ground.
+  scene.add(new THREE.HemisphereLight(0x9cc0ff, 0x2a3350, 0.75));
+  scene.add(new THREE.AmbientLight(0x35406b, 0.75));
 
   return {
     sun,
