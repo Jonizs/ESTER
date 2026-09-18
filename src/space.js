@@ -78,16 +78,12 @@ export function createSpace(scene) {
   sun.shadow.camera.top = 26;
   sun.shadow.camera.bottom = -26;
 
-  // No normalBias. Three.js already fills the shadow map from back faces for
-  // a FrontSide material, so a surface cannot shadow itself and there is no
-  // acne for a normal offset to protect against - measuring it confirmed that
-  // dropping it from 0.06 to 0 leaves acne unchanged. What it did do was push
-  // the shadow lookup off the surface at a wall's foot, letting a hairline of
-  // sunlight through between the wall and its own shadow: the bright dashes
-  // along the bottom of every shaded wall. Keep the depth bias to a whisper
-  // for the same reason.
+  // Casters fill the shadow map from their FRONT faces - see `shadowSide` in
+  // main.js, which is what makes this normalBias the right one. Front-face
+  // casting lets a surface shadow itself, so the normal offset is doing real
+  // work here; 0.02 is enough at 4096 and was checked on hardware.
   sun.shadow.bias = -0.0001;
-  sun.shadow.normalBias = 0;
+  sun.shadow.normalBias = 0.02;
   sun.shadow.radius = 2;
   scene.add(sun);
 
