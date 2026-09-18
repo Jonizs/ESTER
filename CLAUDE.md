@@ -83,6 +83,13 @@ with one inhabitant who walks around and works on what is there.
   immediately. `_clearOfBlocks` in `orbitCamera.js` samples the camera's own
   position against `island.userData.isSolid` and walks the distance out until
   it is clear, leaving `targetDistance` alone so the zoom springs back.
+- **Island cubes are drawn a hair oversized** (`SEAM_OVERLAP` in `island.js`)
+  so neighbours overlap rather than meeting edge to edge. At an exact seam the
+  rasteriser can let a sliver of what is behind through, and against a shaded
+  wall that is the lit ground beyond - it reads as a bright dash at the foot
+  of the wall, one per block. Block centres stay on whole numbers, so nothing
+  else has to know. This does not reproduce headlessly: SwiftShader does not
+  show it, so judge any change to it on a real GPU.
 - **Per-block shade only ever darkens.** The shade multiplier is capped at 1:
   multiplying a layer colour above it pushed the brightest blocks past what
   the tone mapping holds and they clipped out as hard bright slivers.

@@ -2,6 +2,16 @@ import * as THREE from 'three';
 import { fbm2, noise2, rand } from './noise.js';
 
 const BLOCK = 1;
+
+// Neighbouring blocks sit exactly one unit apart, so a unit cube meets the
+// next one edge to edge with nothing to spare. At that seam the rasteriser
+// has two surfaces claiming the same pixel and can let a sliver of whatever
+// is behind through - against a shaded wall that is the brightly lit ground
+// beyond, which reads as a hard bright dash at the foot of the wall, one per
+// block. Drawing each cube a hair oversized makes neighbours overlap instead
+// of meeting, which closes the seam. Positions stay on whole numbers, so
+// nothing else in the game has to know.
+const SEAM_OVERLAP = 0.004;
 const RADIUS = 15;
 const SEED = 20260917;
 
@@ -138,7 +148,8 @@ export function createIsland() {
   }
 
   // --- Pass 3: one InstancedMesh per layer -------------------------------
-  const geometry = new THREE.BoxGeometry(BLOCK, BLOCK, BLOCK);
+  const size = BLOCK + SEAM_OVERLAP;
+  const geometry = new THREE.BoxGeometry(size, size, size);
   const matrix = new THREE.Matrix4();
   const tint = new THREE.Color();
 
