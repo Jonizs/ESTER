@@ -297,6 +297,15 @@ html, body {
 
 #menu button:hover { background: rgba(122, 215, 255, 0.18); }
 
+/* DEV RESET: not dangerous the way leaving is, but not an everyday button
+   either - the violet marks it as the one that throws the run away. */
+#menu button.dev {
+  border-color: rgba(185, 140, 255, 0.45);
+  background: rgba(185, 140, 255, 0.12);
+}
+
+#menu button.dev:hover { background: rgba(185, 140, 255, 0.24); }
+
 #menu button.danger {
   border-color: rgba(232, 100, 106, 0.4);
   background: rgba(232, 100, 106, 0.1);
@@ -1022,6 +1031,16 @@ html, body {
   border-color: var(--edge-lit);
   background: linear-gradient(180deg, rgba(138, 216, 255, 0.24), rgba(185, 140, 255, 0.16));
   box-shadow: 0 0 22px rgba(138, 216, 255, 0.22);
+}
+
+#menu button.dev {
+  border-color: rgba(185, 140, 255, 0.5);
+  background: linear-gradient(180deg, rgba(185, 140, 255, 0.26), rgba(185, 140, 255, 0.08));
+}
+
+#menu button.dev:hover {
+  background: linear-gradient(180deg, rgba(185, 140, 255, 0.4), rgba(185, 140, 255, 0.16));
+  box-shadow: 0 0 22px rgba(185, 140, 255, 0.3);
 }
 
 #menu button.danger {

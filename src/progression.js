@@ -10,6 +10,12 @@ export function createProgression() {
     quest: null,       // { title, progress: 0..1 } once there are quests
     stage: null,       // { number, name } once there are stages
 
+    /** Back to the start of a run. */
+    reset() {
+      this.quest = null;
+      this.stage = null;
+    },
+
     /** 0-100, as the panels show it. */
     get questPercent() {
       return Math.round((this.quest?.progress ?? 0) * 100);

@@ -151,9 +151,22 @@ with one inhabitant who walks around and works on what is there.
 - **Every prop builds its own materials**, which is why the yellow tint can be
   written straight onto them. If props are ever switched to shared materials
   or an `InstancedMesh`, highlighting has to change with it.
-- **Props must not block pathing.** `path.js` only refuses steps of more than
-  one block of height; keeping props walkable avoids pockets the agent can
-  never leave.
+- **Props must not block pathing, with one exception.** `path.js` refuses
+  steps of more than one block of height, and refuses the cells in its
+  `blocked` set; everything else is walkable, which is what keeps the isle
+  free of pockets the agent can never leave. Only props whose kind is marked
+  `solid` in `PROP_KINDS` go into `blocked` - today that is the workbench
+  alone. Before marking anything else solid, sweep the isle and check every
+  cell is still reachable; trees and rocks standing in a line would wall a
+  corner off.
+- **The workbench is walked around, corners included.** Its cell is in
+  `blocked`, so `walkTo` on it returns false and a route never crosses it -
+  and the diagonal check refuses a step whose shoulders are blocked too, so
+  the agent does not shave the corner of a bench that overhangs its cell.
+  `workOn` still works: it asks for an *adjacent* goal, which the search
+  reaches without entering the cell. The cell the agent is standing on is
+  always treated as open, so a cell turning solid underneath it is never a
+  trap.
 - **Pathing is eight-way.** Diagonals cost `SQRT2` and the heuristic is octile,
   not manhattan - a manhattan heuristic overestimates once diagonals exist and
   stops A* returning the shortest route. A diagonal also checks the two cells
@@ -217,6 +230,15 @@ with one inhabitant who walks around and works on what is there.
   `position: relative; z-index: 1` or the stars paint over it. Colours come
   from the variables in `:root` (`--accent` ice blue, `--accent-2` violet,
   `--accent-3` rose) - do not reintroduce flat greys.
+
+- **DEV RESET is game state only.** The pause menu's DEV RESET (`devReset` in
+  `main.js`) puts the run back to how it booted - props standing, the
+  workbench broken, the agent home with full needs, nothing held, nothing
+  selected - without reloading the page. It deliberately leaves the keybinds
+  and camera speed alone; RESET TO DEFAULTS beside it is what those have. Each
+  piece owns its own `reset()` (`person.js`, `inventory.js`,
+  `progression.js`), so anything that gains run state should gain one too and
+  be called from `devReset` - otherwise it quietly survives the reset.
 
 ## Commands
 

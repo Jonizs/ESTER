@@ -42,32 +42,44 @@ const DRAIN = { food: 0.18, water: 0.24, happiness: 0.05 };
  *
  * `action` is always a plain sentence, because it is shown on screen.
  */
+const FRESH_STATS = {
+  health: 100,
+  food: 100,
+  water: 100,
+  happiness: 100,
+  education: null,           // none to start with
+  tool: null,                // none to start with
+  mastery: null              // none to start with
+};
+
 export class Person {
-  constructor(surface, startCell, name = 'Ester') {
+  constructor(surface, startCell, { name = 'Ester', blocked } = {}) {
     this.surface = surface;
     this.name = name;                 // shown in the agent list
-    this.x = startCell.x;
-    this.z = startCell.z;
+    this.home = { x: startCell.x, z: startCell.z };   // where a reset puts them
+    this.blocked = blocked ?? new Set();              // cells they cannot enter
+
+    this.mesh = buildMesh();
+    this.highlight = this.mesh.getObjectByName('selection');
+    this.pos = new THREE.Vector3();
+
+    this.reset();
+  }
+
+  /** Back to the start of a run: home, idle, fed, nothing selected. */
+  reset() {
+    this.x = this.home.x;
+    this.z = this.home.z;
 
     this.path = [];
     this.segment = null;       // the step being walked, for the hop arc
     this.task = null;          // { prop, seconds, elapsed }
     this.action = null;        // only set while actually working
-    this.selected = false;
+    this.stats = { ...FRESH_STATS };
 
-    this.stats = {
-      health: 100,
-      food: 100,
-      water: 100,
-      happiness: 100,
-      education: null,         // none to start with
-      tool: null,              // none to start with
-      mastery: null            // none to start with
-    };
-
-    this.mesh = buildMesh();
-    this.highlight = this.mesh.getObjectByName('selection');
-    this.pos = new THREE.Vector3(this.x, this.groundAt(this.x, this.z), this.z);
+    this.setSelected(false);
+    this.mesh.rotation.y = 0;
+    this.pos.set(this.x, this.groundAt(this.x, this.z), this.z);
     this.mesh.position.copy(this.pos);
   }
 
@@ -97,7 +109,7 @@ export class Person {
 
   /** Send them to a cell. Returns false if there is no way there. */
   goTo(cell, { adjacent = false } = {}) {
-    const path = findPath(this.surface, { x: this.x, z: this.z }, cell, { adjacent });
+    const path = findPath(this.surface, { x: this.x, z: this.z }, cell, { adjacent, blocked: this.blocked });
     if (!path) return false;
     this.path = path;
     this.segment = null;       // start the next step from wherever they are

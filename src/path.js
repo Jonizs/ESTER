@@ -4,9 +4,15 @@
  *
  * Movement is eight-way: the agent walks diagonally as well as along the
  * axes, so it does not have to stair-step its way across open ground.
+ *
+ * `blocked` is the set of cells something solid is standing on - the
+ * workbench, today. They are walked around rather than over, corners
+ * included, so the agent never crosses one even diagonally.
  */
 
 const DIAG = Math.SQRT2;
+
+const EMPTY = new Set();
 
 // Eight neighbours, each with what the step costs on flat ground.
 const NEIGHBOURS = [
@@ -24,16 +30,25 @@ const octile = (ax, az, bx, bz) => {
 
 const chebyshev = (ax, az, bx, bz) => Math.max(Math.abs(ax - bx), Math.abs(az - bz));
 
-export function findPath(surface, start, goal, { adjacent = false } = {}) {
+export function findPath(surface, start, goal, { adjacent = false, blocked = EMPTY } = {}) {
   const heightAt = (x, z) => {
     const h = surface.get(`${x},${z}`);
     return h === undefined ? null : h;
   };
 
+  // Where the agent may stand. Wherever it already is always counts, so a
+  // cell that becomes solid underneath it is never a trap.
+  const startKey = `${start.x},${start.z}`;
+  const open_ = (x, z) => {
+    const key = `${x},${z}`;
+    return key === startKey || !blocked.has(key);
+  };
+
   if (heightAt(start.x, start.z) === null) return null;
   if (start.x === goal.x && start.z === goal.z) return [];
+  // Walking onto something solid is not a route, only walking up beside it.
+  if (!adjacent && blocked.has(`${goal.x},${goal.z}`)) return null;
 
-  const startKey = `${start.x},${start.z}`;
   const open = [{ x: start.x, z: start.z, f: 0 }];
   const cameFrom = new Map();
   const gScore = new Map([[startKey, 0]]);
@@ -61,6 +76,7 @@ export function findPath(surface, start, goal, { adjacent = false } = {}) {
       const nz = current.z + dz;
       const there = heightAt(nx, nz);
       if (there === null) continue;
+      if (!open_(nx, nz)) continue;
 
       const climb = Math.abs(there - here);
       if (climb > 1) continue;                  // too steep to step up
@@ -73,6 +89,9 @@ export function findPath(surface, start, goal, { adjacent = false } = {}) {
         const sideA = heightAt(current.x + dx, current.z);
         const sideB = heightAt(current.x, current.z + dz);
         if (sideA === null || sideB === null) continue;
+        // Both shoulders of the diagonal have to be clear too, or the agent
+        // shaves the corner of whatever is standing beside it.
+        if (!open_(current.x + dx, current.z) || !open_(current.x, current.z + dz)) continue;
         if (Math.abs(sideA - here) > 1 || Math.abs(sideB - here) > 1) continue;
         if (Math.abs(sideA - there) > 1 || Math.abs(sideB - there) > 1) continue;
       }

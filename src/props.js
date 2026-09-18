@@ -21,7 +21,9 @@ export const PROP_KINDS = {
     label: 'workbench',
     action: 'Repairing the workbench',
     seconds: 8,
-    cost: { item: 'wood', amount: 10 }
+    cost: { item: 'wood', amount: 10 },
+    // The only prop with a hitbox: it is walked around, not over.
+    solid: true
   }
 };
 
@@ -58,6 +60,10 @@ export function createProps(surface, scene) {
   const props = [];
   const taken = new Set();
 
+  // The cells nothing may walk onto, for `path.js`. Only solid props are in
+  // it, so trees and rocks stay walkable and cannot pen the agent in.
+  const blocked = new Set();
+
   // Cells far enough from the middle to leave the person somewhere to stand.
   const cells = [...surface.keys()]
     .map((key) => key.split(',').map(Number))
@@ -66,7 +72,7 @@ export function createProps(surface, scene) {
   // The workbench goes down first, in the middle, so the scatter below can
   // never land on top of it - the trees and rocks already keep clear of the
   // centre, but the bench is what the run starts at and must be reachable.
-  const bench = addWorkbench(surface, group, props);
+  const bench = addWorkbench(surface, group, props, blocked);
 
   let salt = 0;
   for (const [kind, count] of Object.entries(COUNTS)) {
@@ -103,7 +109,7 @@ export function createProps(surface, scene) {
     }
   }
 
-  return { group, props, workbench: bench };
+  return { group, props, workbench: bench, blocked };
 }
 
 /**
@@ -112,7 +118,7 @@ export function createProps(surface, scene) {
  * that finishing the work repairs it instead of removing it, and once it is
  * repaired clicking it opens the crafting screen.
  */
-function addWorkbench(surface, group, props) {
+function addWorkbench(surface, group, props, blocked) {
   // The middle cell if the isle has one, otherwise the nearest that exists.
   let cell = null;
   let best = Infinity;
@@ -139,6 +145,7 @@ function addWorkbench(surface, group, props) {
 
   setWorkbenchState(prop, false);
   props.push(prop);
+  if (PROP_KINDS[prop.kind].solid) blocked.add(`${prop.x},${prop.z}`);
   return prop;
 }
 

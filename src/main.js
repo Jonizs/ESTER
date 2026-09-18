@@ -38,11 +38,11 @@ const island = createIsland();
 scene.add(island);
 
 const surface = island.userData.surface;
-const { props, workbench } = createProps(surface, scene);
+const { props, workbench, blocked } = createProps(surface, scene);
 
 // --- the person ------------------------------------------------------------
 
-const person = new Person(surface, startingCell());
+const person = new Person(surface, startingCell(), { blocked });
 scene.add(person.mesh);
 
 // Everything the panels read: what has been gathered, and how far along the
@@ -179,8 +179,44 @@ const menu = createMenu({
   settings,
   controls,
   onLeave: leaveGame,
+  onDevReset: devReset,
   onChange: () => { showBindingsInHelp(); panels.showTabs(); }
 });
+
+/**
+ * DEV RESET: the run from 0 again, without reloading the page.
+ *
+ * Everything the run accumulates goes back to how it booted - the isle's
+ * trees and rocks stand again, the workbench is broken again, the agent is
+ * home with full needs, and nothing is held. Settings are deliberately left
+ * alone; RESET TO DEFAULTS beside it is what those have.
+ */
+function devReset() {
+  setTarget(null);
+
+  for (const prop of props) {
+    setPropHighlight(prop, false);
+    if (prop.kind === 'workbench') {
+      setWorkbenchState(prop, false);
+      prop.mesh.traverse((o) => {
+        if (o.material && o.castShadow) o.material.shadowSide = THREE.FrontSide;
+      });
+      continue;
+    }
+    prop.gone = false;
+    prop.mesh.visible = true;
+  }
+
+  person.reset();
+  inventory.reset();
+  progression.reset();
+
+  controls.reset();
+  panels.close();
+  crafting.close();
+  menu.close();
+  toast('Reset. The isle is as it was at boot.');
+}
 
 // The corner hints name whatever the keys are bound to now, so rebinding
 // something does not leave the help lying about it.

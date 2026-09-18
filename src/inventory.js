@@ -26,6 +26,11 @@ export function createInventory() {
       counts.set(item, this.count(item) + amount);
     },
 
+    /** Drop everything, for a fresh run. */
+    reset() {
+      counts.clear();
+    },
+
     /** Spend items. Returns false, changing nothing, if there are too few. */
     take(item, amount = 1) {
       if (this.count(item) < amount) return false;
