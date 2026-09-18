@@ -158,4 +158,4 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { scene, camera, renderer, controls, island, person, props, surface };
+window.ESTER = { scene, camera, renderer, controls, island, person, props, surface, raycaster, THREE };

@@ -61,6 +61,12 @@ with one inhabitant who walks around and works on what is there.
   *centred* on their cell coordinate, so a column whose top block is at `y`
   has its walkable face half a block higher. Use `GROUND_OFFSET` from
   `props.js`; `y + 1` leaves everything hovering.
+- **The island is solid, not a shell.** Buried blocks are kept and layered
+  like the rest, in separate `<layer>:core` instanced meshes that skip the
+  shadow pass - the surface already occludes the light. 4108 blocks total,
+  1370 of them on the surface. 600 rays fired at the isle from all around
+  never hit a core block first, so the fill stays invisible; it costs under
+  1% of frame time.
 - **Layer the island by depth from the surface, not from each column's
   bottom.** The keel's visible faces *are* the bottom blocks of its columns,
   so keying bedrock off `bottom` painted the whole island body bedrock and
@@ -107,7 +113,8 @@ with one inhabitant who walks around and works on what is there.
 
 There is no test runner. Drive the built game in headless Chromium with
 Playwright against `npx vite preview`. `window.ESTER` exposes `scene`,
-`camera`, `controls`, `island`, `person`, `props` and `surface`.
+`camera`, `controls`, `island`, `person`, `props`, `surface`, plus `raycaster`
+and `THREE` for geometry checks.
 
 To check behaviour without waiting on real time, call `person.update(dt,
 props, onFinish)` in a loop rather than sleeping - a whole work cycle then

@@ -14,6 +14,12 @@ const LAYERS = {
   bedrock: { color: 0x5a6173, roughness: 0.8, metalness: 0.06, emissive: 0x16283c, emissiveIntensity: 0.12 }
 };
 
+// Buried blocks are drawn from the same palette, so the isle is layered all
+// the way through rather than being a painted shell around a void. They are
+// split into their own meshes purely so they can skip the shadow pass: the
+// surface already occludes the light, so including them would only cost time.
+const CORE_SUFFIX = ':core';
+
 const key = (x, y, z) => `${x},${y},${z}`;
 
 /**
@@ -93,8 +99,11 @@ export function createIsland() {
     }
   }
 
-  // --- Pass 2: keep only cells with at least one exposed face ------------
-  const buckets = { grass: [], moss: [], dirt: [], stone: [], bedrock: [] };
+  // --- Pass 2: sort every block into a material ---------------------------
+  // The isle is solid. Buried blocks are kept and layered like the rest; they
+  // are simply bucketed separately so they can be drawn without shadows.
+  const buckets = {};
+  const bucketFor = (name) => (buckets[name] ??= []);
 
   for (const cell of cells) {
     const { x, y, z, top } = cell;
@@ -106,8 +115,6 @@ export function createIsland() {
       filled.has(key(x, y - 1, z)) &&
       filled.has(key(x, y, z + 1)) &&
       filled.has(key(x, y, z - 1));
-    if (buried) continue;
-
     const fromTop = top - y;
 
     let layer;
@@ -128,7 +135,7 @@ export function createIsland() {
       layer = 'stone';
     }
 
-    buckets[layer].push(cell);
+    bucketFor(buried ? layer + CORE_SUFFIX : layer).push(cell);
   }
 
   // --- Pass 3: one InstancedMesh per layer -------------------------------
@@ -139,7 +146,8 @@ export function createIsland() {
   for (const [name, list] of Object.entries(buckets)) {
     if (list.length === 0) continue;
 
-    const spec = LAYERS[name];
+    const hidden = name.endsWith(CORE_SUFFIX);
+    const spec = LAYERS[hidden ? name.slice(0, -CORE_SUFFIX.length) : name];
     const material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: spec.roughness,
@@ -150,8 +158,8 @@ export function createIsland() {
 
     const mesh = new THREE.InstancedMesh(geometry, material, list.length);
     mesh.name = `island-${name}`;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.castShadow = !hidden;
+    mesh.receiveShadow = !hidden;
 
     list.forEach((cell, i) => {
       matrix.makeTranslation(cell.x * BLOCK, cell.y * BLOCK, cell.z * BLOCK);
@@ -169,6 +177,9 @@ export function createIsland() {
   }
 
   group.userData.blockCount = Object.values(buckets).reduce((n, l) => n + l.length, 0);
+  group.userData.surfaceBlockCount = Object.entries(buckets)
+    .filter(([name]) => !name.endsWith(CORE_SUFFIX))
+    .reduce((n, [, list]) => n + list.length, 0);
   group.userData.surface = surface;
   return group;
 }
