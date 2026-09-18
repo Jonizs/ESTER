@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import { createIsland, ISLAND_RADIUS } from './island.js';
 import { createSpace } from './space.js';
 import { OrbitCamera } from './orbitCamera.js';
-import { createProps, setPropHighlight, GROUND_OFFSET } from './props.js';
+import { createProps, setPropHighlight, GROUND_OFFSET, PROP_KINDS } from './props.js';
 import { Person } from './person.js';
 import { createMarkers } from './markers.js';
 import { createSettings, keyLabel } from './settings.js';
 import { createMenu } from './menu.js';
+import { createPanels } from './panels.js';
+import { createInventory } from './inventory.js';
+import { createProgression } from './progression.js';
 import { createDebug } from './debug.js';
 
 const canvas = document.getElementById('viewport');
@@ -41,6 +44,12 @@ const { props } = createProps(surface, scene);
 const person = new Person(surface, startingCell());
 scene.add(person.mesh);
 
+// Everything the panels read: what has been gathered, and how far along the
+// run is. Both are lists so more agents can simply be pushed on later.
+const agents = [person];
+const inventory = createInventory();
+const progression = createProgression();
+
 function startingCell() {
   // The flattest cell nearest the middle, so they start on open ground.
   let best = null;
@@ -73,6 +82,8 @@ function updateTarget() {
 }
 
 function finishProp(prop) {
+  const gathered = PROP_KINDS[prop.kind].yield;
+  if (gathered) inventory.add(gathered.item, gathered.amount);
   prop.gone = true;
   prop.mesh.visible = false;
   if (targeted === prop) setTarget(null);
@@ -109,13 +120,24 @@ const controls = new OrbitCamera(camera, canvas, {
   settings
 });
 
-// --- pause menu ------------------------------------------------------------
+// --- panels and pause menu -------------------------------------------------
+
+// The panels are built first so their Esc handler runs before the menu's -
+// with one open, Esc closes it instead of pausing the game.
+const panels = createPanels({
+  settings,
+  agents,
+  inventory,
+  progression,
+  blocked: () => menu.isOpen(),
+  onSelect: (agent) => agent.setSelected(true)
+});
 
 const menu = createMenu({
   settings,
   controls,
   onLeave: leaveGame,
-  onChange: showBindingsInHelp
+  onChange: () => { showBindingsInHelp(); panels.showTabs(); }
 });
 
 // The corner hints name whatever the keys are bound to now, so rebinding
@@ -255,6 +277,8 @@ function updatePanel() {
   panel.hidden = !person.selected;
   if (panel.hidden) return;
 
+  panel.querySelector('.name').textContent = person.name;
+
   const activity = person.activity;
   activityName.textContent = activity ? activity.action : 'Idle';
   activityTime.textContent = activity ? `${activity.remaining.toFixed(1)}s` : '';
@@ -291,6 +315,7 @@ function frame() {
   controls.update(delta);
   updateLabel();
   updatePanel();
+  panels.update();
 
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
@@ -305,6 +330,6 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { scene, camera, renderer, controls, island, person, props, surface, markers, menu, settings, raycaster, THREE };
+window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, surface, markers, menu, panels, inventory, progression, settings, raycaster, THREE };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 Object.defineProperty(window.ESTER, 'targeted', { get: () => targeted });

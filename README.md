@@ -96,12 +96,23 @@ On Linux/macOS use `./ester.sh` instead of the `.bat` files.
 | **Click** a tree or rock | It walks over and works on it - the target glows yellow until it arrives |
 | **Click** the ground | It walks there - a green wave pulses where you clicked |
 | **Right click** | Deselect the agent |
-| `Esc` | Pause menu: camera speed, keybinds, leave game |
+| `Esc` | Pause menu: camera speed, keybinds, leave game - or close an open panel |
+| `Tab` | Overview: inventory, every agent with their stats and what they are doing, quest progress and stage |
+| `Q` | Crafting - no recipes yet |
+| `W` | Quest book - no quests yet |
+| `E` | Stages - no stages yet |
 | Drag / arrow keys | Orbit the island - unlimited, all axes |
 | Wheel / `+` `-` | Zoom |
 | `R` | Reset the view |
 | `F` | Toggle idle auto-spin |
 | `F11` | Fullscreen (desktop app) |
+
+The four panels are one window with a tab strip, so `Tab`, `Q`, `W` and `E`
+switch straight between them; pressing the key of the tab already showing
+closes it again. All four keys are rebindable in the pause menu. The isle
+stays playable around the panel - only the panel itself takes clicks. Felling
+a tree yields wood and a rock yields stone, which the overview lists; there is
+nothing to spend them on yet.
 
 The agent never starts work on its own - left alone it simply waits. Only work
 in progress is announced: a label with the job ("Cutting down a tree", "Picking

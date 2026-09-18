@@ -43,8 +43,9 @@ const DRAIN = { food: 0.18, water: 0.24, happiness: 0.05 };
  * `action` is always a plain sentence, because it is shown on screen.
  */
 export class Person {
-  constructor(surface, startCell) {
+  constructor(surface, startCell, name = 'Ester') {
     this.surface = surface;
+    this.name = name;                 // shown in the agent list
     this.x = startCell.x;
     this.z = startCell.z;
 

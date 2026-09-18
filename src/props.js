@@ -13,8 +13,8 @@ const SEED = 20260918;
 export const GROUND_OFFSET = 0.5;
 
 export const PROP_KINDS = {
-  tree: { label: 'tree', action: 'Cutting down a tree', seconds: 6 },
-  rock: { label: 'rock', action: 'Picking up a rock',   seconds: 7 }
+  tree: { label: 'tree', action: 'Cutting down a tree', seconds: 6, yield: { item: 'wood', amount: 3 } },
+  rock: { label: 'rock', action: 'Picking up a rock',   seconds: 7, yield: { item: 'stone', amount: 2 } }
 };
 
 const COUNTS = { tree: 9, rock: 6 };
