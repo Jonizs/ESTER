@@ -108,8 +108,19 @@ with one inhabitant who walks around and works on what is there.
   written straight onto them. If props are ever switched to shared materials
   or an `InstancedMesh`, highlighting has to change with it.
 - **Props must not block pathing.** `path.js` only refuses steps of more than
-  one block of height; keeping props walkable avoids pockets the person can
+  one block of height; keeping props walkable avoids pockets the agent can
   never leave.
+- **Pathing is eight-way.** Diagonals cost `SQRT2` and the heuristic is octile,
+  not manhattan - a manhattan heuristic overestimates once diagonals exist and
+  stops A* returning the shortest route. A diagonal also checks the two cells
+  beside it, so the agent cannot clip a raised corner or slip between two
+  blocks.
+- **Height changes are hopped, not slid through.** The cell edge is crossed at
+  the halfway point, so interpolating straight from one ground height to the
+  next puts the agent inside the block. `hopHeight` in `person.js` gains the
+  height before the edge going up, and holds it until past the edge going
+  down. If you retune those curves, check the agent stays above the taller of
+  the two faces while it is still over it.
 - **Keep the isle sparse.** A few trees and rocks - counts live in `COUNTS`
   in `props.js`. There are no flowers; they were removed on request.
 

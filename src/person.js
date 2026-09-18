@@ -2,7 +2,34 @@ import * as THREE from 'three';
 import { findPath } from './path.js';
 import { PROP_KINDS, GROUND_OFFSET } from './props.js';
 
-const WALK_SPEED = 2.2;        // cells per second
+const WALK_SPEED = 2.2;        // cells per second on the level
+const HOP_SPEED = 1.5;         // slower while hopping up or down a block
+const HOP_HEIGHT = 0.28;       // how far the arc lifts them clear of the edge
+
+const easeOut = (t) => 1 - (1 - t) * (1 - t);
+const easeIn = (t) => t * t;
+
+/**
+ * Height part-way through a step, as a fraction `t` of the way across.
+ *
+ * The cell edge is crossed halfway, so a straight line from one cell's ground
+ * to the next puts them inside the block they are climbing. Going up they
+ * gain the height first and arc over the edge; going down they hold their
+ * height until they are out past it and only then drop. Both keep them clear
+ * of the taller block's top face while they are still over it.
+ */
+function hopHeight(from, to, t) {
+  const climb = to - from;
+  if (Math.abs(climb) < 0.01) return from;      // level: no bob at all
+
+  if (climb > 0) {
+    const rise = Math.min(1, t / 0.45);
+    return from + climb * easeOut(rise) + HOP_HEIGHT * Math.sin(Math.PI * t);
+  }
+
+  const fall = Math.max(0, (t - 0.5) / 0.5);
+  return from + climb * easeIn(fall) + HOP_HEIGHT * 0.6 * Math.sin(Math.PI * Math.min(1, t / 0.7));
+}
 
 // How fast the needs run down, in points per second. Food and water empty in
 // a little under ten minutes of play; happiness drifts slower.
@@ -22,6 +49,7 @@ export class Person {
     this.z = startCell.z;
 
     this.path = [];
+    this.segment = null;       // the step being walked, for the hop arc
     this.task = null;          // { prop, seconds, elapsed }
     this.action = null;        // only set while actually working
     this.selected = false;
@@ -71,6 +99,7 @@ export class Person {
     const path = findPath(this.surface, { x: this.x, z: this.z }, cell, { adjacent });
     if (!path) return false;
     this.path = path;
+    this.segment = null;       // start the next step from wherever they are
     return true;
   }
 
@@ -133,19 +162,47 @@ export class Person {
 
   _step(dt) {
     const [tx, tz] = this.path[0];
-    const target = new THREE.Vector3(tx, this.groundAt(tx, tz), tz);
-    const delta = target.clone().sub(this.pos);
-    const distance = delta.length();
-    const step = WALK_SPEED * dt;
 
-    if (distance <= step || distance < 0.001) {
-      this.pos.copy(target);
+    // Each step is walked as its own segment, so the hop can be shaped from
+    // where it began rather than from wherever they happen to be now.
+    let segment = this.segment;
+    if (!segment || segment.tx !== tx || segment.tz !== tz) {
+      segment = this.segment = {
+        tx,
+        tz,
+        fromX: this.pos.x,
+        fromZ: this.pos.z,
+        fromY: this.pos.y,
+        toY: this.groundAt(tx, tz),
+        distance: Math.hypot(tx - this.pos.x, tz - this.pos.z),
+        travelled: 0
+      };
+    }
+
+    const hopping = Math.abs(segment.toY - segment.fromY) > 0.01;
+    const speed = hopping ? HOP_SPEED : WALK_SPEED;
+
+    let t = 1;
+    if (segment.distance > 0.0001) {
+      segment.travelled += speed * dt;
+      t = Math.min(1, segment.travelled / segment.distance);
+    }
+
+    // Horizontal travel is a straight line; only the height is shaped.
+    this.pos.x = segment.fromX + (tx - segment.fromX) * t;
+    this.pos.z = segment.fromZ + (tz - segment.fromZ) * t;
+    this.pos.y = hopHeight(segment.fromY, segment.toY, t);
+
+    const dx = tx - segment.fromX;
+    const dz = tz - segment.fromZ;
+    if (dx !== 0 || dz !== 0) this.mesh.rotation.y = Math.atan2(dx, dz);
+
+    if (t >= 1) {
       this.x = tx;
       this.z = tz;
+      this.pos.set(tx, segment.toY, tz);
       this.path.shift();
-    } else {
-      this.pos.addScaledVector(delta.normalize(), step);
-      this.mesh.rotation.y = Math.atan2(delta.x, delta.z);
+      this.segment = null;
     }
 
     this.mesh.position.copy(this.pos);
