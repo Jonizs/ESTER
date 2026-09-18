@@ -15,7 +15,11 @@ export const ACTIONS = [
   { id: 'zoomIn', label: 'Zoom in', key: '+' },
   { id: 'zoomOut', label: 'Zoom out', key: '-' },
   { id: 'resetView', label: 'Reset view', key: 'r' },
-  { id: 'autoSpin', label: 'Toggle auto-spin', key: 'f' }
+  { id: 'autoSpin', label: 'Toggle auto-spin', key: 'f' },
+  { id: 'panelOverview', label: 'Overview', key: 'Tab' },
+  { id: 'panelCrafting', label: 'Crafting', key: 'q' },
+  { id: 'panelQuests', label: 'Quest book', key: 'w' },
+  { id: 'panelStages', label: 'Stages', key: 'e' }
 ];
 
 export const CAMERA_SPEED = { min: 0.25, max: 3, step: 0.05, default: 1 };

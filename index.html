@@ -51,6 +51,52 @@
       <div><b>Click the agent</b> &mdash; select it</div>
       <div><b>Right click</b> &mdash; deselect</div>
       <div><b>Click</b> &mdash; send it there, or set it on a tree or rock</div>
+      <div><b data-help="panelOverview"></b> &mdash; overview &nbsp; <b data-help="panelCrafting"></b> crafting &nbsp; <b data-help="panelQuests"></b> quests &nbsp; <b data-help="panelStages"></b> stages</div>
+    </div>
+
+    <!-- Tab / Q / W / E panels. One panel, four pages. -->
+    <div id="panels" hidden>
+      <div class="panel">
+        <div class="tabstrip"></div>
+
+        <section data-tab="overview">
+          <h3>Inventory</h3>
+          <div id="panel-inventory"></div>
+
+          <h3>Agents</h3>
+          <div id="panel-agents"></div>
+
+          <h3>Progress</h3>
+          <div id="panel-quest" class="line">
+            <label>Quest</label>
+            <div class="bar"><span class="fill"></span></div>
+            <span class="value"></span>
+          </div>
+          <div id="panel-stage" class="line">
+            <label>Stage</label>
+            <span class="value"></span>
+          </div>
+        </section>
+
+        <section data-tab="crafting" hidden>
+          <h3>Crafting</h3>
+          <p class="empty">No recipes yet.</p>
+        </section>
+
+        <section data-tab="quests" hidden>
+          <h3>Quest book</h3>
+          <p class="empty">No quests yet.</p>
+        </section>
+
+        <section data-tab="stages" hidden>
+          <h3>Stages</h3>
+          <p class="empty">No stages yet.</p>
+        </section>
+
+        <div class="buttons">
+          <button type="button" id="panels-close">CLOSE</button>
+        </div>
+      </div>
     </div>
 
     <div id="menu" hidden>

@@ -51,6 +51,10 @@ with one inhabitant who walks around and works on what is there.
   - `src/markers.js` - the ground-click wave, pooled expanding rings.
   - `src/settings.js` - camera speed and keybinds, held in memory only.
   - `src/menu.js` - the Esc pause menu and its keybind page.
+  - `src/panels.js` - the Tab/Q/W/E panels: overview, crafting, quest book,
+    stages.
+  - `src/inventory.js` - what has been gathered, and the item list.
+  - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
   - `src/path.js` - A* across the surface cells.
 - **Desktop shell:** `electron/main.cjs`, with `electron/preload.cjs`
@@ -148,6 +152,17 @@ with one inhabitant who walks around and works on what is there.
   height before the edge going up, and holds it until past the edge going
   down. If you retune those curves, check the agent stays above the taller of
   the two faces while it is still over it.
+- **The panels are one panel with four tabs**, not four overlays - Tab, Q, W
+  and E each open their own tab, and pressing the key of the tab already
+  showing closes the whole thing. All four are ordinary rebindable actions in
+  `settings.js`, so the panel reads its keys from `settings.bindings` rather
+  than hard-coding them.
+- **The panels are built before the menu in `main.js`.** Both listen for Esc
+  in the capture phase and capture listeners fire in the order they were
+  added, so this is what lets a panel swallow Esc (with
+  `stopImmediatePropagation`) instead of the game pausing behind it.
+- **The panel backdrop takes no clicks.** `#panels` is `pointer-events: none`
+  and only `.panel` takes them back, so the isle stays playable around it.
 - **Keep the isle sparse.** A few trees and rocks - counts live in `COUNTS`
   in `props.js`. There are no flowers; they were removed on request.
 
