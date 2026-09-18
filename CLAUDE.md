@@ -205,6 +205,13 @@ with one inhabitant who walks around and works on what is there.
   can be retuned without it ending up buried or hovering. The snapped leg and
   the plank are added outside the frame, so tipping it does not take them
   with it.
+- **The bench's legs are measured off its top, never given their own
+  height.** `UNDERSIDE + LEG_INSET` in `props.js` is what a standing leg
+  reaches, so it runs a hair *into* the tabletop rather than stopping under
+  it. A shorter leg for the broken bench left an 0.08 gap at the joint, which
+  is invisible on an upright bench and obvious once it is lying on its side
+  with the legs in the air; a leg stopping exactly at the underside leaves a
+  hairline seam, the same one the island's oversized cubes exist to avoid.
 - **The bench's cost is on screen from boot, not on click.** `#bench-label`
   (`updateBenchLabel` in `main.js`) floats "0 / 10 wood" over the bench every
   frame it is broken and off-screen checks aside, and lights up once there is

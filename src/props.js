@@ -161,6 +161,17 @@ export function setWorkbenchState(prop, repaired) {
   mesh.traverse((o) => { o.userData.propId = prop.id; });
 }
 
+// The tabletop, and where its underside sits - the legs are measured off
+// this rather than given their own height, so they always meet it.
+const TOP_Y = 0.86;
+const TOP_THICK = 0.16;
+const UNDERSIDE = TOP_Y - TOP_THICK / 2;
+
+// How far a leg runs up into the top. They used to stop exactly at the
+// underside, which leaves a hairline seam to see through at the joint - the
+// same reason the island's cubes are drawn a hair oversized.
+const LEG_INSET = 0.04;
+
 function buildWorkbench(g, repaired) {
   const wood = repaired ? 0x8a5f37 : 0x6a5136;
   const trim = repaired ? 0x9c6c3f : 0x6e5338;
@@ -171,20 +182,22 @@ function buildWorkbench(g, repaired) {
   const frame = new THREE.Group();
 
   const top = new THREE.Mesh(
-    new THREE.BoxGeometry(1.5, 0.16, 0.95),
+    new THREE.BoxGeometry(1.5, TOP_THICK, 0.95),
     mat(wood, repaired ? { emissive: 0x1a0d04, emissiveIntensity: 1 } : {})
   );
-  top.position.y = 0.86;
+  top.position.y = TOP_Y;
   top.castShadow = true;
   frame.add(top);
 
   // Four legs when it is whole; the front-left one has snapped off when it is
-  // not, which is what put the bench on its side in the first place.
+  // not, which is what put the bench on its side in the first place. Every
+  // leg standing runs from the ground into the top, broken or not - a shorter
+  // leg on the broken bench left it hanging in mid air once tipped over.
   const legs = repaired
     ? [[-0.6, -0.34], [0.6, -0.34], [-0.6, 0.34], [0.6, 0.34]]
     : [[0.6, -0.34], [0.6, 0.34], [-0.6, 0.34]];
+  const h = UNDERSIDE + LEG_INSET;
   for (const [x, z] of legs) {
-    const h = repaired ? 0.78 : 0.7;
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, h, 0.15), mat(trim));
     leg.position.set(x, h / 2, z);
     leg.castShadow = true;
