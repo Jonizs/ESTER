@@ -31,7 +31,6 @@ export class OrbitCamera {
     this.orientation = new THREE.Quaternion();
     this.velocity = new THREE.Vector2(0, 0);
 
-    this.targetGoal = this.target.clone();
     this._offset = new THREE.Vector3();
     this._scratch = new THREE.Quaternion();
     this._pointers = new Map();
@@ -88,16 +87,10 @@ export class OrbitCamera {
     }
 
     this.distance += (this.targetDistance - this.distance) * 0.12;
-    this.target.lerp(this.targetGoal, 0.08);
 
     this._offset.set(0, 0, this.distance).applyQuaternion(this.orientation);
     this.camera.position.copy(this.target).add(this._offset);
     this.camera.quaternion.copy(this.orientation);
-  }
-
-  /** Glide the orbit centre to a new point, e.g. a selected colonist. */
-  focus(point) {
-    this.targetGoal.set(point.x, point.y + 0.6, point.z);
   }
 
   _bind() {

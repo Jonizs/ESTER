@@ -28,7 +28,7 @@ export function createIsland() {
 
   const cells = [];
   const filled = new Set();
-  // "x,z" -> y of the topmost block, i.e. the ground colonists stand on.
+  // "x,z" -> y of the topmost block: the ground anything on the isle stands on.
   const surface = new Map();
 
   // --- Pass 1: decide which cells are solid -------------------------------

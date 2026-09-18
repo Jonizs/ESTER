@@ -17,48 +17,37 @@ using - it pulls origin/main, installs any new dependencies and rebuilds. If
 `WATCH.bat` is running there it picks the push up on its own within ~10
 seconds. A fresh machine needs `git clone` once, then `SETUP.bat`.
 
-Saved colonies live in the browser/Electron profile of the machine they were
-played on, so they do not travel between clones.
+Nothing in the game is saved to disk, so there is no state to move between
+machines.
 
-## LAZER prototype
+## History
 
-The colony sim is a LAZER prototype. If Jonas says **"clean lazer"**, revert
-every game-layer change and restore the repo exactly to the pre-prototype
-state, which is preserved on the branch `lazer-base` (commit `1390074`, the
-floating island with orbit camera and nothing else):
+The LAZER colony-sim prototype was removed on request; the project is back to
+the island with a single inhabitant. Two reference points are kept:
 
-```bash
-git fetch origin lazer-base
-git checkout main
-git restore --source=origin/lazer-base -- .    # or: git reset --hard origin/lazer-base
-git commit -m "Clean lazer: revert prototype"
-git push origin main
-```
+- Branch `lazer-base` (commit `1390074`) - the bare island, before any of it.
+- Commit `ee042f8` on `main` - the full colony sim (colonists, jobs, research,
+  raids, events), if any of it is ever wanted back.
 
-Never delete or move the `lazer-base` branch - it is the only revert point.
+Neither is needed day to day. Do not delete the `lazer-base` branch.
 
 ## Project
 
-ESTER is a 3D space survival game: a RimWorld-style colony sim on a voxel
-island adrift in the void.
+ESTER is a 3D space survival game. Right now it is a voxel island in the void
+with one inhabitant who walks around and works on what is there.
 
 - **Engine:** Three.js (WebGL), bundled with Vite, wrapped in Electron so it
   ships as a desktop executable.
 - **Entry point:** `src/main.js` - renderer, scene, render loop.
-- **World modules:** `src/island.js` (voxel island + the surface heightmap the
-  colony walks on), `src/space.js` (void backdrop, stars, debris, lighting,
-  day/night), `src/orbitCamera.js` (quaternion orbit camera), `src/noise.js`
-  (deterministic value noise).
-- **Colony modules** in `src/game/`:
-  - `game.js` - the simulation: clock, jobs, needs, research, events, combat,
-    save/load. Everything else hangs off this.
-  - `defs.js` - static content (buildings, research tree, events, names).
-  - `world.js` - walkable grid and harvestable resource nodes.
-  - `pawns.js` - colonists and raiders: movement, needs, skills, meshes.
-  - `buildings.js` - structures and their meshes.
-  - `pathfinding.js` - A* over the island grid.
-  - `input.js` - selection, right-click designation, build placement.
-  - `ui.js` - the HUD (plain DOM over the canvas).
+- **Modules:**
+  - `src/island.js` - voxel island, and the surface heightmap everything
+    standing on it uses (`group.userData.surface`, keyed `"x,z"`).
+  - `src/space.js` - nebula shell, stars and lighting.
+  - `src/orbitCamera.js` - quaternion orbit camera.
+  - `src/noise.js` - deterministic value noise.
+  - `src/props.js` - the few trees, rocks and flowers.
+  - `src/person.js` - the single inhabitant: walking, tasks, current action.
+  - `src/path.js` - A* across the surface cells.
 - **Desktop shell:** `electron/main.cjs`.
 - **Web deploy:** `.github/workflows/deploy-pages.yml` builds and publishes
   `dist/` to GitHub Pages on every push to `main`
@@ -66,23 +55,21 @@ island adrift in the void.
   bundle works from the Pages subpath and from `file://` inside Electron -
   do not change it to an absolute path.
 
-## Simulation rules that are easy to break
+## Rules that are easy to break
 
-- **One in-game day is one real hour** (`DAY = 3600` game-seconds in
-  `pawns.js`). Events fire every 7 days, mid-morning - never at midnight,
-  because colonists are asleep then and a raid becomes an execution.
-- **Long jobs must yield to needs.** A research job runs until the whole
-  project completes; without the interrupt in `_runColonist`, the researcher
-  starves at the desk with a full larder. Same for the combat interrupt.
-- **Resource nodes must not block movement.** Dense forest blocking cells
-  fences pawns into pockets they can never path out of. Only solid buildings
-  block, and raiders path *through* walls and attack them.
-- **Rates are per in-game day, not per second.** Healing, farm growth and
-  hunger are all written as `perDay / DAY * dt`.
-- **The tech tree must stay affordable.** The island holds a finite amount of
-  wood, stone and ore; the quarry and smelter are what make late-game stone
-  and metal renewable. Check the beacon is still buildable after any change
-  to yields or costs.
+- **Nothing in the scene drifts.** The island does not bob or rotate, the
+  stars do not turn, and there is no debris belt. Idle motion was removed on
+  request - do not reintroduce it.
+- **The person's `action` is user-facing text.** It is rendered above their
+  head every frame, so it must always be a readable sentence
+  ("Chopping wood"), never an internal state name.
+- **`onFinish` runs after the fallback action is set**, so a callback's
+  message ("Collected a flower") is what stays on screen.
+- **Props must not block pathing.** `path.js` only refuses steps of more than
+  one block of height; keeping props walkable avoids pockets the person can
+  never leave.
+- **Keep the isle sparse.** A few trees, rocks and flowers - counts live in
+  `COUNTS` in `props.js`.
 
 ## Commands
 
@@ -98,10 +85,12 @@ island adrift in the void.
 ## Testing the game
 
 There is no test runner. Drive the built game in headless Chromium with
-Playwright against `npx vite preview`, using the `window.ESTER.debug` handle
-(`give`, `giveAll`, `skipDays`, `raid`, `finishBuilds`, `completeResearch`,
-`run(seconds)`). `debug.run` steps the simulation without waiting on real
-time, which is how a 40-day playthrough can be checked in seconds.
+Playwright against `npx vite preview`. `window.ESTER` exposes `scene`,
+`camera`, `controls`, `island`, `person`, `props` and `surface`.
+
+To check behaviour without waiting on real time, call `person.update(dt,
+props, onFinish)` in a loop rather than sleeping - a whole work cycle then
+takes milliseconds.
 
 Note that headless rendering uses SwiftShader, so frame times there are
 software-rendered and meaningless; measure `game.update()` separately.

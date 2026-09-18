@@ -2,9 +2,8 @@ import * as THREE from 'three';
 import { rand } from './noise.js';
 
 /**
- * The void the island hangs in: a nebula gradient shell, two star layers and
- * a slow belt of debris blocks. Everything is added to the scene and the
- * animated bits are returned for the render loop.
+ * The void the island hangs in: a nebula gradient shell and two star layers.
+ * Nothing here moves - the scene is deliberately still.
  */
 export function createSpace(scene) {
   // --- Nebula shell (inside-out sphere, painted by a gradient shader) ----
@@ -62,10 +61,6 @@ export function createSpace(scene) {
   ];
   starLayers.forEach((layer) => scene.add(layer));
 
-  // --- Debris belt --------------------------------------------------------
-  const debris = createDebris(70);
-  scene.add(debris);
-
   // --- Lighting -----------------------------------------------------------
   const sun = new THREE.DirectionalLight(0xfff0d4, 2.4);
   sun.position.set(48, 62, 34);
@@ -95,33 +90,7 @@ export function createSpace(scene) {
 
   return {
     sun,
-
-    /**
-     * Swing the sun around the island for the colony's day/night cycle.
-     * @param {number} t 0 = midnight, 0.5 = midday.
-     */
-    setDayPhase(t) {
-      const angle = (t - 0.25) * Math.PI * 2;
-      const height = Math.sin(angle);
-      sun.position.set(Math.cos(angle) * 60, height * 70, 34);
-
-      const daylight = Math.max(0, height);
-      sun.intensity = 0.25 + daylight * 2.3;
-      sun.color.setHSL(0.09 + daylight * 0.04, 0.55 - daylight * 0.35, 0.55 + daylight * 0.2);
-      underglow.intensity = 0.6 + (1 - daylight) * 0.35;
-      rim.intensity = 0.9 + (1 - daylight) * 0.6;
-    },
-
-    /** Called once per frame from the render loop. */
-    update(elapsed, delta) {
-      starLayers[0].rotation.y = elapsed * 0.004;
-      starLayers[1].rotation.y = -elapsed * 0.007;
-      debris.rotation.y += delta * 0.035;
-      debris.children.forEach((rock, i) => {
-        rock.rotation.x += delta * (0.12 + rand(i, 3) * 0.25);
-        rock.rotation.z += delta * (0.08 + rand(i, 9) * 0.2);
-      });
-    }
+    starLayers
   };
 }
 
@@ -173,30 +142,3 @@ function starField(count, innerRadius, outerRadius, size, opacity) {
   return points;
 }
 
-function createDebris(count) {
-  const group = new THREE.Group();
-  group.name = 'debris';
-
-  const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const material = new THREE.MeshStandardMaterial({
-    color: 0x6b7285,
-    roughness: 0.9,
-    metalness: 0.08
-  });
-
-  for (let i = 0; i < count; i++) {
-    const rock = new THREE.Mesh(geometry, material);
-
-    const angle = rand(i, 11) * Math.PI * 2;
-    const radius = 60 + rand(i, 22) * 110;
-    const height = (rand(i, 33) - 0.5) * 80;
-    const scale = 0.5 + Math.pow(rand(i, 44), 2) * 3.4;
-
-    rock.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
-    rock.scale.setScalar(scale);
-    rock.rotation.set(rand(i, 55) * Math.PI, rand(i, 66) * Math.PI, rand(i, 77) * Math.PI);
-    group.add(rock);
-  }
-
-  return group;
-}
