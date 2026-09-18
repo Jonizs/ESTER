@@ -61,6 +61,13 @@ with one inhabitant who walks around and works on what is there.
   *centred* on their cell coordinate, so a column whose top block is at `y`
   has its walkable face half a block higher. Use `GROUND_OFFSET` from
   `props.js`; `y + 1` leaves everything hovering.
+- **Layer the island by depth from the surface, not from each column's
+  bottom.** The keel's visible faces *are* the bottom blocks of its columns,
+  so keying bedrock off `bottom` painted the whole island body bedrock and
+  produced zero stone. Bedrock is now limited to the deepest few blocks of
+  the whole isle; everything under the soil is stone.
+- **Keep the fill lights near neutral.** Saturated blue rim and ambient
+  light stains the flanks and the stone stops reading as stone.
 - **Keep the heightmap free of single-cell pits.** Rounding the noise creates
   one-block dents whose walls face away from the sun and read as hard dark
   blotches on open ground. `island.js` runs two median passes over the

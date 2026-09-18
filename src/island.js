@@ -5,13 +5,13 @@ const BLOCK = 1;
 const RADIUS = 15;
 const SEED = 20260917;
 
-// Palette for the floating isle, top layer down to the crystal core.
+// Palette for the isle: turf over soil over stone, bedrock at the keel tip.
 const LAYERS = {
   grass: { color: 0x4fae78, roughness: 0.88, metalness: 0.0 },
   moss: { color: 0x3a8a5e, roughness: 0.9, metalness: 0.0 },
   dirt: { color: 0x6d503c, roughness: 0.95, metalness: 0.0 },
-  stone: { color: 0x707a8c, roughness: 0.8, metalness: 0.05 },
-  bedrock: { color: 0x4d5670, roughness: 0.75, metalness: 0.1, emissive: 0x13314d, emissiveIntensity: 0.18 }
+  stone: { color: 0x8b8d92, roughness: 0.82, metalness: 0.03 },
+  bedrock: { color: 0x5a6173, roughness: 0.8, metalness: 0.06, emissive: 0x16283c, emissiveIntensity: 0.12 }
 };
 
 const key = (x, y, z) => `${x},${y},${z}`;
@@ -81,12 +81,15 @@ export function createIsland() {
   }
 
   // --- Pass 1c: stack the blocks ------------------------------------------
+  let deepest = 0;
+  for (const column of columns.values()) if (column.bottom < deepest) deepest = column.bottom;
+
   for (const { x, z, top, bottom } of columns.values()) {
     surface.set(`${x},${z}`, top);
 
     for (let y = bottom; y <= top; y++) {
       filled.add(key(x, y, z));
-      cells.push({ x, y, z, top, bottomOf: bottom });
+      cells.push({ x, y, z, top });
     }
   }
 
@@ -94,7 +97,7 @@ export function createIsland() {
   const buckets = { grass: [], moss: [], dirt: [], stone: [], bedrock: [] };
 
   for (const cell of cells) {
-    const { x, y, z, top, bottomOf } = cell;
+    const { x, y, z, top } = cell;
 
     const buried =
       filled.has(key(x + 1, y, z)) &&
@@ -108,11 +111,22 @@ export function createIsland() {
     const fromTop = top - y;
 
     let layer;
-    if (fromTop === 0) layer = 'grass';
-    else if (fromTop === 1) layer = 'moss';
-    else if (fromTop <= 3) layer = 'dirt';
-    else if (y <= bottomOf + 1) layer = 'bedrock';
-    else layer = 'stone';
+    if (fromTop === 0) {
+      // Bare patches of earth and stone worn through the turf.
+      const wear = fbm2(x * 0.46, z * 0.46, 2, SEED + 41);
+      if (wear > 0.70) layer = 'dirt';
+      else if (wear < 0.28) layer = 'stone';
+      else layer = 'grass';
+    } else if (fromTop === 1) {
+      layer = 'moss';
+    } else if (fromTop <= 3) {
+      layer = 'dirt';
+    } else if (y <= deepest + 2) {
+      // Only the last few blocks of the whole isle, at the tip of the keel.
+      layer = 'bedrock';
+    } else {
+      layer = 'stone';
+    }
 
     buckets[layer].push(cell);
   }

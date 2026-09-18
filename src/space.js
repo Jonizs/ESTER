@@ -85,19 +85,21 @@ export function createSpace(scene) {
   scene.add(sun);
 
   // Cool bounce from the void below, so the underside is not pitch black.
-  const rim = new THREE.DirectionalLight(0x8fb0e0, 1.15);
+  // Kept close to neutral: a saturated blue here stains the whole flank and
+  // the stone stops reading as stone.
+  const rim = new THREE.DirectionalLight(0xa8b6c8, 0.85);
   rim.position.set(-40, -30, -25);
   scene.add(rim);
 
   // Soft up-light so the flat underside of the isle is readable from below.
-  const underglow = new THREE.DirectionalLight(0x7c9ade, 0.6);
+  const underglow = new THREE.DirectionalLight(0x93a2b8, 0.5);
   underglow.position.set(0, -50, 8);
   scene.add(underglow);
 
   // Fill, so the block faces turned away from the sun read as shaded stone
   // rather than as black holes in the ground.
-  scene.add(new THREE.HemisphereLight(0x9cc0ff, 0x2a3350, 0.75));
-  scene.add(new THREE.AmbientLight(0x35406b, 0.75));
+  scene.add(new THREE.HemisphereLight(0xb8cdec, 0x3b3f4c, 0.8));
+  scene.add(new THREE.AmbientLight(0x4b5064, 0.7));
 
   return {
     sun,
