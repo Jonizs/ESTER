@@ -133,6 +133,71 @@ html, body {
 
 #action.visible { opacity: 1; }
 
+/* What the broken workbench still needs, pinned over it. Unlike the agent's
+   label this one is not a passing thing - it is up for as long as the bench
+   is broken - so it stays quiet until the wood is actually there, and only
+   then lights up. */
+#bench-label {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 4;
+  padding: 7px 12px 8px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, rgba(20, 16, 48, 0.88), rgba(7, 6, 20, 0.9));
+  border: 1px solid rgba(154, 182, 255, 0.24);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  color: var(--ink);
+  font-size: 12px;
+  white-space: nowrap;
+  text-align: center;
+  min-width: 132px;
+  user-select: none;
+  pointer-events: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+#bench-label[hidden] { display: none; }
+
+#bench-label .what {
+  display: block;
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+#bench-label .need {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+}
+
+#bench-label .need b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+#bench-label .bar { height: 4px; background: rgba(150, 180, 255, 0.16); }
+
+#bench-label .fill {
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  box-shadow: none;
+  transition: width 0.25s ease;
+}
+
+/* Enough wood on hand: the badge says so without needing a click. */
+#bench-label.ready {
+  border-color: var(--edge-lit);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 0 24px rgba(138, 216, 255, 0.28);
+}
+
+#bench-label.ready .what { color: var(--accent); }
+#bench-label.ready .need { color: var(--ink); }
+#bench-label.ready .fill { box-shadow: 0 0 12px rgba(138, 216, 255, 0.6); }
+
 /* Shared meter: a thin track with a fill whose width is set from JS. */
 .bar {
   height: 5px;

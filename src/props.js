@@ -162,21 +162,24 @@ export function setWorkbenchState(prop, repaired) {
 }
 
 function buildWorkbench(g, repaired) {
-  const wood = repaired ? 0x8a5f37 : 0x4f3d2c;
-  const trim = repaired ? 0x9c6c3f : 0x584431;
+  const wood = repaired ? 0x8a5f37 : 0x6a5136;
+  const trim = repaired ? 0x9c6c3f : 0x6e5338;
+
+  // The bench proper - top and legs - is built upright either way, and then
+  // tipped over as a whole when it is broken. Building it once and rotating
+  // it keeps the two states the same object rather than two drawings of it.
+  const frame = new THREE.Group();
 
   const top = new THREE.Mesh(
     new THREE.BoxGeometry(1.5, 0.16, 0.95),
     mat(wood, repaired ? { emissive: 0x1a0d04, emissiveIntensity: 1 } : {})
   );
   top.position.y = 0.86;
-  // A broken bench is a bench that has given way on one side.
-  if (!repaired) { top.rotation.z = -0.17; top.position.y = 0.72; top.position.x = -0.06; }
   top.castShadow = true;
-  g.add(top);
+  frame.add(top);
 
-  // Four legs when it is whole; the front-left one is snapped off when it
-  // is not, which is what makes the top tilt.
+  // Four legs when it is whole; the front-left one has snapped off when it is
+  // not, which is what put the bench on its side in the first place.
   const legs = repaired
     ? [[-0.6, -0.34], [0.6, -0.34], [-0.6, 0.34], [0.6, 0.34]]
     : [[0.6, -0.34], [0.6, 0.34], [-0.6, 0.34]];
@@ -185,15 +188,33 @@ function buildWorkbench(g, repaired) {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, h, 0.15), mat(trim));
     leg.position.set(x, h / 2, z);
     leg.castShadow = true;
-    g.add(leg);
+    frame.add(leg);
   }
+
+  if (!repaired) {
+    // Over it goes, all the way: the tabletop down on the grass and the legs
+    // in the air. Half a turn reads as a collapsed bench at a glance, where
+    // a quarter turn just reads as a board standing on its end. The lean off
+    // square keeps it from looking placed.
+    frame.rotation.z = Math.PI - 0.2;
+    frame.rotation.y = 0.34;
+
+    // Then dropped until whatever is now lowest is resting on the ground,
+    // measured rather than guessed - the numbers above can be retuned
+    // without the bench ending up buried or hovering.
+    frame.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(frame);
+    frame.position.y = -box.min.y;
+  }
+
+  g.add(frame);
 
   if (repaired) {
     // A vice and a lamp, so a working bench reads as one at a glance.
     const vice = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.3), mat(0x8a8f9c, { metalness: 0.3 }));
     vice.position.set(0.5, 1.05, 0);
     vice.castShadow = true;
-    g.add(vice);
+    frame.add(vice);
 
     const lamp = new THREE.Mesh(
       new THREE.BoxGeometry(0.26, 0.26, 0.26),
@@ -205,17 +226,18 @@ function buildWorkbench(g, repaired) {
       })
     );
     lamp.position.set(-0.45, 1.08, 0);
-    g.add(lamp);
+    frame.add(lamp);
   } else {
-    // The snapped leg and a plank, lying where they fell.
+    // The snapped leg and a plank, lying on the ground where they fell -
+    // outside the frame, so tipping it does not take them with it.
     const shard = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.62, 0.15), mat(trim));
-    shard.position.set(-0.62, 0.08, -0.52);
-    shard.rotation.z = Math.PI / 2;
+    shard.position.set(-0.52, 0.08, -0.58);
+    shard.rotation.set(0, 0.7, Math.PI / 2);
     shard.castShadow = true;
     g.add(shard);
 
     const plank = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 0.28), mat(wood));
-    plank.position.set(0.15, 0.06, 0.66);
+    plank.position.set(0.28, 0.06, 0.62);
     plank.rotation.y = 0.5;
     plank.castShadow = true;
     g.add(plank);

@@ -346,6 +346,46 @@ function updateLabel() {
   label.style.top = `${(-labelPos.y * 0.5 + 0.5) * window.innerHeight}px`;
 }
 
+// --- what the broken workbench still needs -------------------------------
+
+// Always up while the bench is broken, so the cost of repairing it is
+// readable from the moment the run starts rather than only after a click.
+const benchLabel = document.getElementById('bench-label');
+const benchHave = benchLabel.querySelector('.have');
+const benchWant = benchLabel.querySelector('.want');
+const benchFill = benchLabel.querySelector('.fill');
+const benchPos = new THREE.Vector3();
+
+benchWant.textContent = PROP_KINDS.workbench.cost.amount;
+
+function updateBenchLabel() {
+  if (!workbench || workbench.repaired) {
+    benchLabel.hidden = true;
+    return;
+  }
+
+  const { item, amount } = PROP_KINDS.workbench.cost;
+  const held = inventory.count(item);
+  const enough = held >= amount;
+
+  benchHave.textContent = Math.min(held, amount);
+  benchFill.style.width = `${Math.min(1, held / amount) * 100}%`;
+  benchLabel.classList.toggle('ready', enough);
+
+  benchPos.copy(workbench.mesh.position);
+  benchPos.y += 2.3;
+  benchPos.project(camera);
+
+  // Same rule as the agent's label: gone when it is behind the camera or
+  // off the edge of the screen.
+  const onScreen = benchPos.z < 1 && Math.abs(benchPos.x) < 1.2 && Math.abs(benchPos.y) < 1.2;
+  benchLabel.hidden = !onScreen;
+  if (!onScreen) return;
+
+  benchLabel.style.left = `${(benchPos.x * 0.5 + 0.5) * window.innerWidth}px`;
+  benchLabel.style.top = `${(-benchPos.y * 0.5 + 0.5) * window.innerHeight}px`;
+}
+
 // --- the selected agent's stats panel ------------------------------------
 
 const panel = document.getElementById('agent-panel');
@@ -406,6 +446,7 @@ function frame() {
   markers.update(delta);
   controls.update(delta);
   updateLabel();
+  updateBenchLabel();
   updatePanel();
   panels.update();
   crafting.update();

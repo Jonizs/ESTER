@@ -196,6 +196,21 @@ with one inhabitant who walks around and works on what is there.
   keep a wider berth from the bench (3.6 cells rather than 2.2) so it is not
   hidden behind a tree, and the agent's starting cell is chosen off the same
   `props` list, so it never starts standing on it.
+- **The broken bench is the whole bench, tipped over.** `buildWorkbench`
+  builds the top and legs into one `frame` group either way, and the broken
+  state turns that group half over so the tabletop is down on the grass and
+  the legs are in the air - a quarter turn was tried first and reads as a
+  board standing on its end, not as a collapsed bench. The frame is then
+  dropped by its measured `Box3`, not by a hand-picked offset, so the tilt
+  can be retuned without it ending up buried or hovering. The snapped leg and
+  the plank are added outside the frame, so tipping it does not take them
+  with it.
+- **The bench's cost is on screen from boot, not on click.** `#bench-label`
+  (`updateBenchLabel` in `main.js`) floats "0 / 10 wood" over the bench every
+  frame it is broken and off-screen checks aside, and lights up once there is
+  enough wood. It needs nothing clicked, and it goes for good when the bench
+  is repaired. It is anchored 2.3 above the bench: lower and the badge covers
+  the bench itself at a wide zoom.
 - **A repaired bench needs its shadowSide set again.** `setWorkbenchState`
   builds fresh materials, and the front-face casting the rest of the scene got
   once at boot has to be applied to them - `finishProp` in `main.js` does it.
