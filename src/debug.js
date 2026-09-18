@@ -87,6 +87,69 @@ export function createDebug({ renderer, scene, island, props }) {
       say(`flat (unlit) ${on ? 'on' : 'off'}`);
     },
 
+    /**
+     * Print this exact camera, so the same view can be set up elsewhere.
+     * The artifact does not show in headless Chromium, and the likeliest
+     * reason left is that the angle was never matched.
+     */
+    where() {
+      const { camera, controls } = window.ESTER;
+      const pose = {
+        position: camera.position.toArray().map((n) => +n.toFixed(3)),
+        quaternion: camera.quaternion.toArray().map((n) => +n.toFixed(4)),
+        target: controls.target.toArray().map((n) => +n.toFixed(3)),
+        distance: +controls.distance.toFixed(3)
+      };
+      console.log('[ESTER debug] camera pose - copy this whole line:');
+      console.log(JSON.stringify(pose));
+      return pose;
+    },
+
+    /**
+     * Cycle candidate shadow setups. Call try(1), try(2)... and say which
+     * number makes the bright dashes go; try(0) is what the game ships with.
+     */
+    try(n = 0) {
+      const cam = sun.shadow.camera;
+      const setSide = (side) => {
+        scene.traverse((o) => { if (o.material && o.castShadow) o.material.shadowSide = side; });
+      };
+      const setMap = (size) => {
+        sun.shadow.mapSize.set(size, size);
+        if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+      };
+
+      // start from what ships, then change the one thing
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      sun.shadow.bias = -0.0001;
+      sun.shadow.normalBias = 0;
+      setSide(null);
+      setMap(4096);
+
+      const presets = {
+        0: 'as shipped',
+        1: 'stronger depth bias (-0.001)',
+        2: 'much stronger depth bias (-0.004)',
+        3: 'PCF filtering instead of PCF soft',
+        4: 'hard shadows, no filtering',
+        5: 'cast from front faces, normalBias 0.02',
+        6: 'shadow map 8192',
+        7: 'shadow map 1024 (should make it worse - confirms it is the map)'
+      };
+      if (n === 1) sun.shadow.bias = -0.001;
+      if (n === 2) sun.shadow.bias = -0.004;
+      if (n === 3) renderer.shadowMap.type = THREE.PCFShadowMap;
+      if (n === 4) renderer.shadowMap.type = THREE.BasicShadowMap;
+      if (n === 5) { setSide(THREE.FrontSide); sun.shadow.normalBias = 0.02; }
+      if (n === 6) setMap(8192);
+      if (n === 7) setMap(1024);
+
+      cam.updateProjectionMatrix();
+      refresh();
+      say(`try(${n}): ${presets[n] ?? 'unknown'}`);
+    },
+
     reset() {
       renderer.shadowMap.enabled = original.shadows;
       sun.shadow.bias = original.bias;
@@ -96,6 +159,11 @@ export function createDebug({ renderer, scene, island, props }) {
       fills.forEach((l, i) => { l.intensity = original.fills[i]; });
       sun.intensity = original.sun;
       this.flat(false);
+      scene.traverse((o) => { if (o.material && o.castShadow) o.material.shadowSide = null; });
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      sun.shadow.mapSize.set(4096, 4096);
+      if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+      refresh();
       say('back to normal');
     }
   };
