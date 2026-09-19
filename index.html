@@ -62,10 +62,10 @@
       <div><b>With one selected</b> &mdash; click to send it, or click a tree or rock to work it</div>
       <div><b>Click the workbench</b> &mdash; crafting</div>
       <div><b data-help="moveStation"></b> &mdash; move whatever the cursor is over</div>
-      <div><b data-help="panelOverview"></b> &mdash; overview &nbsp; <b data-help="panelQuests"></b> quests &nbsp; <b data-help="panelStages"></b> stages</div>
+      <div><b data-help="panelOverview"></b> &mdash; overview &nbsp; <b data-help="panelInventory"></b> inventory &nbsp; <b data-help="panelQuests"></b> quests &nbsp; <b data-help="panelStages"></b> stages</div>
     </div>
 
-    <!-- Tab / W / E panels: one screen, three pages. Built out by
+    <!-- Tab / Q / W / E panels: one screen, four pages. Built out by
          src/panels.js - the rail, the agent cards and the item tiles are all
          filled in from the game state. Crafting is not here; it is opened by
          clicking the workbench on the isle. -->
@@ -122,12 +122,14 @@
                   <h3>Agents <span class="count" id="agent-count"></span></h3>
                   <div id="panel-agents" class="agents"></div>
                 </div>
-
-                <div class="column">
-                  <h3>Inventory</h3>
-                  <div id="panel-inventory" class="tiles"></div>
-                </div>
               </div>
+            </section>
+
+            <!-- The inventory has a page of its own, opened with Q. The
+                 overview only carries the count on its summary tile. -->
+            <section data-tab="inventory" class="inventory" hidden>
+              <h3>Held <span class="count" id="inventory-count"></span></h3>
+              <div id="panel-inventory" class="tiles"></div>
             </section>
 
             <section data-tab="quests" class="blank" hidden>
@@ -155,25 +157,30 @@
         <header class="craft-head">
           <div>
             <h2>Crafting</h2>
-            <p>At the workbench, out in the middle of the isle.</p>
           </div>
           <button type="button" id="crafting-close">
             <span>Close</span><kbd>Esc</kbd>
           </button>
         </header>
 
+        <!-- The 4x4 grid sits in the top right and is floated, so the list of
+             craftable items flows around it: down its left and on under it
+             once there are enough recipes to reach that far. -->
         <div class="craft-body">
-          <div class="blank">
-            <div class="blank-mark" data-mark="crafting"></div>
-            <h3>Nothing to craft yet</h3>
-            <p>Recipes will show up here once there are any. The bench is
-               standing and ready for them.</p>
-          </div>
+          <section class="craft-grid">
+            <h3>Grid</h3>
+            <div id="craft-grid" class="grid4"></div>
+          </section>
 
-          <div class="craft-stock">
+          <section class="craft-recipes">
+            <h3>Craftable</h3>
+            <div id="craft-recipes" class="recipes"></div>
+          </section>
+
+          <section class="craft-stock">
             <h3>On the bench</h3>
             <div id="craft-stock" class="tiles"></div>
-          </div>
+          </section>
         </div>
       </div>
     </div>

@@ -4,8 +4,8 @@ import { icon } from './icons.js';
 
 /**
  * The information panels, opened with their own keys: the overview (Tab), the
- * quest book (W) and stages (E). Crafting is not among them - it lives on the
- * workbench out on the isle (src/crafting.js).
+ * inventory (Q), the quest book (W) and stages (E). Crafting is not among
+ * them - it lives on the workbench out on the isle (src/crafting.js).
  *
  * They are one screen with a rail of tabs rather than separate overlays, so
  * the same key both opens its tab and closes the screen again, and any of them
@@ -25,7 +25,14 @@ const TABS = [
     label: 'Overview',
     action: 'panelOverview',
     title: 'Overview',
-    blurb: 'Everything gathered, everyone on the isle, and how far along the run is.'
+    blurb: 'Everyone on the isle, and how far along the run is.'
+  },
+  {
+    id: 'inventory',
+    label: 'Inventory',
+    action: 'panelInventory',
+    title: 'Inventory',
+    blurb: 'Everything the agents have gathered and carried back.'
   },
   {
     id: 'quests',
@@ -79,6 +86,7 @@ export function createPanels({ settings, agents, inventory, progression, blocked
   }
 
   const inventoryTiles = root.querySelector('#panel-inventory');
+  const inventoryCount = root.querySelector('#inventory-count');
   const agentList = root.querySelector('#panel-agents');
   const agentCount = root.querySelector('#agent-count');
   const sumAgents = root.querySelector('#sum-agents');
@@ -104,7 +112,7 @@ export function createPanels({ settings, agents, inventory, progression, blocked
     headSub.textContent = current.blurb;
   }
 
-  // --- the overview -------------------------------------------------------
+  // --- the overview and the inventory ------------------------------------
   // Rows and tiles are rebuilt only when what they list changes; their numbers
   // are written onto the existing nodes every frame the screen is open.
   // null rather than '', so the first pass builds even when both are empty.
@@ -139,9 +147,12 @@ export function createPanels({ settings, agents, inventory, progression, blocked
       }
     }
 
+    let total = 0;
     for (const entry of entries) {
+      total += entry.count;
       inventoryTiles.querySelector(`[data-item="${entry.item}"] .tile-count`).textContent = entry.count;
     }
+    inventoryCount.textContent = total;
   }
 
   function buildAgentCard(agent) {
@@ -248,8 +259,13 @@ export function createPanels({ settings, agents, inventory, progression, blocked
   }
 
   function update() {
-    if (!isOpen() || tab !== 'overview') return;
-    updateInventory();
+    if (!isOpen()) return;
+
+    // The inventory is a page of its own (Q); the overview no longer carries
+    // a copy of it, only the count on its summary tile.
+    if (tab === 'inventory') { updateInventory(); return; }
+    if (tab !== 'overview') return;
+
     updateAgents();
 
     sumAgents.textContent = agents.length;

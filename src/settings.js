@@ -25,6 +25,7 @@ export const ACTIONS = [
   { id: 'selectAgent4', label: 'Select agent 4', key: '4' },
   { id: 'selectAgent5', label: 'Select agent 5', key: '5' },
   { id: 'panelOverview', label: 'Overview', key: 'Tab' },
+  { id: 'panelInventory', label: 'Inventory', key: 'q' },
   { id: 'panelQuests', label: 'Quest book', key: 'w' },
   { id: 'panelStages', label: 'Stages', key: 'e' }
 ];

@@ -7,6 +7,10 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1600,
     height: 900,
+    // The game opens full screen every launch. F11 is what leaves it - Esc is
+    // the pause menu and must stay that, so it is deliberately not a way out
+    // of full screen any more.
+    fullscreen: true,
     minWidth: 960,
     minHeight: 600,
     backgroundColor: '#04050a',
@@ -30,12 +34,11 @@ function createWindow() {
     win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 
-  // F11 fullscreen, F12 devtools, Esc to leave fullscreen.
+  // F11 fullscreen, F12 devtools. Esc belongs to the pause menu.
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     if (input.key === 'F11') win.setFullScreen(!win.isFullScreen());
     if (input.key === 'F12') win.webContents.toggleDevTools();
-    if (input.key === 'Escape' && win.isFullScreen()) win.setFullScreen(false);
   });
 }
 

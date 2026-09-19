@@ -59,16 +59,20 @@ with one inhabitant who walks around and works on what is there.
   - `src/markers.js` - the ground-click wave, pooled expanding rings.
   - `src/settings.js` - camera speed and keybinds, held in memory only.
   - `src/menu.js` - the Esc pause menu and its keybind page.
-  - `src/panels.js` - the Tab/W/E panels: overview, quest book, stages.
+  - `src/panels.js` - the Tab/Q/W/E panels: overview, inventory, quest book,
+    stages.
   - `src/crafting.js` - the crafting screen, opened from the workbench.
   - `src/icons.js` - the line-art glyphs the panels and crafting both draw.
+  - `src/starfield.js` - the drifting motes behind every UI surface.
+  - `src/fullscreen.js` - full screen on launch, in a browser.
   - `src/inventory.js` - what has been gathered, and the item list.
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
   - `src/path.js` - A* across the surface cells.
   - `src/placement.js` - picking a station up and putting it down again.
 - **Desktop shell:** `electron/main.cjs`, with `electron/preload.cjs`
-  exposing just `window.ester.quit()` for the menu's LEAVE GAME.
+  exposing just `window.ester.quit()` for the menu's LEAVE GAME. The window
+  opens full screen (`fullscreen: true`).
 - **Web deploy:** `.github/workflows/deploy-pages.yml` builds and publishes
   `dist/` to GitHub Pages on every push to `main`
   (https://jonizs.github.io/ESTER/). Vite's `base` is `'./'` so the same
@@ -135,6 +139,9 @@ with one inhabitant who walks around and works on what is there.
 - **Nothing in the scene drifts.** The island does not bob or rotate, the
   stars do not turn, and there is no debris belt. Idle motion was removed on
   request - do not reintroduce it.
+- **Nothing in the game is deterministic-critical about the UI.** The motes
+  are placed with `Math.random()` on purpose; the no-bare-`Math.random()`
+  rule under Conventions is about world generation, not dressing.
 - **The agent never acts on its own.** It only walks and works when clicked;
   there is no idle "find something to do" behaviour, and reintroducing one was
   explicitly refused.
@@ -216,15 +223,27 @@ with one inhabitant who walks around and works on what is there.
   height before the edge going up, and holds it until past the edge going
   down. If you retune those curves, check the agent stays above the taller of
   the two faces while it is still over it.
-- **The panels are one panel with three tabs**, not three overlays - Tab, W
+- **The panels are one panel with four tabs**, not four overlays - Tab, Q, W
   and E each open their own tab, and pressing the key of the tab already
-  showing closes the whole thing. All three are ordinary rebindable actions in
+  showing closes the whole thing. All four are ordinary rebindable actions in
   `settings.js`, so the panel reads its keys from `settings.bindings` rather
-  than hard-coding them.
+  than hard-coding them. Adding a tab is a `TABS` entry in `panels.js`, an
+  `ACTIONS` entry in `settings.js`, a glyph in `icons.js` and a
+  `<section data-tab>` in `index.html` - nothing else.
 - **Crafting is not one of them and has no key.** It is its own overlay
   (`src/crafting.js`, `#crafting`), and the only way in is to click the
   workbench standing in the middle of the isle. Opening it closes the panels,
   so the two are never up together.
+- **The crafting grid floats; the recipes flow around it.** The 4x4 grid sits
+  in the top right and is `float: right`, which is the whole reason
+  `.craft-body` is block flow rather than a grid - only normal flow lets the
+  craftable items run down the grid's left and then carry on *underneath* it
+  once there are more than fit beside. That is also why the recipe cards are
+  `display: inline-block`: a grid or flex container would be held in a narrow
+  column beside the float and never reach under it. `RECIPES` in
+  `crafting.js` is the list, empty for now - pushing an entry onto it is all
+  that is needed to see it on screen. What is held is still listed along the
+  bottom, under both, on `clear: both`.
 - **Wreckage cannot be moved; repair it first.** `canMove()` in `props.js`
   is the one test - a `placed` kind that also has a `cost` is not movable
   until `prop.repaired`, so the fallen bench stays where it fell. It still
@@ -324,18 +343,35 @@ with one inhabitant who walks around and works on what is there.
   first pass still builds when the inventory is empty.
 - **Keep the isle sparse.** A few trees and rocks - counts live in `COUNTS`
   in `props.js`. There are no flowers; they were removed on request.
-- **The overview's right column is the inventory and nothing else.** The card
-  that counted how many trees and rocks were left standing was removed on
-  request; the tiles now take the whole column down to the bottom of the page
-  (`align-content: start` keeps them packed at the top of that space).
+- **The inventory is its own page, opened with Q, and is not on the
+  overview.** It was the overview's right column once; it is a tab of its own
+  now, and the overview keeps only the GATHERED count on its summary tile -
+  do not put the tiles back beside the agents. The framed field of tiles runs
+  the height of the page, with `align-content: start` keeping them packed at
+  the top of that space rather than stretched tall.
 - **The UI is cosmic, and it is all one recipe.** Every pane - the panels, the
   crafting screen, the pause menu - is a dark surface with the `--nebula`
-  wash behind it, a drifting `--stars` tile over that from the shared
-  `.starfield` class, and an ice-blue edge. The star layer is an absolutely
-  positioned `::before`, so anything sitting on such a surface needs
-  `position: relative; z-index: 1` or the stars paint over it. Colours come
-  from the variables in `:root` (`--accent` ice blue, `--accent-2` violet,
+  wash behind it, a faint `--stars` tile over that from the shared
+  `.starfield` class, drifting motes over *that*, and an ice-blue edge. Both
+  star layers sit underneath, so anything on such a surface needs
+  `position: relative; z-index: 1` or they paint over it. Colours come from
+  the variables in `:root` (`--accent` ice blue, `--accent-2` violet,
   `--accent-3` rose) - do not reintroduce flat greys.
+- **The motes are elements, not a moving tile.** The star layer used to be one
+  repeating background creeping diagonally, so every star moved as one and
+  none of them ever changed. `src/starfield.js` now fills each `.starfield`
+  surface with individual `.star` spans, each given its own rise time, fade
+  time and *negative* delays, so the field is already scattered and mid-fade
+  the moment a panel opens. Both are plain CSS animations once placed -
+  nothing runs per frame, so an open panel costs the render loop nothing. The
+  `.stars` layer is the one child of a pane that must stay at `z-index: 0`,
+  which is why `#menu .panel > :not(.stars)` is written the way it is.
+- **Full screen is the default, and Esc is not the way out of it.** The
+  desktop window opens `fullscreen: true` and F11 toggles it; Esc belongs to
+  the pause menu and is deliberately no longer wired to leave full screen.
+  A browser cannot be put into full screen without a gesture, so
+  `src/fullscreen.js` waits for the first click or key press, asks once, and
+  never asks again - someone who leaves with F11 or Esc stays out.
 
 - **DEV RESET is game state only.** The pause menu's DEV RESET (`devReset` in
   `main.js`) puts the run back to how it booted - props standing, the

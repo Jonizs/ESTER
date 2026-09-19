@@ -10,18 +10,87 @@ import { ITEMS } from './inventory.js';
  * it behaves like the panels do - Esc or the scrim closes it, and the pause
  * menu takes precedence.
  *
- * There are no recipes yet; what it does show is what is on the bench to work
- * with, read straight off the inventory.
+ * The screen is the 4x4 grid in the top right, the craftable items flowing
+ * around it, and what is on the bench along the bottom. The grid is floated
+ * rather than placed in a column (see style.css), which is what lets the
+ * recipe list run down its left and then carry on underneath it - so a long
+ * list fills the page instead of stacking up in a narrow strip.
  */
+
+// The grid is 4x4. Nothing is dropped into it yet; the cells are here so the
+// bench looks like a bench and so the recipes have somewhere to lay out.
+export const GRID = { w: 4, h: 4 };
+
+/**
+ * What can be made. Each entry is
+ * `{ id, label, item, cost: [{ item, amount }] }`.
+ *
+ * Empty for now, on purpose - recipes are coming. Everything below already
+ * reads this list, so adding one is all that is needed to see it on screen.
+ */
+export const RECIPES = [];
+
 export function createCrafting({ inventory, blocked, onOpen }) {
   const root = document.getElementById('crafting');
   const stock = root.querySelector('#craft-stock');
-  const mark = root.querySelector('.blank-mark');
+  const grid = root.querySelector('#craft-grid');
+  const recipeList = root.querySelector('#craft-recipes');
 
-  mark.innerHTML = icon('crafting', 34);
+  // --- the grid -----------------------------------------------------------
+  // Built once: sixteen cells that never change shape.
+  for (let i = 0; i < GRID.w * GRID.h; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.dataset.cell = i;
+    grid.append(cell);
+  }
 
-  // Like the overview's tiles: the row is rebuilt only when what is held
-  // changes, and the numbers are written onto it every frame after that.
+  // --- the craftable items ------------------------------------------------
+  // Rebuilt only when the list of recipes changes, like the tiles below.
+  let recipeKey = null;
+
+  function updateRecipes() {
+    const key = RECIPES.map((r) => r.id).join(',');
+    if (key !== recipeKey) {
+      recipeKey = key;
+      recipeList.textContent = '';
+      recipeList.classList.toggle('is-empty', RECIPES.length === 0);
+
+      if (RECIPES.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'hint';
+        empty.textContent = 'Nothing to craft yet. Recipes will fill this side of the bench.';
+        recipeList.append(empty);
+      }
+
+      for (const recipe of RECIPES) {
+        const card = document.createElement('div');
+        card.className = 'recipe';
+        card.dataset.recipe = recipe.id;
+        card.innerHTML = `
+          <div class="recipe-icon">${icon(recipe.item ?? recipe.id, 22)}</div>
+          <div class="recipe-name">${recipe.label}</div>
+          <div class="recipe-cost">${
+            (recipe.cost ?? [])
+              .map((c) => `<span><b>${c.amount}</b> ${ITEMS[c.item]?.label ?? c.item}</span>`)
+              .join('')
+          }</div>`;
+        recipeList.append(card);
+      }
+    }
+
+    // Whether each one can be afforded right now, which is written onto the
+    // cards that are already there.
+    for (const recipe of RECIPES) {
+      const card = recipeList.querySelector(`[data-recipe="${recipe.id}"]`);
+      const enough = (recipe.cost ?? []).every((c) => inventory.count(c.item) >= c.amount);
+      card.classList.toggle('short', !enough);
+    }
+  }
+
+  // --- what is on the bench ------------------------------------------------
+  // Like the inventory page's tiles: the row is rebuilt only when what is
+  // held changes, and the numbers are written onto it every frame after that.
   let stockKey = null;
 
   function updateStock() {
@@ -60,6 +129,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
 
   function update() {
     if (!isOpen()) return;
+    updateRecipes();
     updateStock();
   }
 

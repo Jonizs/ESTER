@@ -16,6 +16,8 @@ import { createPlacement } from './placement.js';
 import { createInventory } from './inventory.js';
 import { createProgression } from './progression.js';
 import { createDebug } from './debug.js';
+import { createStarfields } from './starfield.js';
+import { autoFullscreen } from './fullscreen.js';
 
 const canvas = document.getElementById('viewport');
 
@@ -258,6 +260,15 @@ function showBindingsInHelp() {
 }
 
 showBindingsInHelp();
+
+// The drifting motes behind every pane. Built once, from the markup, and then
+// left to CSS - nothing here runs per frame.
+createStarfields();
+
+// Full screen on launch. The desktop window opens that way on its own; in a
+// browser this waits for the first click or key press, which is the only
+// moment the request is allowed.
+autoFullscreen();
 
 // The menu owns the keyboard while it is open, and a station being moved
 // owns the left-drag - both are the same gesture on the same canvas.

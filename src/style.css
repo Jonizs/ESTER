@@ -30,27 +30,60 @@
     radial-gradient(1px 1px   at 8% 84%,    rgba(255, 255, 255, 0.45), transparent 100%);
 }
 
-/* Everything that wants a drifting star tile behind its contents. The tile is
-   small and repeated, and the whole layer creeps so the surface is never quite
-   still - slow enough that it never pulls the eye off the page. */
+/* Everything that wants cosmic dust behind its contents. The faint tile below
+   is the bed; the motes that drift over it are individual elements, built by
+   src/starfield.js so each one can rise and breathe on its own clock. */
 .starfield::before {
   content: '';
   position: absolute;
-  inset: -40%;
+  inset: 0;
   background-image: var(--stars);
-  background-size: 240px 240px;
-  opacity: 0.55;
+  background-size: 300px 300px;
+  opacity: 0.18;
   pointer-events: none;
-  animation: drift 150s linear infinite;
 }
 
-@keyframes drift {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(-240px, -240px, 0); }
+/* The mote layer. It sits under everything on the surface - the panes give
+   their own contents `z-index: 1`, so this is pinned to 0 rather than picking
+   up one of those rules by being a child. */
+.starfield > .stars {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
+/* Two clocks per mote, both seeded in JS: it rises the height of the surface
+   over `--rise`, and fades all the way in and out again over `--fade`. The
+   two are deliberately unrelated, so a mote can wink out mid-climb and the
+   field never falls into step with itself. */
+.starfield .star {
+  position: absolute;
+  top: 108%;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  box-shadow: 0 0 6px rgba(190, 220, 255, 0.55);
+  animation:
+    star-rise var(--rise) linear var(--rise-delay) infinite,
+    star-fade var(--fade) ease-in-out var(--fade-delay) infinite;
+}
+
+@keyframes star-rise {
+  from { top: 108%; }
+  to   { top: -8%; }
+}
+
+@keyframes star-fade {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: var(--lit, 0.6); }
+}
+
+/* Nothing drifts if the machine has asked for that: the bed tile stays and
+   the motes go, rather than sitting frozen mid-climb. */
 @media (prefers-reduced-motion: reduce) {
-  .starfield::before { animation: none; }
+  .starfield > .stars { display: none; }
 }
 
 * { box-sizing: border-box; }
@@ -710,11 +743,26 @@ html, body {
 
 #panels .stat .bar { margin-top: 11px; height: 6px; }
 
+/* One column, since the inventory moved onto a page of its own - kept as a
+   grid so a second column can come back without reshaping the overview. */
 #panels .columns {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(290px, 0.7fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 26px;
   align-items: start;
+}
+
+/* --- the inventory page --------------------------------------------------- */
+
+#panels .inventory {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  min-height: 100%;
+}
+
+#panels .inventory .tiles {
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
 }
 
 #panels .column > h3:not(:first-child) { margin-top: 24px; }
@@ -992,7 +1040,6 @@ html, body {
   #panels .tab { grid-template-columns: 1fr; justify-items: center; gap: 5px; padding: 10px 4px; }
   #panels .tab kbd { justify-self: center; }
   #panels .rail { padding: 16px 10px; }
-  #panels .columns { grid-template-columns: minmax(0, 1fr); }
   #panels .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #panels .content-head, #panels .content-body { padding-left: 20px; padding-right: 20px; }
 }
@@ -1078,7 +1125,7 @@ html, body {
 
 #menu .panel { border-radius: 16px; }
 
-#menu .panel > *,
+#menu .panel > :not(.stars),
 #panels .rail,
 #panels .content,
 #crafting .craft-head,
@@ -1193,8 +1240,7 @@ html, body {
   color: var(--accent);
 }
 
-#panels .blank-mark,
-#crafting .blank-mark {
+#panels .blank-mark {
   border-color: var(--edge-lit);
   background: linear-gradient(180deg, rgba(185, 140, 255, 0.18), rgba(138, 216, 255, 0.06));
   box-shadow: 0 0 40px rgba(138, 216, 255, 0.16);
@@ -1205,13 +1251,11 @@ html, body {
 #panels .content-body::-webkit-scrollbar-thumb { background: rgba(185, 140, 255, 0.4); }
 #panels .content-body { scrollbar-color: rgba(185, 140, 255, 0.4) transparent; }
 
-/* --- the inventory fills its column --------------------------------------
-   It used to share the column with a card counting the isle's trees and
-   rocks; that is gone, so the tiles now take the whole column and run to the
-   bottom of the page. `align-content: start` keeps them packed at the top of
-   that space rather than stretched tall. */
-
-#panels .columns { align-items: stretch; }
+/* --- the inventory fills its page ----------------------------------------
+   It used to share the overview's right column; it has a page of its own now
+   (Q), so the framed field of tiles runs the height of that page.
+   `align-content: start` keeps the tiles packed at the top of that space
+   rather than stretched tall. */
 
 #panels .column {
   display: flex;
@@ -1220,7 +1264,6 @@ html, body {
 }
 
 #panels #panel-inventory {
-  flex: 1;
   align-content: start;
   padding: 14px;
   border-radius: 16px;
@@ -1303,49 +1346,115 @@ html, body {
   color: var(--ink);
 }
 
+/* Block flow rather than a grid on purpose: the 4x4 grid below floats right,
+   and only normal flow lets the craftable items run down its left and then
+   carry on underneath it once there are more than fit beside it. */
 #crafting .craft-body {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 22px;
+  display: block;
   padding: 24px 28px 28px;
   overflow-y: auto;
 }
 
-#crafting .blank {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  text-align: center;
-  padding: 20px;
+/* --- the 4x4 grid, top right --------------------------------------------- */
+
+#crafting .craft-grid {
+  float: right;
+  width: 268px;
+  margin: 0 0 22px 26px;
 }
 
-#crafting .blank-mark {
+#crafting .grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--edge-lit);
+  background: linear-gradient(180deg, rgba(150, 180, 255, 0.08), rgba(150, 180, 255, 0.02));
+  box-shadow: inset 0 0 30px rgba(138, 216, 255, 0.07);
+}
+
+#crafting .grid4 .cell {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid rgba(150, 180, 255, 0.16);
+  background: rgba(4, 3, 14, 0.42);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+#crafting .grid4 .cell:hover {
+  border-color: var(--edge-lit);
+  background: rgba(138, 216, 255, 0.1);
+}
+
+/* --- the craftable items -------------------------------------------------- */
+
+/* Inline-block cards, so they wrap around the floated grid instead of being
+   held in a column beside it the way a grid or flex container would be. */
+#crafting .recipes {
+  font-size: 0;            /* no gaps between the inline-block cards */
+}
+
+#crafting .recipes.is-empty {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px dashed rgba(150, 180, 255, 0.16);
+}
+
+#crafting .recipe {
+  display: inline-block;
+  vertical-align: top;
+  width: 168px;
+  margin: 0 10px 10px 0;
+  padding: 13px 14px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(150, 180, 255, 0.12);
+  background: linear-gradient(180deg, rgba(150, 180, 255, 0.075), rgba(150, 180, 255, 0.02));
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#crafting .recipe:hover { border-color: var(--edge-lit); }
+
+/* Too few of something on the bench: still listed, just dimmed. */
+#crafting .recipe.short { opacity: 0.45; }
+
+#crafting .recipe-icon {
   display: grid;
   place-items: center;
-  width: 74px;
-  height: 74px;
-  margin-bottom: 20px;
-  border-radius: 22px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--edge-lit);
+  background: linear-gradient(180deg, rgba(185, 140, 255, 0.2), rgba(138, 216, 255, 0.08));
   color: var(--accent);
 }
 
-#crafting .blank h3 {
-  margin: 0 0 8px;
-  font-size: 15px;
-  letter-spacing: 0.14em;
-  text-transform: none;
+#crafting .recipe-name {
+  margin-top: 10px;
+  font-size: 13px;
   color: var(--ink);
-  text-shadow: none;
 }
 
-#crafting .blank p {
-  max-width: 44ch;
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.7;
+#crafting .recipe-cost {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 6px;
+  font-size: 11px;
   color: var(--dim);
+}
+
+#crafting .recipe-cost b { color: var(--ink); font-weight: 600; }
+
+/* --- what is on the bench -------------------------------------------------- */
+
+/* Below both, whatever the recipe list did or did not flow under. */
+#crafting .craft-stock {
+  clear: both;
+  padding-top: 22px;
 }
 
 #crafting h3 {
