@@ -170,6 +170,27 @@ export class Person {
     return this._startNextJob();
   }
 
+  /** How much work they have on: the job in hand and everything behind it. */
+  jobCount() {
+    return this.queue.length + (this.task ? 1 : 0);
+  }
+
+  /**
+   * Put one more job behind whatever they are doing, up to `limit` in all.
+   *
+   * With nothing on they simply start it. An order already given is never
+   * interrupted by this - that is the whole point of it - and asking twice
+   * for the same thing does nothing rather than queueing it twice.
+   */
+  queueUp(prop, limit = Infinity) {
+    if (prop.gone || !PROP_KINDS[prop.kind]?.action) return false;
+    if (this.task?.prop === prop || this.queue.includes(prop)) return false;
+    if (!this.task) return this._begin(prop);
+    if (this.jobCount() >= limit) return false;
+    this.queue.push(prop);
+    return true;
+  }
+
   /** Walk over and work on a prop, leaving the queue alone. */
   _begin(prop) {
     if (prop.gone || !PROP_KINDS[prop.kind]?.action) return false;

@@ -70,7 +70,9 @@ export function createSelectBox({ canvas, blocked, onBox }) {
     const was = dragging;
     const r = rect(press, { x: event.clientX, y: event.clientY });
     stop();
-    if (was) onBox?.(r);
+    // Ctrl (or Cmd) means the same here as it does on a click: behind the
+    // work already ordered rather than instead of it.
+    if (was) onBox?.(r, { queue: !!(event.ctrlKey || event.metaKey) });
   }
 
   canvas.addEventListener('pointerup', release);

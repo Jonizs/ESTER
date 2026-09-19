@@ -165,19 +165,42 @@ with one inhabitant who walks around and works on what is there.
   is one pointer for both buttons, so each gesture stands the other down
   while it is running - `controls.pointerBlocked` and the box's `blocked`
   check each other, or one drag would do both things at once.
-- **A box takes agents over props, always.** `applyBox` in `main.js` looks
-  for agents inside the rectangle first and, if it finds any, selects the one
-  nearest the middle of the box and stops - selection is single, so a box
-  over a crowd still comes out with exactly one. Only a box with no agent in
-  it is read as work. That is also why a box thrown over the whole screen is
-  a selection, not an order: the agent is in it.
-- **A box of work is one order, not many.** Everything in the box there is
-  something to do to goes to the selected agent as a queue (`workOnAll` in
-  `person.js`), and they take the nearest job each time one is finished -
+- **A box with work in it is work; a box with only people in it is a
+  selection.** `applyBox` in `main.js` reads both, and an agent already
+  selected plus something to do in the box is an order - even if the box
+  clipped that agent on its way past. Taking agents first was the obvious
+  rule and it was wrong: swiping a rock while grazing the agent reselected
+  them and threw the order away, which is nothing happening as far as the
+  player can see. A box with nobody selected, or one that caught only
+  agents, still selects the one nearest the middle of the box, and exactly
+  one - selection is single.
+- **An agent is never given more than three jobs at once.** `JOB_LIMIT` in
+  `main.js` is the cap and it covers both ways of giving work: a box keeps
+  the three caught nearest the middle of it and leaves the rest standing, so
+  a box thrown across half the isle is not a whole afternoon's work on one
+  order, and a queue click is refused once there are three. The middle of the
+  box is what picks the agent out of a crowd too, so the same rule decides
+  both. The three go to the selected agent as a queue
+  (`workOnAll` in `person.js`), and they take the nearest job each time one
+  is finished -
   measured from wherever they are then, not from where they started.
   Anything unreachable or already felled is skipped rather than stalling the
   batch, and `walkTo` calls the whole thing off. The bench is left out of a
   box on purpose: it is a station with a cost, repaired by clicking it.
+- **Ctrl adds, and never takes anything away.** Holding it turns a click on
+  a tree or a rock into `queueUp` (`person.js`) - behind whatever the agent
+  is already doing rather than instead of it, up to `JOB_LIMIT` in all, and
+  asking twice for the same thing does nothing rather than queueing it
+  twice. A box drawn with it held adds as well, taking however many of the
+  three are still going spare. Because it only ever adds, a queue click that
+  misses is silent: on bare ground it does not send them walking, and on the
+  void it does not drop the selection. `queueing(event)` in `main.js` is the
+  one test, and it takes Cmd as well for a Mac in a browser.
+- **A queue is worked nearest-first, however it was given.** `_startNextJob`
+  picks the nearest job to wherever the agent is standing *then*, so neither
+  the order things were ctrl-clicked in nor the order they came out of a box
+  is kept. That is the same rule for both, which is the point - two
+  orderings would be worse than one that is occasionally not what was meant.
 - **The box checks what the isle hides.** `hiddenByIsland` casts one ray per
   candidate when the button comes up, so a box dragged over the near slope
   does not quietly take in the trees on the far side. It is a handful of

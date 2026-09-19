@@ -472,7 +472,7 @@ const selectBox = createSelectBox({
     menu.isOpen() || crafting.isOpen() || panels.isOpen() ||
     placement.isActive() || controls.isDragging()
   ),
-  onBox: (rect) => applyBox(rect)
+  onBox: (rect, how) => applyBox(rect, how)
 });
 
 function leaveGame() {
@@ -524,6 +524,14 @@ function agentInSlot(slot) {
 }
 
 /**
+ * Whether this click is meant to go behind the work already ordered rather
+ * than replace it. Cmd counts as well as Ctrl, for a Mac in a browser.
+ */
+function queueing(event) {
+  return !!(event.ctrlKey || event.metaKey);
+}
+
+/**
  * Who an order is for, or null if nobody is selected.
  *
  * *Every* order needs a selected agent - walking somewhere as much as working
@@ -556,7 +564,12 @@ function handleClick(event) {
           if (!PROP_KINDS[prop.kind].action) return;
           const agent = selectedAgent();
           if (!agent) return;
-          agent.workOn(prop);
+          // Ctrl held: behind whatever they are already doing rather than
+          // instead of it, up to three jobs in all. A full queue simply
+          // refuses the click - the lit props are what say how many there
+          // are.
+          if (queueing(event)) agent.queueUp(prop, JOB_LIMIT);
+          else agent.workOn(prop);
           return;
         }
       }
@@ -567,6 +580,9 @@ function handleClick(event) {
     const x = Math.round(hit.point.x);
     const z = Math.round(hit.point.z);
     if (surface.has(`${x},${z}`)) {
+      // Ctrl is the queue gesture, so a miss with it held leaves the queue
+      // alone rather than calling the whole thing off and walking there.
+      if (queueing(event)) return;
       const agent = selectedAgent();
       if (!agent) return;
       if (agent.walkTo({ x, z })) markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
@@ -574,11 +590,17 @@ function handleClick(event) {
     }
   }
 
-  // Clicked the void: nothing is selected any more.
-  selectOnly(null);
+  // Clicked the void: nothing is selected any more - unless this was a
+  // queue click, which only ever adds and never takes the selection away.
+  if (!queueing(event)) selectOnly(null);
 }
 
 // --- the selection box ---------------------------------------------------
+
+// How much work one agent may be given at once - by a box, or by holding
+// the queue key down and picking things out one at a time. Everything over
+// the three is left standing.
+const JOB_LIMIT = 3;
 
 const boxPoint = new THREE.Vector3();
 const boxDir = new THREE.Vector3();
@@ -631,31 +653,55 @@ function hiddenByIsland(point) {
  * their way through it nearest first. With nobody selected it does nothing
  * at all, the same as every other order.
  */
-function applyBox(box) {
+function applyBox(box, { queue = false } = {}) {
   const centre = { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
+  const toCentre = (at) => Math.hypot(at.x - centre.x, at.y - centre.y);
 
+  // Who is standing in the box, nearest the middle of it first.
   let pick = null;
   for (const agent of agents) {
     const at = onScreen(boxAt.copy(agent.pos).setY(agent.pos.y + 0.8));
     if (!inBox(box, at)) continue;
-    const d = Math.hypot(at.x - centre.x, at.y - centre.y);
+    const d = toCentre(at);
     if (!pick || d < pick.d) pick = { agent, d };
   }
-  if (pick) { selectOnly(pick.agent); return; }
 
-  const agent = selectedAgent();
-  if (!agent) return;
-
-  // The bench is left out: it is a station with a cost, repaired by clicking
-  // it, not something to sweep up with the trees. Saplings have no `action`,
-  // so they fall out on their own.
-  const batch = props.filter((prop) => {
-    if (prop.gone || prop.kind === 'workbench' || !PROP_KINDS[prop.kind]?.action) return false;
+  // What there is to do in the box. The bench is left out: it is a station
+  // with a cost, repaired by clicking it, not something to sweep up with the
+  // trees. Saplings have no `action`, so they fall out on their own.
+  const caught = [];
+  for (const prop of props) {
+    if (prop.gone || prop.kind === 'workbench' || !PROP_KINDS[prop.kind]?.action) continue;
     boxAt.copy(prop.mesh.position).setY(prop.mesh.position.y + 0.5);
-    return inBox(box, onScreen(boxAt)) && !hiddenByIsland(boxAt);
-  });
+    const at = onScreen(boxAt);
+    if (!inBox(box, at) || hiddenByIsland(boxAt)) continue;
+    caught.push({ prop, d: toCentre(at) });
+  }
 
-  if (batch.length > 0) agent.workOnAll(batch);
+  // Three at a time and no more. A box thrown across half the isle would
+  // otherwise be a whole afternoon's work on one order, and there would be
+  // no seeing what was in it - the agent is picked out of a crowd on the
+  // middle of the box the same way, so the three nearest it are the ones
+  // kept and the rest are left standing.
+  caught.sort((a, b) => a.d - b.d);
+  const batch = caught.slice(0, JOB_LIMIT).map((entry) => entry.prop);
+
+  // An agent already selected and something to do: that is an order, even
+  // if the box clipped the agent on its way past. Catching whoever is
+  // already selected used to throw the order away and reselect them, which
+  // is nothing happening as far as the player can see.
+  const agent = selectedAgent();
+  if (agent && batch.length > 0) {
+    // Held down, a box adds to the queue instead of replacing it - however
+    // many of the three are still going spare.
+    if (queue) for (const prop of batch) agent.queueUp(prop, JOB_LIMIT);
+    else agent.workOnAll(batch);
+    return;
+  }
+
+  // Otherwise a box with someone in it is a selection, and exactly one comes
+  // out of it - selection is single.
+  if (pick) selectOnly(pick.agent);
 }
 
 // --- AGENT SWARM (dev) ----------------------------------------------------
