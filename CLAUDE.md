@@ -138,12 +138,21 @@ with one inhabitant who walks around and works on what is there.
 - **The agent never acts on its own.** It only walks and works when clicked;
   there is no idle "find something to do" behaviour, and reintroducing one was
   explicitly refused.
-- **Work orders need the agent selected first.** Clicking a tree, a rock or
-  the broken bench does nothing at all unless an agent is selected - it says
-  so in `#toast` instead, through `ordersAllowed()` in `main.js`. Opening the
-  *repaired* bench is exempt, because that opens a screen rather than giving
-  an order, and so is the ground click that sends the agent walking, which
-  still works with nothing selected.
+- **Every order needs the agent selected first**, walking included. A click
+  on a tree, a rock, the broken bench *or* bare ground does nothing at all
+  unless an agent is selected - it says so in `#toast` instead, through
+  `ordersAllowed()` in `main.js`. The one exemption is opening the *repaired*
+  bench, because that opens a screen rather than giving an order.
+- **Selection is single, and `selectOnly()` is the only thing that sets it.**
+  Clicking an agent, clicking their card in the overview, the number keys,
+  right-clicking and clicking the void all go through it, so exactly one
+  agent or none is ever selected. Anything new that selects should call it
+  rather than `setSelected` directly, or two agents end up lit at once.
+- **The number keys are slots into `agents`, not names.** `selectAgent1`
+  through `selectAgent5` in `settings.js` are ordinary rebindable actions,
+  and the slot indexes the same `agents` list the overview lists in order.
+  An empty slot says so rather than clearing the selection, so a mis-hit
+  never leaves the player with nothing selected.
 - **`person.action` is user-facing text**, rendered above their head while
   they work, so it must be a readable sentence ("Cutting down a tree"), never
   an internal state name. It is `null` whenever no work is under way - walking

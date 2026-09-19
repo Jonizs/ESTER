@@ -170,7 +170,7 @@ const panels = createPanels({
   inventory,
   progression,
   blocked: () => menu.isOpen() || crafting.isOpen() || placement.isActive(),
-  onSelect: (agent) => agent.setSelected(true)
+  onSelect: (agent) => selectOnly(agent)
 });
 
 // Crafting is a screen of its own, reached by clicking the repaired bench
@@ -307,20 +307,33 @@ canvas.addEventListener('pointerup', (e) => {
   if (performance.now() - started.t > 500) return;
 
   // Right click clears the selection, wherever it lands.
-  if (started.button === 2) { person.setSelected(false); return; }
+  if (started.button === 2) { selectOnly(null); return; }
   if (started.button === 0) handleClick(e);
 });
 
 /**
- * Whether a click may give the agent work.
+ * Select one agent and no other. Selection is single: the stats panel, the
+ * order gate below and the number keys all assume exactly one or none.
+ */
+function selectOnly(agent) {
+  for (const other of agents) other.setSelected(other === agent);
+}
+
+/** The agent in a number-key slot, or null if nobody is in it. */
+function agentInSlot(slot) {
+  return agents[slot - 1] ?? null;
+}
+
+/**
+ * Whether a click may order the agent about.
  *
- * Nothing is collected by clicking it on its own: an agent has to be selected
- * first, so a stray click on a tree is never an order. Says why when it
- * refuses, rather than silently doing nothing.
+ * *Every* order needs a selected agent - walking somewhere as much as working
+ * on something - so a stray click on the isle never moves anyone. Says why it
+ * refused rather than silently doing nothing.
  */
 function ordersAllowed() {
-  if (person.selected) return true;
-  toast('Select an agent first, then click what it should work on.');
+  if (agents.some((a) => a.selected)) return true;
+  toast('Select an agent first - press 1, or click them.');
   return false;
 }
 
@@ -334,7 +347,7 @@ function handleClick(event) {
     let object = hit.object;
     while (object) {
       // The agent itself: select it and show its stats.
-      if (object.userData.isPerson) { person.setSelected(true); return; }
+      if (object.userData.isPerson) { selectOnly(person); return; }
 
       if (object.userData.propId) {
         const prop = props.find((p) => p.id === object.userData.propId);
@@ -352,6 +365,7 @@ function handleClick(event) {
     const x = Math.round(hit.point.x);
     const z = Math.round(hit.point.z);
     if (surface.has(`${x},${z}`)) {
+      if (!ordersAllowed()) return;
       if (person.walkTo({ x, z })) {
         setTarget(null);
         markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
@@ -361,7 +375,7 @@ function handleClick(event) {
   }
 
   // Clicked the void: nothing is selected any more.
-  person.setSelected(false);
+  selectOnly(null);
 }
 
 // --- the job label over the agent's head --------------------------------
@@ -450,6 +464,23 @@ canvas.addEventListener('pointerleave', () => {
   pointerAt = null;
   refreshHover();
 });
+
+// The number keys pick an agent by its slot, the way the overview lists them.
+window.addEventListener('keydown', (event) => {
+  if (menu.isOpen() || placement.isActive()) return;
+
+  const action = settings.actionFor(event.key);
+  if (!action?.startsWith('selectAgent')) return;
+  event.preventDefault();
+
+  const slot = Number(action.slice('selectAgent'.length));
+  const agent = agentInSlot(slot);
+  if (!agent) {
+    toast(`No agent in slot ${slot}.`);
+    return;
+  }
+  selectOnly(agent);
+}, true);
 
 // The move key picks up whatever the cursor is on.
 window.addEventListener('keydown', (event) => {

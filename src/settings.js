@@ -17,6 +17,13 @@ export const ACTIONS = [
   { id: 'resetView', label: 'Reset view', key: 'r' },
   { id: 'autoSpin', label: 'Toggle auto-spin', key: 'f' },
   { id: 'moveStation', label: 'Move station', key: 'a' },
+  // One slot per agent, in the order the overview lists them. There is only
+  // one agent so far; the rest are here so a second one needs no new wiring.
+  { id: 'selectAgent1', label: 'Select agent 1', key: '1' },
+  { id: 'selectAgent2', label: 'Select agent 2', key: '2' },
+  { id: 'selectAgent3', label: 'Select agent 3', key: '3' },
+  { id: 'selectAgent4', label: 'Select agent 4', key: '4' },
+  { id: 'selectAgent5', label: 'Select agent 5', key: '5' },
   { id: 'panelOverview', label: 'Overview', key: 'Tab' },
   { id: 'panelQuests', label: 'Quest book', key: 'w' },
   { id: 'panelStages', label: 'Stages', key: 'e' }
