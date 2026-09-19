@@ -23,17 +23,28 @@ export const ICONS = {
   agent: '<path d="M12 4a3.2 3.2 0 110 6.4A3.2 3.2 0 0112 4zM5 20a7 7 0 0114 0"/>',
 
   // --- the materials on the isle -----------------------------------------
-  // A stack of logs seen end-on, two under one. The ring inside each is what
-  // makes them logs rather than pipes, and the stack is what makes it a pile
-  // of timber rather than one log.
-  wood: '<circle cx="8.2" cy="15.3" r="3.9"/><circle cx="8.2" cy="15.3" r="1.3"/>'
-      + '<circle cx="15.8" cy="15.3" r="3.9"/><circle cx="15.8" cy="15.3" r="1.3"/>'
-      + '<circle cx="12" cy="8.4" r="3.9"/><circle cx="12" cy="8.4" r="1.3"/>',
+  // A cut log stood on its end, growth rings turned to the viewer.
+  //
+  // Logs drawn lying down - end-on circles, a side view, a crossed pair -
+  // were all tried and all read as something else at tile size: a row of
+  // buttons, a battery, a bowtie. The rings are what carry it: nothing else
+  // in the set is a set of nested ellipses, so it is timber at a glance and
+  // at any size.
+  wood: '<ellipse cx="12" cy="8.6" rx="7.3" ry="3.5"/>'
+      + '<ellipse cx="12" cy="8.6" rx="4" ry="1.9"/>'
+      + '<ellipse cx="12" cy="8.6" rx="1.3" ry="0.6"/>'
+      + '<path d="M4.7 8.6v5.3a7.3 3.5 0 0014.6 0V8.6"/>'
+      + '<path d="M8.3 12.6v3.9M15.7 12.6v3.9"/>',
 
-  // A chunk of rock: a broad flat base so it sits on the ground, and two
-  // facets meeting at the top so the light has a side to fall on.
-  stone: '<path d="M4.5 17.6l1.9-6.5 5.4-3.6 6.5 3.2 1.3 6.9z"/>'
-       + '<path d="M6.4 11.1l5.6 2.3 6.3-2.2M12 13.4v4.2"/>',
+  // A broken boulder with a chip knocked off it. An outline with one crease
+  // reads as an empty bag, so the face is split by a crease running the
+  // width of it and two spurs down from it, and the chip in front says
+  // stone-the-material rather than one rock.
+  stone: '<path d="M8.6 18.6l-1.4-5 3.2-4.1 5.3-.6 4.1 4.2-1.2 5.5z"/>'
+       + '<path d="M7.2 13.6l3.6 1.3 4.7-2.2 4.2 1.8"/>'
+       + '<path d="M10.8 14.9l-.4 3.7M15.5 12.7l1.3 5.9"/>'
+       + '<path d="M12.6 16.8h1.6"/>'
+       + '<path d="M2.4 18.6l.5-3 2.6-1.1 1.9 2.2-.4 1.9z"/>',
 
   // A shoot with two leaves, well under the tree's own bulk so the two never
   // read as the same thing at tile size.

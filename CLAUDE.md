@@ -409,8 +409,16 @@ with one inhabitant who walks around and works on what is there.
   the top of that space rather than stretched tall.
 - **Every material has an icon, and it is `itemIcon` that guarantees it.**
   The glyphs are in `src/icons.js`, drawn as little emblems of the thing -
-  a stack of cut logs, a chunk of rock, a shoot - the way a board game marks
-  its resources, all on the same 24x24 grid at one weight of line. `icon()`
+  a cut log with its growth rings, a broken boulder, a shoot - the way a
+  board game marks its resources, all on the same 24x24 grid at one weight
+  of line. Two of them took several goes and the rejected shapes are worth
+  not repeating: logs drawn *lying down* all read as something else at tile
+  size (end-on circles as a row of buttons, a side view as a battery, a
+  crossed pair as a bowtie), and a rock drawn as an outline with one crease
+  reads as an empty bag. What fixed them was nested ellipses for the wood -
+  nothing else in the set is that shape - and, for the stone, a crease
+  running the width of the face with spurs down from it plus a chip in
+  front. Judge a new one at 24px, not at 64: that is the size it ships at. `icon()`
   is strict and comes back empty for a name it does not know, which is what
   a mistyped *tab* should do; `itemIcon()` falls back to the crate, because a
   tile with nothing drawn on it reads as a bug and an item is the one thing
