@@ -122,6 +122,20 @@ const HIGHLIGHT = 0xffc83d;
 // something the cursor is already over, so there is nothing to see through.
 const OUTLINE_COLOUR = 0x8ad8ff;
 
+/**
+ * Whether a prop can be picked up and moved right now.
+ *
+ * Anything that has still to be repaired is wreckage lying on the ground
+ * rather than a station to reposition - `cost` is what marks a kind as
+ * needing repair first, so this stays true of whatever is added next.
+ */
+export function canMove(prop) {
+  const kind = prop && !prop.gone && PROP_KINDS[prop.kind];
+  if (!kind?.placed) return false;
+  if (kind.cost && !prop.repaired) return false;
+  return true;
+}
+
 /** Give a prop's meshes their (hidden) edge outlines. Idempotent. */
 export function buildOutline(prop) {
   prop.mesh.traverse((object) => {

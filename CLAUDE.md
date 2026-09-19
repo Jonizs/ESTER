@@ -140,9 +140,15 @@ with one inhabitant who walks around and works on what is there.
   explicitly refused.
 - **Every order needs the agent selected first**, walking included. A click
   on a tree, a rock, the broken bench *or* bare ground does nothing at all
-  unless an agent is selected - it says so in `#toast` instead, through
-  `ordersAllowed()` in `main.js`. The one exemption is opening the *repaired*
-  bench, because that opens a screen rather than giving an order.
+  unless an agent is selected - `ordersAllowed()` in `main.js` is the gate.
+  The one exemption is opening the *repaired* bench, because that opens a
+  screen rather than giving an order.
+- **There are no toasts.** The line that used to appear at the top of the
+  screen was removed on request, along with everything it said. A refused
+  click, an empty agent slot and a bench with too little wood are all silent
+  now - so anything that needs to be *told* to the player belongs on a panel
+  or on a label in the world (`#bench-label` is the pattern), never in a
+  passing notice. Do not reintroduce one.
 - **Selection is single, and `selectOnly()` is the only thing that sets it.**
   Clicking an agent, clicking their card in the overview, the number keys,
   right-clicking and clicking the void all go through it, so exactly one
@@ -219,6 +225,12 @@ with one inhabitant who walks around and works on what is there.
   (`src/crafting.js`, `#crafting`), and the only way in is to click the
   workbench standing in the middle of the isle. Opening it closes the panels,
   so the two are never up together.
+- **Wreckage cannot be moved; repair it first.** `canMove()` in `props.js`
+  is the one test - a `placed` kind that also has a `cost` is not movable
+  until `prop.repaired`, so the fallen bench stays where it fell. It still
+  outlines on hover, because it is still something to interact with; it just
+  refuses the move key. `placement.begin` turns down anything `canMove` says
+  no to, so callers do not have to check first.
 - **The workbench starts broken and costs 10 wood.** It is an ordinary prop as
   far as clicking, highlighting and pathing go - `props` carries it - but
   finishing the work repairs it instead of removing it, so it is never
@@ -277,8 +289,16 @@ with one inhabitant who walks around and works on what is there.
   away from whatever the camera is looking at, snapped to the nearest axis,
   so the arrows keep meaning the same thing once the isle has been orbited.
   The D-pad's CSS grid is keyed off each button's `data-step`, not
-  `nth-of-type` - the drag handle counts as a button too, and keying off
-  position put two of the four arrows in the wrong cells.
+  `nth-of-type` - the middle of the cross is a mark rather than a button, and
+  keying off position put two of the four arrows in the wrong cells.
+- **A station is dragged on the isle, not by a handle.** With a move on,
+  left-press on the canvas and move: the station follows the cell under the
+  cursor. That is the same gesture that orbits the camera, so
+  `controls.pointerBlocked` hands it to `placement.js` for as long as the
+  move lasts - which is also why the orbit camera grew that hook beside
+  `keyboardBlocked`. The station only moves once the cursor actually travels,
+  so a plain click never teleports it, and `setPointerCapture` is wrapped in
+  a try/catch because a refused capture must not swallow the drag.
 - **DEV RESET puts stations back.** A placed prop carries `prop.home`, the
   anchor it started the run at, and `devReset` walks them back to it - a
   bench left at the far end of the isle otherwise survives the reset.

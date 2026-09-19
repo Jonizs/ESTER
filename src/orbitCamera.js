@@ -161,6 +161,9 @@ export class OrbitCamera {
     const dom = this.dom;
 
     dom.addEventListener('pointerdown', (e) => {
+      // Something else may own the drag - moving a station uses the same
+      // press-and-move on the same canvas, and it takes precedence.
+      if (this.pointerBlocked?.()) return;
       dom.setPointerCapture(e.pointerId);
       this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       this.velocity.set(0, 0);

@@ -1,17 +1,18 @@
 import * as THREE from 'three';
 import {
   PROP_KINDS, GROUND_OFFSET,
-  canPlace, placeProp, footprintCells, footprintCentre, footprintOf, syncBlocked
+  canMove, canPlace, placeProp, footprintCells, footprintCentre, footprintOf, syncBlocked
 } from './props.js';
 
 /**
  * Moving a placed station around the isle.
  *
  * Entered with the move key while the cursor is over a station (see
- * `PROP_KINDS[kind].placed`), and it owns the screen until it is placed or
- * cancelled. The station is nudged a cell at a time with the four arrows, or
- * dragged straight to a cell by holding the middle button and moving the
- * cursor over the isle.
+ * `canMove`), and it owns the screen until it is placed or cancelled. The
+ * station is nudged a cell at a time with the four arrows, or dragged
+ * straight to a cell by pressing the left button on the isle and moving -
+ * the camera stops orbiting on that drag for as long as the move is on, so
+ * the same gesture that turns the isle carries the station instead.
  *
  * The station never occupies anything illegal, not even mid-move: a move is
  * simply refused unless every cell of the footprint is solid ground at one
@@ -39,7 +40,6 @@ export function createPlacement({
   const root = document.getElementById('mover');
   const title = root.querySelector('.mover-what');
   const hint = root.querySelector('.mover-hint');
-  const dragButton = root.querySelector('#mover-drag');
 
   // The footprint under the station: one flat tile per cell it covers, plus
   // the outline of the whole rectangle.
@@ -58,6 +58,7 @@ export function createPlacement({
   let prop = null;            // the station being moved
   let origin = null;          // where it stood when the move began
   let refused = 0;            // seconds of red left on the footprint
+  let dragging = false;       // the left button is down on the isle
 
   const isActive = () => prop !== null;
 
@@ -195,7 +196,7 @@ export function createPlacement({
   // --- beginning and ending -----------------------------------------------
 
   function begin(next) {
-    if (!next || !PROP_KINDS[next.kind]?.placed) return false;
+    if (!canMove(next)) return false;
 
     prop = next;
     origin = { x: prop.x, z: prop.z };
@@ -207,6 +208,7 @@ export function createPlacement({
 
     buildMarker(prop.kind);
     showMarker();
+    canvas.style.cursor = 'grab';
 
     const { w, d } = footprintOf(prop.kind);
     title.textContent = PROP_KINDS[prop.kind].label.toUpperCase();
@@ -221,8 +223,10 @@ export function createPlacement({
     const moved = prop;
     prop = null;
     origin = null;
+    dragging = false;
     marker.visible = false;
     root.hidden = true;
+    canvas.style.cursor = '';
     syncBlocked(props, blocked);
     onEnd?.(moved);
   }
@@ -256,28 +260,38 @@ export function createPlacement({
     button.addEventListener('click', () => nudge(dx, dz));
   }
 
-  // Hold the middle button and move: pointer capture keeps the events coming
-  // to the button even once the cursor has left it for the isle, which is
-  // what makes this a real drag rather than a click-then-move mode.
-  dragButton.addEventListener('pointerdown', (event) => {
-    if (!isActive()) return;
+  // --- dragging it on the isle --------------------------------------------
+  // Left button down on the canvas and move, which is also how the camera
+  // orbits - so while a move is on, `controls.pointerBlocked` hands the
+  // gesture to us instead. The station is not moved on the press itself,
+  // only once the cursor actually travels, so a plain click never teleports
+  // it somewhere by accident.
+
+  canvas.addEventListener('pointerdown', (event) => {
+    if (!isActive() || event.button !== 0) return;
     event.preventDefault();
-    dragButton.setPointerCapture(event.pointerId);
-    dragButton.classList.add('dragging');
+    dragging = true;
+    canvas.style.cursor = 'grabbing';
+    // Capture keeps the drag alive if the cursor leaves the canvas, but it is
+    // only an improvement - a browser that refuses it must not lose the drag.
+    try { canvas.setPointerCapture(event.pointerId); } catch { /* no capture */ }
   });
 
-  dragButton.addEventListener('pointermove', (event) => {
-    if (!dragButton.hasPointerCapture?.(event.pointerId)) return;
+  canvas.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
     dragToPointer(event.clientX, event.clientY);
   });
 
   const endDrag = (event) => {
-    if (!dragButton.hasPointerCapture?.(event.pointerId)) return;
-    dragButton.releasePointerCapture(event.pointerId);
-    dragButton.classList.remove('dragging');
+    if (!dragging) return;
+    dragging = false;
+    canvas.style.cursor = isActive() ? 'grab' : '';
+    try {
+      if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    } catch { /* it was never captured */ }
   };
-  dragButton.addEventListener('pointerup', endDrag);
-  dragButton.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
 
   root.querySelector('#mover-place').addEventListener('click', commit);
   root.querySelector('#mover-cancel').addEventListener('click', cancel);

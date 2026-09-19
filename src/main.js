@@ -4,7 +4,7 @@ import { createSpace } from './space.js';
 import { OrbitCamera } from './orbitCamera.js';
 import {
   createProps, setPropHighlight, setPropOutline, setWorkbenchState,
-  placeProp, footprintCells, syncBlocked, GROUND_OFFSET, PROP_KINDS
+  canMove, placeProp, footprintCells, syncBlocked, GROUND_OFFSET, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
 import { createMarkers } from './markers.js';
@@ -98,7 +98,6 @@ function finishProp(prop) {
     prop.mesh.traverse((o) => {
       if (o.material && o.castShadow) o.material.shadowSide = THREE.FrontSide;
     });
-    toast('The workbench is whole again. Click it to craft.');
     return;
   }
 
@@ -121,11 +120,9 @@ function useWorkbench(prop) {
   if (person.task?.prop === prop) return;   // already on its way
 
   const cost = PROP_KINDS.workbench.cost;
-  const held = inventory.count(cost.item);
-  if (held < cost.amount) {
-    toast(`The workbench needs ${cost.amount} wood to repair - ${held} gathered.`);
-    return;
-  }
+  // The badge over the bench already says how much wood it wants and how
+  // much there is, so a click without enough simply does nothing.
+  if (inventory.count(cost.item) < cost.amount) return;
   if (person.workOn(prop)) setTarget(prop);
 }
 
@@ -198,7 +195,6 @@ const placement = createPlacement({
     panels.close();
     crafting.close();
     setHovered(prop);           // keep it outlined for the whole move
-    toast('Arrows nudge it a cell; hold DRAG to place it by hand.');
   },
   onEnd: () => {
     hovered = null;
@@ -251,7 +247,6 @@ function devReset() {
   panels.close();
   crafting.close();
   menu.close();
-  toast('Reset. The isle is as it was at boot.');
 }
 
 // The corner hints name whatever the keys are bound to now, so rebinding
@@ -264,8 +259,10 @@ function showBindingsInHelp() {
 
 showBindingsInHelp();
 
-// The menu owns the keyboard while it is open.
+// The menu owns the keyboard while it is open, and a station being moved
+// owns the left-drag - both are the same gesture on the same canvas.
 controls.keyboardBlocked = () => menu.isOpen();
+controls.pointerBlocked = () => placement.isActive();
 
 function leaveGame() {
   // The desktop build can actually quit; in a browser tab all that can be
@@ -274,19 +271,6 @@ function leaveGame() {
   window.close();
   // Still here, so the browser refused: say so rather than do nothing.
   document.getElementById('menu').querySelector('#menu-leave').textContent = 'CLOSE THIS TAB TO LEAVE';
-}
-
-// --- passing notices ------------------------------------------------------
-
-const toastEl = document.getElementById('toast');
-let toastTimer = null;
-
-/** A short line at the top of the screen, for things a click could not do. */
-function toast(text) {
-  toastEl.textContent = text;
-  toastEl.classList.add('visible');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toastEl.classList.remove('visible'), 3200);
 }
 
 const raycaster = new THREE.Raycaster();
@@ -328,13 +312,10 @@ function agentInSlot(slot) {
  * Whether a click may order the agent about.
  *
  * *Every* order needs a selected agent - walking somewhere as much as working
- * on something - so a stray click on the isle never moves anyone. Says why it
- * refused rather than silently doing nothing.
+ * on something - so a stray click on the isle never moves anyone.
  */
 function ordersAllowed() {
-  if (agents.some((a) => a.selected)) return true;
-  toast('Select an agent first - press 1, or click them.');
-  return false;
+  return agents.some((a) => a.selected);
 }
 
 function handleClick(event) {
@@ -474,12 +455,9 @@ window.addEventListener('keydown', (event) => {
   event.preventDefault();
 
   const slot = Number(action.slice('selectAgent'.length));
+  // An empty slot leaves the selection alone rather than clearing it.
   const agent = agentInSlot(slot);
-  if (!agent) {
-    toast(`No agent in slot ${slot}.`);
-    return;
-  }
-  selectOnly(agent);
+  if (agent) selectOnly(agent);
 }, true);
 
 // The move key picks up whatever the cursor is on.
@@ -488,10 +466,8 @@ window.addEventListener('keydown', (event) => {
   if (settings.actionFor(event.key) !== 'moveStation') return;
   event.preventDefault();
 
-  if (!hovered) {
-    toast('Point at a station first, then press it to move it.');
-    return;
-  }
+  // Nothing under the cursor, or wreckage that has still to be repaired:
+  // `begin` turns both down on its own.
   placement.begin(hovered);
 });
 

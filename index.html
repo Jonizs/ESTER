@@ -184,12 +184,14 @@
       <div class="mover-head">
         <span class="mover-what"></span>
         <span class="mover-hint"></span>
+        <span class="mover-drag-hint">Drag it on the isle, or nudge:</span>
       </div>
 
       <div class="pad">
         <button type="button" class="step" data-step="0,1" aria-label="Move away">&#9650;</button>
         <button type="button" class="step" data-step="-1,0" aria-label="Move left">&#9664;</button>
-        <button type="button" id="mover-drag" aria-label="Drag to place">DRAG</button>
+        <!-- Not a button any more: the drag happens on the isle itself. -->
+        <div class="pad-centre" aria-hidden="true">&#10021;</div>
         <button type="button" class="step" data-step="1,0" aria-label="Move right">&#9654;</button>
         <button type="button" class="step" data-step="0,-1" aria-label="Move nearer">&#9660;</button>
       </div>
@@ -199,9 +201,6 @@
         <button type="button" id="mover-cancel">CANCEL <kbd>Esc</kbd></button>
       </div>
     </div>
-
-    <!-- A line at the top of the screen for things a click could not do. -->
-    <div id="toast"></div>
 
     <div id="menu" hidden>
       <div class="panel starfield">
