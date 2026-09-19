@@ -139,13 +139,16 @@ export function createPanels({ settings, agents, inventory, progression, blocked
         const tile = document.createElement('div');
         tile.className = 'tile';
         tile.dataset.item = entry.item;
-        // Each material is drawn in its own colour; anything without one
-        // falls back to the UI's accent.
+        // What it is called is on the tile as data rather than as text: the
+        // slot shows the picture and the count, and CSS puts the name up
+        // only while the cursor is on it.
+        tile.dataset.label = ITEMS[entry.item].label;
+        // The material's own colour, for the slot's glow.
         if (ITEMS[entry.item].tint) tile.style.setProperty('--tint', ITEMS[entry.item].tint);
+        // Drawn large: the picture is what the slot reads as.
         tile.innerHTML = `
-          <div class="tile-icon">${itemIcon(entry.item, 24)}</div>
-          <div class="tile-count"></div>
-          <div class="tile-label">${ITEMS[entry.item].label}</div>`;
+          <div class="tile-icon">${itemIcon(entry.item, 64)}</div>
+          <div class="tile-count"></div>`;
 
         // Anything that can be put on the isle carries its own little button
         // for doing so - the screen closes and the sapling goes onto the

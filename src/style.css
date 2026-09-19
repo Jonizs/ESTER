@@ -762,7 +762,7 @@ html, body {
 }
 
 #panels .inventory .tiles {
-  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
 }
 
 #panels .column > h3:not(:first-child) { margin-top: 24px; }
@@ -914,7 +914,7 @@ html, body {
 
 #panels .tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 10px;
 }
 
@@ -925,38 +925,87 @@ html, body {
   border: 1px dashed rgba(233, 241, 255, 0.14);
 }
 
-#panels .tile {
-  padding: 13px 14px 12px;
-  border-radius: 13px;
-  border: 1px solid rgba(233, 241, 255, 0.09);
-  background: linear-gradient(180deg, rgba(233, 241, 255, 0.05), rgba(233, 241, 255, 0.015));
-}
-
-#panels .tile-icon {
+/* A square slot with the material drawn big in the middle of it, the way an
+   inventory reads: the picture is the thing, the count sits in the corner of
+   it, and what it is called is only there while the cursor is on it. */
+#panels .tile,
+#crafting .tile {
+  position: relative;
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: rgba(122, 215, 255, 0.1);
-  color: var(--accent);
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(233, 241, 255, 0.09);
+  background: linear-gradient(180deg, rgba(233, 241, 255, 0.05), rgba(233, 241, 255, 0.015));
+  overflow: hidden;
 }
 
-#panels .tile-count {
-  margin-top: 10px;
-  font-size: 21px;
+#panels .tile-icon,
+#crafting .tile-icon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* The art is drawn to the slot rather than to a fixed pixel size, so the
+   same tile works at every column width the grid lands on. */
+#panels .tile-icon .icon,
+#crafting .tile-icon .icon {
+  width: 62%;
+  height: 62%;
+}
+
+#panels .tile-count,
+#crafting .tile-count {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(6, 5, 18, 0.72);
+  border: 1px solid rgba(233, 241, 255, 0.12);
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  line-height: 1.25;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
-#panels .tile-label {
-  margin-top: 1px;
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
+/* What it is, only while the cursor is on it. Inside the slot rather than
+   floating above it, because the crafting screen's list scrolls and anything
+   outside the tile would be clipped by it. */
+#panels .tile::after,
+#crafting .tile::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  padding: 4px 2px;
+  border-radius: 8px;
+  background: rgba(6, 5, 18, 0.86);
+  border: 1px solid rgba(233, 241, 255, 0.12);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--dim);
+  text-align: center;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
 }
+
+#panels .tile:hover::after,
+#crafting .tile:hover::after { opacity: 1; }
+
+/* A slot with a button has it along the bottom, so the name sits above it
+   rather than over it - and the art is given that much room back, or the
+   button crops the bottom off it. */
+#panels .tile:has(.tile-action)::after { bottom: 34px; }
+#panels .tile:has(.tile-action) .tile-icon { padding-bottom: 28px; }
 
 /* The little button an item carries when there is something to do with it -
    a sapling's PLANT. It sits under the label on its own tile, small enough
@@ -964,10 +1013,11 @@ html, body {
    has these: the crafting screen's list is stock on the bench, not things to
    go and do. */
 #panels .tile-action {
-  display: block;
-  width: 100%;
-  margin-top: 9px;
-  padding: 6px 8px;
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  padding: 5px 6px;
   border-radius: 8px;
   border: 1px solid rgba(138, 216, 255, 0.3);
   background: linear-gradient(180deg, rgba(138, 216, 255, 0.18), rgba(185, 140, 255, 0.07));
@@ -1246,9 +1296,7 @@ html, body {
 #panels h3 .count { background: rgba(185, 140, 255, 0.2); }
 
 #panels .card,
-#panels .stat,
-#panels .tile,
-#crafting .tile {
+#panels .stat {
   border-color: rgba(150, 180, 255, 0.12);
   background:
     linear-gradient(180deg, rgba(150, 180, 255, 0.075), rgba(150, 180, 255, 0.02));
@@ -1260,22 +1308,28 @@ html, body {
   box-shadow: 0 0 26px rgba(138, 216, 255, 0.14);
 }
 
-#panels .agent-face,
-#panels .tile-icon,
-#crafting .tile-icon {
+#panels .agent-face {
   border-color: var(--edge-lit);
   background: linear-gradient(180deg, rgba(185, 140, 255, 0.2), rgba(138, 216, 255, 0.08));
   color: var(--accent);
 }
 
-/* Each material is drawn in its own colour - `--tint` is set on the tile
-   from `ITEMS` - so a row of them is told apart by colour as much as by
-   shape. Anything without one keeps the accent. */
-#panels .tile-icon,
-#crafting .tile-icon {
+/* `--tint` is the material's own colour, set on the tile from `ITEMS`. The
+   painted art carries its own colours, so the tint is the slot's glow rather
+   than the picture - it is what makes a row of them read apart at a glance.
+   A material still drawn as a line glyph picks it up as its ink. */
+#panels .tile,
+#crafting .tile {
+  border-color: color-mix(in srgb, var(--tint, var(--accent)) 30%, transparent);
+  background:
+    radial-gradient(120% 100% at 50% 118%, color-mix(in srgb, var(--tint, var(--accent)) 16%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(150, 180, 255, 0.075), rgba(150, 180, 255, 0.02));
   color: var(--tint, var(--accent));
-  border-color: color-mix(in srgb, var(--tint, var(--accent)) 45%, transparent);
-  box-shadow: inset 0 0 18px color-mix(in srgb, var(--tint, var(--accent)) 14%, transparent);
+}
+
+#panels .tile:hover,
+#crafting .tile:hover {
+  border-color: color-mix(in srgb, var(--tint, var(--accent)) 60%, transparent);
 }
 
 #panels .blank-mark {
@@ -1517,9 +1571,9 @@ html, body {
    top of the screen. */
 #crafting .tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: 10px;
-  max-height: 214px;
+  max-height: 208px;
   overflow-y: auto;
   padding-right: 6px;
 }
@@ -1540,34 +1594,7 @@ html, body {
   border: 1px dashed rgba(150, 180, 255, 0.16);
 }
 
-#crafting .tile {
-  padding: 13px 14px 12px;
-  border-radius: 13px;
-  border: 1px solid rgba(150, 180, 255, 0.12);
-}
-
-#crafting .tile-icon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-}
-
-#crafting .tile-count {
-  margin-top: 10px;
-  font-size: 21px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-#crafting .tile-label {
-  margin-top: 1px;
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--dim);
-}
+/* The slot itself is shared with the inventory page, above. */
 
 @media (max-width: 900px) {
   #crafting .craft-head { padding-left: 20px; padding-right: 20px; }

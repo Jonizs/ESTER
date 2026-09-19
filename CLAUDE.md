@@ -407,18 +407,37 @@ with one inhabitant who walks around and works on what is there.
   do not put the tiles back beside the agents. The framed field of tiles runs
   the height of the page, with `align-content: start` keeping them packed at
   the top of that space rather than stretched tall.
-- **Every material has an icon, and it is `itemIcon` that guarantees it.**
-  The glyphs are in `src/icons.js`, drawn as little emblems of the thing -
-  a cut log with its growth rings, a broken boulder, a shoot - the way a
-  board game marks its resources, all on the same 24x24 grid at one weight
-  of line. Two of them took several goes and the rejected shapes are worth
-  not repeating: logs drawn *lying down* all read as something else at tile
-  size (end-on circles as a row of buttons, a side view as a battery, a
-  crossed pair as a bowtie), and a rock drawn as an outline with one crease
-  reads as an empty bag. What fixed them was nested ellipses for the wood -
-  nothing else in the set is that shape - and, for the stone, a crease
-  running the width of the face with spurs down from it plus a chip in
-  front. Judge a new one at 24px, not at 64: that is the size it ships at. `icon()`
+- **The materials are painted; everything else is line art.** `ICONS` in
+  `src/icons.js` is the line-art set - tabs, empty-page marks, the agent -
+  stroked in `currentColor`, which is right for a *mark*. `MATERIAL_ART` is
+  the other set: a material is a thing, and a hollow outline of one reads as
+  a sticker with the middle missing, so those carry their own colours and
+  their own shading - a lit face, a shaded face, a dark edge. Warm browns for
+  the wood, cool greys for the stone, so they still belong to the same sky as
+  the UI. Same 24x24 grid as the rest.
+- **`itemIcon` is what picks between them, and it never comes back empty.**
+  Painted art if the material has any, the line glyph if not, and the crate
+  if it has neither - a tile with nothing drawn on it reads as a bug, and an
+  item is the one thing that can arrive without the icon set being touched.
+  The wrapper it builds for painted art deliberately sets *no* `fill` or
+  `stroke`: forcing `currentColor` over the top is exactly what would make it
+  hollow again. The materials nothing drops yet are still line art; they get
+  painted when something actually hands them out.
+- **Judge an icon at the size it ships at.** The tiles draw them big now, but
+  they are still read at a glance, and shapes that look fine at 64px turn to
+  mush. Earlier line-art attempts are worth not repeating: logs drawn lying
+  down read as a row of buttons, a battery, or a bowtie, and a rock drawn as
+  an outline with one crease reads as an empty bag.
+- **An inventory slot is a picture, a count and nothing else.** The tile is
+  square, the art is drawn to 62% of it, the count sits in a badge in the top
+  right corner, and what the material is *called* is on the tile as
+  `data-label` - CSS puts it up only while the cursor is on it. There is no
+  label text under the picture any more; do not put one back.
+- **The hover name goes inside the slot, not above it.** The crafting
+  screen's list scrolls, so anything floating outside the tile is clipped by
+  it. On a slot that also carries a button the name sits above the button
+  (`:has(.tile-action)`), and the art is given that much room back or the
+  button crops the bottom off it. `icon()`
   is strict and comes back empty for a name it does not know, which is what
   a mistyped *tab* should do; `itemIcon()` falls back to the crate, because a
   tile with nothing drawn on it reads as a bug and an item is the one thing
@@ -426,10 +445,11 @@ with one inhabitant who walks around and works on what is there.
   there for materials nothing drops yet (plank, grain, fibre, clay, ore,
   metal, coal, crystal) - `ITEMS` in `inventory.js` is what decides what
   actually exists, so they cost nothing until something does.
-- **A material's icon is drawn in its own colour.** `ITEMS[item].tint` is set
-  on the tile as `--tint` and the icon reads it, so a row of them is told
-  apart by colour as much as by shape. They are all luminous - the
-  no-flat-greys rule holds.
+- **`--tint` is the slot's glow, not the picture.** `ITEMS[item].tint` is the
+  material's own colour, set on the tile; the painted art carries its own
+  colours, so the tint lights the slot's edge and the wash behind it instead.
+  A material still drawn as a line glyph picks it up as its ink. They are all
+  luminous - the no-flat-greys rule holds.
 - **Item buttons belong to the inventory page, not the crafting screen.** The
   crafting screen's list is stock on the bench to build from; PLANT and
   anything like it live on the Q page, where the item is a thing to go and
