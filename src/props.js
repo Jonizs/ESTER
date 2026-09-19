@@ -153,8 +153,16 @@ export function placeProp(prop, cell, surface) {
  */
 let nextSpawnId = 0;
 
+/** A shape seed for something the run grew, rather than the isle. */
+const rollSalt = () => Math.floor(Math.random() * 100000);
+
 export function spawnProp(kind, cell, { surface, group, props, extra = {} }) {
-  const mesh = buildProp(kind, Math.floor(Math.random() * 1000));
+  // `salt` is what `buildProp` varies a prop's shape from - a tree's height,
+  // a sapling's yaw. It is kept on the prop and saved with it, so a restored
+  // one comes back the same tree rather than a different one in the same
+  // spot.
+  const salt = extra.salt ?? rollSalt();
+  const mesh = buildProp(kind, salt);
   group.add(mesh);
 
   const prop = {
@@ -165,7 +173,8 @@ export function spawnProp(kind, cell, { surface, group, props, extra = {} }) {
     mesh,
     gone: false,
     spawned: true,
-    ...extra
+    ...extra,
+    salt
   };
 
   placeProp(prop, cell, surface);
@@ -194,13 +203,15 @@ export function removeProp(prop, group, props) {
  * cell. The mesh is rebuilt rather than swapped for a new prop, so anything
  * already holding this prop - the agent's task, the hover - keeps working.
  */
-export function growProp(prop) {
+export function growProp(prop, salt = rollSalt()) {
   const grown = PROP_KINDS[prop.kind]?.grows;
   if (!grown) return false;
 
   for (const child of [...prop.mesh.children]) prop.mesh.remove(child);
-  const built = buildProp(grown, Math.floor(Math.random() * 1000));
+  const built = buildProp(grown, salt);
   for (const child of [...built.children]) prop.mesh.add(child);
+  // The tree it became is its own shape now, not the sapling's.
+  prop.salt = salt;
 
   prop.kind = grown;
   delete prop.growth;

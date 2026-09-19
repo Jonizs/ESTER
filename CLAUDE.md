@@ -557,6 +557,21 @@ with one inhabitant who walks around and works on what is there.
   `save.js` only serialises what they hand it and does the prop surgery
   itself. Anything that gains run state needs all three, or it quietly fails
   to survive a restart - the same trap as forgetting a `reset`.
+- **Write a prop's state back only to a kind that has that state.** The
+  restore wrote `repaired` onto every generated prop it found, and a tree's
+  `repaired` is `undefined` while `!!entry.repaired` is `false` - so
+  `undefined !== false` fired on all of them and rebuilt every tree and rock
+  as a broken workbench the moment a save was loaded. The guard is the kind
+  (`PROP_KINDS[kind].cost`), not the value. The data was never wrong, only
+  the meshes, which is why every test passed: a check on `kind` and `gone`
+  cannot see this. **Test a restore by what the props are built of** - how
+  many meshes hang off each one and how big it stands - not only by what the
+  save says they are.
+- **A spawned prop keeps its `salt`.** `buildProp` rolls a tree's height and
+  a sapling's yaw off it, so without saving it a restored tree came back a
+  different size in the same spot. `spawnProp` and `growProp` both take one
+  and store it, and `save.js` carries it - a restored isle is identical, not
+  merely correct.
 - **`SAVE_VERSION` is a fence, not a migration.** Change the shape of what is
   written and bump it; an older save is dropped rather than half-read. There
   is nothing in a run yet worth migrating.

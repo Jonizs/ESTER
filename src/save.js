@@ -1,4 +1,4 @@
-import { placeProp, spawnProp, removeProp, syncBlocked } from './props.js';
+import { PROP_KINDS, placeProp, spawnProp, removeProp, syncBlocked } from './props.js';
 
 /**
  * Keeping a run across a restart.
@@ -73,6 +73,8 @@ export function createSaves({
           entry.growth = prop.growth ?? 0;
           entry.growSeconds = prop.growSeconds;
         }
+        // What its shape was rolled from, so it comes back the same one.
+        if (prop.salt !== undefined) entry.salt = prop.salt;
         return entry;
       })
     };
@@ -129,6 +131,7 @@ export function createSaves({
           extra.growth = entry.growth ?? 0;
           extra.growSeconds = entry.growSeconds;
         }
+        if (entry.salt !== undefined) extra.salt = entry.salt;
         const prop = spawnProp(entry.kind, entry, { surface, group: propsGroup, props, extra });
         onSpawn?.(prop);
         continue;
@@ -142,7 +145,15 @@ export function createSaves({
       prop.gone = !!entry.gone;
       prop.mesh.visible = !prop.gone;
       if (surface.has(`${entry.x},${entry.z}`)) placeProp(prop, entry, surface);
-      if (prop.repaired !== !!entry.repaired) setWorkbenchRepaired?.(prop, !!entry.repaired);
+
+      // Only a kind that can actually be repaired has its state written back,
+      // and only when it differs. Without the kind check this fired on every
+      // tree and rock: their `repaired` is `undefined`, `!!entry.repaired` is
+      // `false`, and `undefined !== false` - so every one of them was rebuilt
+      // as a broken workbench the moment a save was restored.
+      if (PROP_KINDS[prop.kind]?.cost && prop.repaired !== !!entry.repaired) {
+        setWorkbenchRepaired?.(prop, !!entry.repaired);
+      }
     }
 
     syncBlocked(props, blocked);
