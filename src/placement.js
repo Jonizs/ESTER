@@ -5,10 +5,17 @@ import {
 } from './props.js';
 
 /**
- * Moving a placed station around the isle.
+ * Moving a placed station around the isle - and planting one that is not
+ * standing anywhere yet.
  *
  * Entered with the move key while the cursor is over a station (see
- * `canMove`), and it owns the screen until it is placed or cancelled. The
+ * `canMove`), or with `plant()` when something is being put down out of the
+ * inventory. The two are deliberately the same screen and the same gesture:
+ * a sapling is positioned exactly the way a bench is. What differs is only
+ * what PLACE and CANCEL mean at the end of it - a move puts a station back
+ * where it started when cancelled, a planting takes the new one away again.
+ *
+ * It owns the screen until it is placed or cancelled. The
  * station is nudged a cell at a time with the four arrows, or dragged
  * straight to a cell by pressing the left button on the isle and moving -
  * the camera stops orbiting on that drag for as long as the move is on, so
@@ -32,7 +39,7 @@ const REFUSED = 0xff6e96;
 
 export function createPlacement({
   scene, camera, canvas, surface, props, blocked, person, island,
-  blockedBy, onBegin, onEnd
+  blockedBy, onBegin, onEnd, onPlant, onPickUp, onDiscard
 }) {
   // Its own ray rather than the one main.js clicks with: this is built before
   // that exists, and a drag has no business sharing state with a click.
@@ -40,6 +47,7 @@ export function createPlacement({
   const root = document.getElementById('mover');
   const title = root.querySelector('.mover-what');
   const hint = root.querySelector('.mover-hint');
+  const pickUpButton = root.querySelector('#mover-pickup');
 
   // The footprint under the station: one flat tile per cell it covers, plus
   // the outline of the whole rectangle.
@@ -55,8 +63,9 @@ export function createPlacement({
     color: VALID, transparent: true, opacity: 0.95, depthTest: false
   });
 
-  let prop = null;            // the station being moved
+  let prop = null;            // the station being moved, or being planted
   let origin = null;          // where it stood when the move began
+  let planting = false;       // it is being put down, not repositioned
   let refused = 0;            // seconds of red left on the footprint
   let dragging = false;       // the left button is down on the isle
 
@@ -195,11 +204,9 @@ export function createPlacement({
 
   // --- beginning and ending -----------------------------------------------
 
-  function begin(next) {
-    if (!canMove(next)) return false;
-
+  /** The parts of a move and a planting that are the same. */
+  function start(next) {
     prop = next;
-    origin = { x: prop.x, z: prop.z };
     refused = 0;
 
     // Whatever the agent was doing to this station is no longer about a place
@@ -213,16 +220,40 @@ export function createPlacement({
     const { w, d } = footprintOf(prop.kind);
     title.textContent = PROP_KINDS[prop.kind].label.toUpperCase();
     hint.textContent = `Needs ${w * d} solid ${w * d === 1 ? 'block' : 'blocks'}, level and clear`;
+    // Only something already standing can be taken back into the inventory;
+    // one still being planted is put away with CANCEL.
+    pickUpButton.hidden = planting || !PROP_KINDS[prop.kind]?.portable;
     root.hidden = false;
 
     onBegin?.(prop);
     return true;
   }
 
+  /** Reposition a station that is already standing. */
+  function begin(next) {
+    if (!canMove(next)) return false;
+    planting = false;
+    origin = { x: next.x, z: next.z };
+    return start(next);
+  }
+
+  /**
+   * Position something that has just been put into the world out of the
+   * inventory. The caller has already stood it somewhere legal; this is only
+   * about moving it from there to where it is wanted.
+   */
+  function plant(next) {
+    if (!next) return false;
+    planting = true;
+    origin = null;
+    return start(next);
+  }
+
   function finish() {
     const moved = prop;
     prop = null;
     origin = null;
+    planting = false;
     dragging = false;
     marker.visible = false;
     root.hidden = true;
@@ -231,17 +262,40 @@ export function createPlacement({
     onEnd?.(moved);
   }
 
-  /** Leave it where it now stands. */
+  /**
+   * Leave it where it now stands.
+   *
+   * A planting is only paid for here, at the end - so a cancelled one costs
+   * nothing - and `onPlant` is what decides whether another one follows
+   * straight away, which is how several saplings go down without the
+   * inventory being reopened between them.
+   */
   function commit() {
     if (!isActive()) return;
+    const placed = prop;
+    const wasPlanting = planting;
     finish();
+    if (wasPlanting) onPlant?.(placed);
   }
 
-  /** Put it back where the move started. */
+  /** Put it back where the move started - or take it away again, if it was
+   *  never standing anywhere to begin with. */
   function cancel() {
     if (!isActive()) return;
-    placeProp(prop, origin, surface);
+    const dropped = prop;
+    const wasPlanting = planting;
+    if (!wasPlanting) placeProp(prop, origin, surface);
     finish();
+    if (wasPlanting) onDiscard?.(dropped);
+  }
+
+  /** Take a station that is standing back into the inventory. */
+  function pickUp() {
+    if (!isActive() || planting) return;
+    if (!PROP_KINDS[prop.kind]?.portable) return;
+    const taken = prop;
+    finish();
+    onPickUp?.(taken);
   }
 
   function update(dt) {
@@ -295,6 +349,7 @@ export function createPlacement({
 
   root.querySelector('#mover-place').addEventListener('click', commit);
   root.querySelector('#mover-cancel').addEventListener('click', cancel);
+  pickUpButton.addEventListener('click', pickUp);
 
   // --- keyboard -----------------------------------------------------------
   // Capture phase, before the pause menu, so Esc puts the station back
@@ -327,5 +382,9 @@ export function createPlacement({
   }, true);
 
   root.hidden = true;
-  return { begin, commit, cancel, isActive, update, moveTo, nudge, dragToPointer, get prop() { return prop; } };
+  return {
+    begin, plant, commit, cancel, pickUp, isActive, update, moveTo, nudge, dragToPointer,
+    get prop() { return prop; },
+    get planting() { return planting; }
+  };
 }

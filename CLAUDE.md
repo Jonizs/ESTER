@@ -65,11 +65,13 @@ with one inhabitant who walks around and works on what is there.
   - `src/icons.js` - the line-art glyphs the panels and crafting both draw.
   - `src/starfield.js` - the drifting motes behind every UI surface.
   - `src/fullscreen.js` - full screen on launch, in a browser.
-  - `src/inventory.js` - what has been gathered, and the item list.
+  - `src/inventory.js` - what has been gathered, and the item list (an item
+    with `plants` gets a PLANT button on its tile).
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
   - `src/path.js` - A* across the surface cells.
-  - `src/placement.js` - picking a station up and putting it down again.
+  - `src/placement.js` - picking a station up and putting it down again, and
+    planting one out of the inventory.
 - **Desktop shell:** `electron/main.cjs`, with `electron/preload.cjs`
   exposing just `window.ester.quit()` for the menu's LEAVE GAME. The window
   opens full screen (`fullscreen: true`).
@@ -170,6 +172,49 @@ with one inhabitant who walks around and works on what is there.
   they work, so it must be a readable sentence ("Cutting down a tree"), never
   an internal state name. It is `null` whenever no work is under way - walking
   and standing idle say nothing at all, and `person.activity` is null then too.
+- **A felled tree drops saplings, 0 to 2.** `PROP_KINDS.tree.drops` is the
+  roll, beside the wood `yield`, and `finishProp` in `main.js` walks it - so
+  anything else that should drop more than one thing needs no new code. The
+  roll is a bare `Math.random()`, which is fine: it is what happens during a
+  run, not world generation.
+- **A sapling is planted through the move screen, not a screen of its own.**
+  The PLANT button on an inventory tile (any item with `plants` in `ITEMS`)
+  calls `beginPlanting` in `main.js`, which stands a sapling on the nearest
+  legal cell and hands it to `placement.plant()` - from there it is arrows,
+  or dragged on the isle, exactly like moving the bench. Nothing is spent
+  until PLACE; CANCEL takes it away again unspent (`onDiscard`). After a
+  PLACE, if another sapling is held the next one starts immediately, so a
+  handful goes down in one go without reopening the inventory - that is
+  `onPlant` calling `beginPlanting` again, and it is the whole reason
+  `commit()` fires its callback *after* `finish()`.
+- **A planted sapling can be picked back up.** `PROP_KINDS[kind].portable`
+  is what puts PICK UP on the mover, and it only shows while something
+  already standing is being moved - never while one is being planted, where
+  CANCEL is the way out. It goes back into the inventory whatever it had
+  grown so far.
+- **Saplings grow on a timer, and need two clear cells.** 3 to 4 minutes
+  (`GROW_SECONDS`), counted in `updateGrowth` in `main.js` and only while the
+  sapling is in the ground - one still being positioned is not growing. When
+  its time is up it comes up *if* no tree is within `GROW_CLEARANCE` (2)
+  cells; if one is, it stays a sapling and tries again every few seconds, so
+  two planted side by side give one tree and one sapling, and felling that
+  tree lets the other through. The clearance is measured to trees only, never
+  to other saplings, or a close pair would deadlock each other. **None of
+  this is told to the player** - no label, no tooltip, no line anywhere about
+  how long it takes or how far apart they go. Do not add one.
+- **Growing is the prop changing kind, not a new prop.** `growProp` rebuilds
+  the meshes under the same prop object and flips `kind` to `tree`, so the
+  agent's task, the hover and anything else holding it keep working. Props
+  the run put on the isle carry `spawned`, which is how DEV RESET knows to
+  take them away rather than stand them back up.
+- **Anything built after boot needs `castFromFront`.** The scene-wide
+  front-face shadow pass runs once at startup, so a repaired bench, a planted
+  sapling and a sapling that has just become a tree each have to be given it
+  again - `castFromFront` in `main.js` is the one helper for it.
+- **Clearing the hover means `setHovered(null)`, never `hovered = null`.**
+  Writing the variable by hand leaves the outline burning on whatever was
+  lit, because `setHovered` then sees nothing to change. That is what left a
+  planted sapling outlined for the rest of the run.
 - **The top layer of the island is all grass.** No dirt or stone patches wear
   through it; soil and stone start one block down.
 - **Click feedback is two separate things.** A ground order pulses a green
@@ -180,6 +225,11 @@ with one inhabitant who walks around and works on what is there.
 - **Every prop builds its own materials**, which is why the yellow tint can be
   written straight onto them. If props are ever switched to shared materials
   or an `InstancedMesh`, highlighting has to change with it.
+- **Saplings are not work.** They have no `action` in `PROP_KINDS`, and
+  `handleClick` in `main.js` checks for one before ordering anyone about - so
+  clicking a sapling does nothing at all rather than sending the agent to
+  stand over it. Anything else that is scenery to look at rather than a job
+  goes the same way.
 - **Props must not block pathing, with one exception.** `path.js` refuses
   steps of more than one block of height, and refuses the cells in its
   `blocked` set; everything else is walkable, which is what keeps the isle
@@ -242,8 +292,12 @@ with one inhabitant who walks around and works on what is there.
   `display: inline-block`: a grid or flex container would be held in a narrow
   column beside the float and never reach under it. `RECIPES` in
   `crafting.js` is the list, empty for now - pushing an entry onto it is all
-  that is needed to see it on screen. What is held is still listed along the
-  bottom, under both, on `clear: both`.
+  that is needed to see it on screen. What is held is listed along the bottom
+  under the heading INVENTORY, on `clear: both`, and it *scrolls* rather than
+  growing - `max-height` on `#crafting .tiles` - so a full inventory never
+  pushes the grid off the top. The empty-recipes box is `display: flow-root`
+  on purpose: a plain block box's border runs along behind the floated grid
+  even though its text wraps clear of it, which reads as the two overlapping.
 - **Wreckage cannot be moved; repair it first.** `canMove()` in `props.js`
   is the one test - a `placed` kind that also has a `cost` is not movable
   until `prop.repaired`, so the fallen bench stays where it fell. It still

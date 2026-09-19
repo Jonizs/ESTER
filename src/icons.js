@@ -16,6 +16,9 @@ export const ICONS = {
   // Three logs stacked end-on, which reads better at tile size than one log.
   wood: '<circle cx="8.2" cy="15.4" r="3.6"/><circle cx="15.8" cy="15.4" r="3.6"/><circle cx="12" cy="8.4" r="3.6"/>',
   stone: '<path d="M4 14l4-7 5-2 6 6-2 7H6z"/><path d="M8 7l2.8 5.2 5.4-1.2M10.8 12.2L9.3 18"/>',
+  // A shoot with two leaves, well under the tree's own bulk so the two never
+  // read as the same thing at tile size.
+  sapling: '<path d="M12 20v-7M12 13c0-2.6-1.8-4.4-4.4-4.4C7.6 11.2 9.4 13 12 13zM12 13c0-3 2-5 5-5 0 3-2 5-5 5z"/>',
   agent: '<path d="M12 4a3.2 3.2 0 110 6.4A3.2 3.2 0 0112 4zM5 20a7 7 0 0114 0"/>'
 };
 

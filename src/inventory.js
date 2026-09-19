@@ -9,7 +9,11 @@
 // Every item the game knows about, in the order the inventory lists them.
 export const ITEMS = {
   wood:  { label: 'Wood' },
-  stone: { label: 'Stone' }
+  stone: { label: 'Stone' },
+  // Cut a tree down and some of it comes back as saplings. `plants` is the
+  // prop kind the item puts on the ground, which is what gives the item its
+  // PLANT button on the inventory tiles.
+  sapling: { label: 'Sapling', plants: 'sapling' }
 };
 
 export function createInventory() {

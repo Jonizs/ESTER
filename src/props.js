@@ -13,7 +13,25 @@ const SEED = 20260918;
 export const GROUND_OFFSET = 0.5;
 
 export const PROP_KINDS = {
-  tree: { label: 'tree', action: 'Cutting down a tree', seconds: 6, yield: { item: 'wood', amount: 3 } },
+  tree: {
+    label: 'tree',
+    action: 'Cutting down a tree',
+    seconds: 6,
+    yield: { item: 'wood', amount: 3 },
+    // Some of what comes down comes back as something to replant. The roll
+    // is 0 to 2, so a felled tree is not a guaranteed replacement.
+    drops: [{ item: 'sapling', min: 0, max: 2 }]
+  },
+  // A planted sapling. It is not work - there is nothing to do to it - so it
+  // has no `action` and clicking it gives no order. It can be moved and it
+  // can be picked back up, which is what `placed` and `portable` mark.
+  sapling: {
+    label: 'sapling',
+    placed: true,
+    portable: true,
+    item: 'sapling',
+    grows: 'tree'
+  },
   rock: { label: 'rock', action: 'Picking up a rock',   seconds: 7, yield: { item: 'stone', amount: 2 } },
   // The workbench is not harvested - it is repaired once, and then it is a
   // door into the crafting screen rather than a job.
@@ -34,6 +52,34 @@ export const PROP_KINDS = {
 };
 
 const ONE_CELL = { w: 1, d: 1 };
+
+/**
+ * How long a sapling takes to come up, in seconds, and how much room a grown
+ * tree needs around it.
+ *
+ * The clearance is measured to other *trees* only, so two saplings planted
+ * close together are not both stuck: whichever comes up first takes the
+ * space, and the other simply stays a sapling until there is room - if the
+ * tree beside it is ever felled, it comes up then.
+ */
+export const GROW_SECONDS = { min: 180, max: 240 };
+export const GROW_CLEARANCE = 2;
+
+/** A fresh sapling's own growing time. */
+export function rollGrowSeconds() {
+  return GROW_SECONDS.min + Math.random() * (GROW_SECONDS.max - GROW_SECONDS.min);
+}
+
+/**
+ * Whether a sapling has the room to come up where it stands: no tree within
+ * `GROW_CLEARANCE` cells. Exactly two cells apart is far enough.
+ */
+export function hasRoomToGrow(prop, props) {
+  return !props.some((other) => (
+    other !== prop && !other.gone && other.kind === 'tree' &&
+    Math.hypot(other.x - prop.x, other.z - prop.z) < GROW_CLEARANCE
+  ));
+}
 
 /** How many cells of ground a kind stands on. */
 export function footprintOf(kind) {
@@ -95,6 +141,74 @@ export function placeProp(prop, cell, surface) {
   prop.z = cell.z;
   const centre = footprintCentre(prop.kind, cell);
   prop.mesh.position.set(centre.x, surface.get(`${cell.x},${cell.z}`) + GROUND_OFFSET, centre.z);
+}
+
+/**
+ * Put a new prop into the world at `cell`, mesh and all.
+ *
+ * `spawned` marks it as something the run produced rather than something the
+ * isle was generated with, which is how DEV RESET knows to take it away
+ * again. The caller pushes nothing and wires nothing: the prop comes back
+ * ready to be clicked, hovered and moved.
+ */
+let nextSpawnId = 0;
+
+export function spawnProp(kind, cell, { surface, group, props, extra = {} }) {
+  const mesh = buildProp(kind, Math.floor(Math.random() * 1000));
+  group.add(mesh);
+
+  const prop = {
+    id: `${kind}-${nextSpawnId++}`,
+    kind,
+    x: cell.x,
+    z: cell.z,
+    mesh,
+    gone: false,
+    spawned: true,
+    ...extra
+  };
+
+  placeProp(prop, cell, surface);
+  tagProp(prop);
+  buildOutline(prop);
+  props.push(prop);
+  return prop;
+}
+
+/** Everything under a prop answers to its id, so a click anywhere finds it. */
+export function tagProp(prop) {
+  prop.mesh.userData.propId = prop.id;
+  prop.mesh.traverse((o) => { o.userData.propId = prop.id; });
+}
+
+/** Take a prop out of the world for good. */
+export function removeProp(prop, group, props) {
+  prop.gone = true;
+  group.remove(prop.mesh);
+  const at = props.indexOf(prop);
+  if (at >= 0) props.splice(at, 1);
+}
+
+/**
+ * A sapling becomes the tree it was going to be, in place and keeping its
+ * cell. The mesh is rebuilt rather than swapped for a new prop, so anything
+ * already holding this prop - the agent's task, the hover - keeps working.
+ */
+export function growProp(prop) {
+  const grown = PROP_KINDS[prop.kind]?.grows;
+  if (!grown) return false;
+
+  for (const child of [...prop.mesh.children]) prop.mesh.remove(child);
+  const built = buildProp(grown, Math.floor(Math.random() * 1000));
+  for (const child of [...built.children]) prop.mesh.add(child);
+
+  prop.kind = grown;
+  delete prop.growth;
+  delete prop.growSeconds;
+  tagProp(prop);
+  // A tree is scenery, not a station, so it gets no outline - and the old
+  // sapling's outlines went with the meshes they were children of.
+  return true;
 }
 
 /** Rebuild the set of cells nothing may walk onto, from where props are now. */
@@ -237,8 +351,7 @@ export function createProps(surface, scene) {
       group.add(mesh);
 
       const prop = { id: `${kind}${i}`, kind, x, z, mesh, gone: false };
-      mesh.userData.propId = prop.id;
-      mesh.traverse((o) => { o.userData.propId = prop.id; });
+      tagProp(prop);
       props.push(prop);
     }
   }
@@ -409,6 +522,35 @@ function mat(color, opts = {}) {
 
 function buildProp(kind, salt) {
   const g = new THREE.Group();
+
+  if (kind === 'sapling') {
+    // Deliberately small: a shoot and two leaves, nothing like the bulk of
+    // the tree it turns into, so the two never read as the same thing.
+    const stem = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.44, 0.12), mat(0x6b5a34));
+    stem.position.y = 0.22;
+    stem.castShadow = true;
+    g.add(stem);
+
+    const leafA = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.3), mat(0x4f9a5e));
+    leafA.position.set(0.17, 0.44, 0);
+    leafA.rotation.z = -0.35;
+    leafA.castShadow = true;
+    g.add(leafA);
+
+    const leafB = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.12, 0.26), mat(0x468f57));
+    leafB.position.set(-0.15, 0.36, 0.04);
+    leafB.rotation.z = 0.4;
+    leafB.castShadow = true;
+    g.add(leafB);
+
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.2), mat(0x57a869));
+    tip.position.y = 0.55;
+    tip.castShadow = true;
+    g.add(tip);
+
+    g.rotation.y = rand(salt, 11) * Math.PI;
+    return g;
+  }
 
   if (kind === 'tree') {
     // A short trunk under a broad two-tier crown, rather than a bare pole

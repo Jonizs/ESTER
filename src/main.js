@@ -4,7 +4,9 @@ import { createSpace } from './space.js';
 import { OrbitCamera } from './orbitCamera.js';
 import {
   createProps, setPropHighlight, setPropOutline, setWorkbenchState,
-  canMove, placeProp, footprintCells, syncBlocked, GROUND_OFFSET, PROP_KINDS
+  canMove, canPlace, placeProp, footprintCells, syncBlocked,
+  spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds,
+  GROUND_OFFSET, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
 import { createMarkers } from './markers.js';
@@ -13,7 +15,7 @@ import { createMenu } from './menu.js';
 import { createPanels } from './panels.js';
 import { createCrafting } from './crafting.js';
 import { createPlacement } from './placement.js';
-import { createInventory } from './inventory.js';
+import { createInventory, ITEMS } from './inventory.js';
 import { createProgression } from './progression.js';
 import { createDebug } from './debug.js';
 import { createStarfields } from './starfield.js';
@@ -44,7 +46,7 @@ const island = createIsland();
 scene.add(island);
 
 const surface = island.userData.surface;
-const { props, workbench, blocked } = createProps(surface, scene);
+const { group: propsGroup, props, workbench, blocked } = createProps(surface, scene);
 
 // --- the person ------------------------------------------------------------
 
@@ -88,6 +90,19 @@ function updateTarget() {
   if (arrived || person.task?.prop !== targeted || targeted.gone) setTarget(null);
 }
 
+/**
+ * Fill the shadow map from this object's FRONT faces - see the note at the
+ * scene-wide pass below for why. Anything built after boot (a repaired
+ * bench, a planted sapling, a sapling that has come up as a tree) has to be
+ * given it too, or it casts the wrong way and the old bright dash at the
+ * foot of its walls comes back.
+ */
+function castFromFront(object) {
+  object.traverse((o) => {
+    if (o.material && o.castShadow) o.material.shadowSide = THREE.FrontSide;
+  });
+}
+
 function finishProp(prop) {
   if (targeted === prop) setTarget(null);
 
@@ -97,14 +112,22 @@ function finishProp(prop) {
     const cost = PROP_KINDS.workbench.cost;
     inventory.take(cost.item, cost.amount);
     setWorkbenchState(prop, true);
-    prop.mesh.traverse((o) => {
-      if (o.material && o.castShadow) o.material.shadowSide = THREE.FrontSide;
-    });
+    castFromFront(prop.mesh);
     return;
   }
 
-  const gathered = PROP_KINDS[prop.kind].yield;
+  const kind = PROP_KINDS[prop.kind];
+  const gathered = kind.yield;
   if (gathered) inventory.add(gathered.item, gathered.amount);
+
+  // Whatever else comes off it - a felled tree drops 0 to 2 saplings. The
+  // roll is a plain `Math.random()`: this is what happens during a run, not
+  // world generation, so it is not held to the seeded-noise rule.
+  for (const drop of kind.drops ?? []) {
+    const n = drop.min + Math.floor(Math.random() * (drop.max - drop.min + 1));
+    if (n > 0) inventory.add(drop.item, n);
+  }
+
   prop.gone = true;
   prop.mesh.visible = false;
 }
@@ -140,9 +163,7 @@ function useWorkbench(prop) {
 // The cost is that a surface can now shadow itself, which is what the sun's
 // normalBias in space.js is for. This does not reproduce in headless
 // Chromium; it was confirmed on hardware with ESTER.debug.try(5).
-scene.traverse((object) => {
-  if (object.material && object.castShadow) object.material.shadowSide = THREE.FrontSide;
-});
+castFromFront(scene);
 
 // --- controls --------------------------------------------------------------
 
@@ -169,7 +190,8 @@ const panels = createPanels({
   inventory,
   progression,
   blocked: () => menu.isOpen() || crafting.isOpen() || placement.isActive(),
-  onSelect: (agent) => selectOnly(agent)
+  onSelect: (agent) => selectOnly(agent),
+  onPlantItem: (item) => beginPlanting(item)
 });
 
 // Crafting is a screen of its own, reached by clicking the repaired bench
@@ -178,11 +200,15 @@ const panels = createPanels({
 const crafting = createCrafting({
   inventory,
   blocked: () => menu.isOpen() || placement.isActive(),
-  onOpen: () => panels.close()
+  onOpen: () => panels.close(),
+  onPlantItem: (item) => beginPlanting(item)
 });
 
 // Moving a station owns Esc while it is up, so like the panels it is built
 // before the menu: capture listeners fire in the order they were added.
+//
+// It is also what puts a sapling in the ground: planting is the same screen
+// and the same gesture as moving a bench, only the ends differ.
 const placement = createPlacement({
   scene,
   camera,
@@ -199,10 +225,113 @@ const placement = createPlacement({
     setHovered(prop);           // keep it outlined for the whole move
   },
   onEnd: () => {
-    hovered = null;
+    // `setHovered(null)`, not `hovered = null`: clearing the variable by hand
+    // leaves the outline burning on whatever was lit, because setHovered then
+    // sees nothing to change. A planted sapling stayed outlined for the rest
+    // of the run that way.
+    setHovered(null);
     refreshHover();
+  },
+  // A sapling is only spent once it is actually put down, and if there is
+  // another one held the next goes straight onto the cursor - the inventory
+  // does not have to be reopened between them.
+  onPlant: (prop) => {
+    const item = PROP_KINDS[prop.kind].item;
+    inventory.take(item, 1);
+    plantedAt = { x: prop.x, z: prop.z };
+    prop.growth = 0;              // its time starts where it ends up, not where it appeared
+    if (inventory.count(item) > 0) beginPlanting(item);
+  },
+  // Cancelled before it was ever planted: it goes away again, unspent.
+  onDiscard: (prop) => {
+    removeProp(prop, propsGroup, props);
+    syncBlocked(props, blocked);
+  },
+  // Taken back out of the ground, whatever it had grown so far.
+  onPickUp: (prop) => {
+    inventory.add(PROP_KINDS[prop.kind].item, 1);
+    removeProp(prop, propsGroup, props);
+    syncBlocked(props, blocked);
   }
 });
+
+// Where the last sapling went in, so the next one starts beside it rather
+// than back at the agent's feet.
+let plantedAt = null;
+
+/** The nearest cell to `from` something of this kind may stand on. */
+function freeCellNear(kind, from) {
+  let best = null;
+  for (const key of surface.keys()) {
+    const [x, z] = key.split(',').map(Number);
+    const cell = { x, z };
+    if (!canPlace(surface, kind, cell, { props, keepClear: [{ x: person.x, z: person.z }] })) continue;
+    const d = Math.hypot(x - from.x, z - from.z);
+    if (!best || d < best.d) best = { cell, d };
+  }
+  return best?.cell ?? null;
+}
+
+/**
+ * Take something plantable out of the inventory and put it on the isle.
+ *
+ * It stands somewhere legal straight away and is then positioned exactly the
+ * way a bench is moved - arrows, or dragged on the isle - so there is one
+ * gesture to learn rather than two. Nothing is spent until PLACE.
+ */
+function beginPlanting(item) {
+  const kind = ITEMS[item]?.plants;
+  if (!kind || inventory.count(item) < 1 || placement.isActive()) return false;
+
+  const cell = freeCellNear(kind, plantedAt ?? { x: person.x, z: person.z });
+  if (!cell) return false;                    // nowhere left on the isle for it
+
+  const prop = spawnProp(kind, cell, {
+    surface,
+    group: propsGroup,
+    props,
+    extra: { growth: 0, growSeconds: rollGrowSeconds() }
+  });
+  castFromFront(prop.mesh);
+  syncBlocked(props, blocked);
+
+  if (!placement.plant(prop)) {
+    removeProp(prop, propsGroup, props);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Saplings coming up.
+ *
+ * One only counts down while it is in the ground - a sapling still being
+ * positioned is not growing yet. When its time is up it comes up as a tree
+ * if it has the room; if a tree already took the space it simply stays a
+ * sapling and tries again a few seconds later, so felling the tree beside it
+ * is enough to let it through.
+ */
+const GROW_RETRY = 5;
+
+function updateGrowth(dt) {
+  for (const prop of props) {
+    if (prop.kind !== 'sapling') continue;
+    if (placement.prop === prop) continue;
+
+    prop.growth = (prop.growth ?? 0) + dt;
+    if (prop.growth < prop.growSeconds) continue;
+
+    if (!hasRoomToGrow(prop, props)) {
+      prop.growth = prop.growSeconds - GROW_RETRY;
+      continue;
+    }
+
+    growProp(prop);
+    castFromFront(prop.mesh);
+    // It is scenery now, not a station: no outline, and nothing to move.
+    if (hovered === prop) { setHovered(null); refreshHover(); }
+  }
+}
 
 const menu = createMenu({
   settings,
@@ -224,14 +353,15 @@ function devReset() {
   placement.cancel();
   setTarget(null);
 
-  for (const prop of props) {
+  for (const prop of [...props]) {
     setPropHighlight(prop, false);
+    // Anything the run itself put on the isle - a planted sapling, or the
+    // tree one grew into - goes away rather than being reset in place.
+    if (prop.spawned) { removeProp(prop, propsGroup, props); continue; }
     if (prop.home) placeProp(prop, prop.home, surface);
     if (prop.kind === 'workbench') {
       setWorkbenchState(prop, false);
-      prop.mesh.traverse((o) => {
-        if (o.material && o.castShadow) o.material.shadowSide = THREE.FrontSide;
-      });
+      castFromFront(prop.mesh);
       continue;
     }
     prop.gone = false;
@@ -240,6 +370,7 @@ function devReset() {
 
   syncBlocked(props, blocked);
   setHovered(null);
+  plantedAt = null;
 
   person.reset();
   inventory.reset();
@@ -345,6 +476,9 @@ function handleClick(event) {
         const prop = props.find((p) => p.id === object.userData.propId);
         if (prop && prop.kind === 'workbench') { useWorkbench(prop); return; }
         if (prop && !prop.gone) {
+          // Nothing to do to a sapling: there is no work on it, so the click
+          // is simply spent rather than becoming an order to walk there.
+          if (!PROP_KINDS[prop.kind].action) return;
           if (!ordersAllowed()) return;
           if (person.workOn(prop)) setTarget(prop);
           return;
@@ -412,7 +546,6 @@ function updateLabel() {
 // the mouse twitches is not worth it. The island is only brought in once a
 // station has actually been hit, to check nothing is standing in front of
 // it: that is rare, so the expensive cast almost never happens.
-const propsGroup = scene.getObjectByName('props');
 let hovered = null;
 let pointerAt = null;
 
@@ -578,6 +711,7 @@ function frame() {
   const delta = Math.min(clock.getDelta(), 0.1);
 
   person.update(delta, props, finishProp);
+  updateGrowth(delta);
   updateTarget();
   markers.update(delta);
   placement.update(delta);
@@ -601,6 +735,6 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, workbench, blocked, surface, markers, menu, panels, crafting, placement, inventory, progression, settings, raycaster, THREE };
+window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, inventory, progression, settings, raycaster, THREE, plant: beginPlanting, updateGrowth, finishProp };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 Object.defineProperty(window.ESTER, 'targeted', { get: () => targeted });

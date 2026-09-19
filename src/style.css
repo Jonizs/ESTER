@@ -958,6 +958,34 @@ html, body {
   color: var(--dim);
 }
 
+/* The little button an item carries when there is something to do with it -
+   a sapling's PLANT. It sits under the label on its own tile, small enough
+   that the count is still what the tile reads as. */
+#panels .tile-action,
+#crafting .tile-action {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(138, 216, 255, 0.3);
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.18), rgba(185, 140, 255, 0.07));
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+#panels .tile-action:hover,
+#crafting .tile-action:hover {
+  border-color: var(--edge-lit);
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.34), rgba(185, 140, 255, 0.14));
+}
+
 /* --- progress ------------------------------------------------------------ */
 
 #panels .progress .k {
@@ -1397,7 +1425,11 @@ html, body {
   font-size: 0;            /* no gaps between the inline-block cards */
 }
 
+/* `flow-root` makes the empty box its own formatting context, which is what
+   keeps it from running along underneath the floated grid - a plain block
+   box's border would pass behind it even though its text wraps clear. */
 #crafting .recipes.is-empty {
+  display: flow-root;
   padding: 18px;
   border-radius: 14px;
   border: 1px dashed rgba(150, 180, 255, 0.16);
@@ -1470,11 +1502,26 @@ html, body {
 
 #crafting .hint { margin: 0; font-size: 12px; color: var(--dim); }
 
+/* Scrolls rather than growing: everything held is reachable from here
+   however much of it there is, without the grid above being pushed off the
+   top of the screen. */
 #crafting .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 10px;
+  max-height: 214px;
+  overflow-y: auto;
+  padding-right: 6px;
 }
+
+#crafting .tiles::-webkit-scrollbar { width: 8px; }
+#crafting .tiles::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background: rgba(185, 140, 255, 0.4);
+}
+#crafting .tiles { scrollbar-width: thin; scrollbar-color: rgba(185, 140, 255, 0.4) transparent; }
+
+#crafting .tiles.is-empty { max-height: none; overflow: visible; }
 
 #crafting .tiles.is-empty {
   display: block;
@@ -1646,6 +1693,20 @@ html, body {
 }
 
 #mover #mover-cancel:hover { background: linear-gradient(180deg, rgba(255, 110, 150, 0.3), rgba(255, 110, 150, 0.12)); }
+
+/* Only there for what can go back into the inventory, so it takes a row of
+   its own under the pair rather than squeezing the cross into three. */
+#mover #mover-pickup {
+  grid-column: 1 / -1;
+  border-color: rgba(185, 140, 255, 0.45);
+  background: linear-gradient(180deg, rgba(185, 140, 255, 0.22), rgba(185, 140, 255, 0.07));
+}
+
+#mover #mover-pickup:hover {
+  background: linear-gradient(180deg, rgba(185, 140, 255, 0.36), rgba(185, 140, 255, 0.14));
+}
+
+#mover #mover-pickup[hidden] { display: none; }
 
 #mover kbd {
   padding: 2px 5px;

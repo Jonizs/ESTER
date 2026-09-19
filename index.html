@@ -168,17 +168,17 @@
              once there are enough recipes to reach that far. -->
         <div class="craft-body">
           <section class="craft-grid">
-            <h3>Grid</h3>
+            <h3>Crafting grid</h3>
             <div id="craft-grid" class="grid4"></div>
           </section>
 
           <section class="craft-recipes">
-            <h3>Craftable</h3>
+            <h3>Recipes</h3>
             <div id="craft-recipes" class="recipes"></div>
           </section>
 
           <section class="craft-stock">
-            <h3>On the bench</h3>
+            <h3>Inventory</h3>
             <div id="craft-stock" class="tiles"></div>
           </section>
         </div>
@@ -205,6 +205,9 @@
 
       <div class="mover-buttons">
         <button type="button" id="mover-place">PLACE <kbd>Enter</kbd></button>
+        <!-- Only for kinds that can go back into the inventory, and only
+             while one that is already standing is being moved. -->
+        <button type="button" id="mover-pickup" hidden>PICK UP</button>
         <button type="button" id="mover-cancel">CANCEL <kbd>Esc</kbd></button>
       </div>
     </div>

@@ -30,7 +30,7 @@ export const GRID = { w: 4, h: 4 };
  */
 export const RECIPES = [];
 
-export function createCrafting({ inventory, blocked, onOpen }) {
+export function createCrafting({ inventory, blocked, onOpen, onPlantItem }) {
   const root = document.getElementById('crafting');
   const stock = root.querySelector('#craft-stock');
   const grid = root.querySelector('#craft-grid');
@@ -116,6 +116,21 @@ export function createCrafting({ inventory, blocked, onOpen }) {
           <div class="tile-icon">${icon(entry.item, 24)}</div>
           <div class="tile-count"></div>
           <div class="tile-label">${ITEMS[entry.item].label}</div>`;
+
+        // Anything that can be put on the isle carries its own little button
+        // for doing so - the screen closes and the sapling goes onto the
+        // cursor, positioned the same way a station is moved.
+        if (ITEMS[entry.item].plants) {
+          const plant = document.createElement('button');
+          plant.type = 'button';
+          plant.className = 'tile-action';
+          plant.textContent = 'Plant';
+          plant.addEventListener('click', (event) => {
+            event.stopPropagation();
+            onPlantItem?.(entry.item);
+          });
+          tile.append(plant);
+        }
         stock.append(tile);
       }
     }
