@@ -16,6 +16,16 @@ export function createProgression() {
       this.stage = null;
     },
 
+    /** For the save; both are still placeholders, but they travel already. */
+    saveState() {
+      return { quest: this.quest, stage: this.stage };
+    },
+
+    loadState(state) {
+      this.quest = state?.quest ?? null;
+      this.stage = state?.stage ?? null;
+    },
+
     /** 0-100, as the panels show it. */
     get questPercent() {
       return Math.round((this.quest?.progress ?? 0) * 100);

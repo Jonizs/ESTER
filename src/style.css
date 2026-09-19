@@ -960,9 +960,10 @@ html, body {
 
 /* The little button an item carries when there is something to do with it -
    a sapling's PLANT. It sits under the label on its own tile, small enough
-   that the count is still what the tile reads as. */
-#panels .tile-action,
-#crafting .tile-action {
+   that the count is still what the tile reads as. Only the inventory page
+   has these: the crafting screen's list is stock on the bench, not things to
+   go and do. */
+#panels .tile-action {
   display: block;
   width: 100%;
   margin-top: 9px;
@@ -980,8 +981,7 @@ html, body {
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 
-#panels .tile-action:hover,
-#crafting .tile-action:hover {
+#panels .tile-action:hover {
   border-color: var(--edge-lit);
   background: linear-gradient(180deg, rgba(138, 216, 255, 0.34), rgba(185, 140, 255, 0.14));
 }
@@ -1266,6 +1266,16 @@ html, body {
   border-color: var(--edge-lit);
   background: linear-gradient(180deg, rgba(185, 140, 255, 0.2), rgba(138, 216, 255, 0.08));
   color: var(--accent);
+}
+
+/* Each material is drawn in its own colour - `--tint` is set on the tile
+   from `ITEMS` - so a row of them is told apart by colour as much as by
+   shape. Anything without one keeps the accent. */
+#panels .tile-icon,
+#crafting .tile-icon {
+  color: var(--tint, var(--accent));
+  border-color: color-mix(in srgb, var(--tint, var(--accent)) 45%, transparent);
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--tint, var(--accent)) 14%, transparent);
 }
 
 #panels .blank-mark {

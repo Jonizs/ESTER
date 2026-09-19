@@ -18,6 +18,7 @@ import { createPlacement } from './placement.js';
 import { createInventory, ITEMS } from './inventory.js';
 import { createProgression } from './progression.js';
 import { createDebug } from './debug.js';
+import { createSaves } from './save.js';
 import { createStarfields } from './starfield.js';
 import { autoFullscreen } from './fullscreen.js';
 
@@ -200,8 +201,7 @@ const panels = createPanels({
 const crafting = createCrafting({
   inventory,
   blocked: () => menu.isOpen() || placement.isActive(),
-  onOpen: () => panels.close(),
-  onPlantItem: (item) => beginPlanting(item)
+  onOpen: () => panels.close()
 });
 
 // Moving a station owns Esc while it is up, so like the panels it is built
@@ -375,6 +375,9 @@ function devReset() {
   person.reset();
   inventory.reset();
   progression.reset();
+  // The run is back at 0, so the saved one is too - otherwise the next
+  // launch quietly undoes the reset.
+  saves.clear();
 
   controls.reset();
   panels.close();
@@ -392,6 +395,29 @@ function showBindingsInHelp() {
 
 showBindingsInHelp();
 
+// --- the saved run ---------------------------------------------------------
+
+// Written down every few seconds and read back on launch, so closing the game
+// - or `WATCH.bat` restarting it on a new build - does not cost the run.
+const saves = createSaves({
+  surface,
+  propsGroup,
+  props,
+  blocked,
+  person,
+  inventory,
+  progression,
+  setWorkbenchRepaired: (prop, repaired) => {
+    setWorkbenchState(prop, repaired);
+    castFromFront(prop.mesh);
+  },
+  onSpawn: (prop) => castFromFront(prop.mesh)
+});
+
+// Before the first frame, so a restored run is simply how the isle looks on
+// launch rather than something visibly rearranging itself a moment later.
+saves.restore();
+
 // The drifting motes behind every pane. Built once, from the markup, and then
 // left to CSS - nothing here runs per frame.
 createStarfields();
@@ -407,6 +433,10 @@ controls.keyboardBlocked = () => menu.isOpen();
 controls.pointerBlocked = () => placement.isActive();
 
 function leaveGame() {
+  // Whatever has happened since the last autosave, written down before the
+  // window goes - `pagehide` covers the rest.
+  saves.write();
+
   // The desktop build can actually quit; in a browser tab all that can be
   // done is close the window, which only works if the page opened it.
   if (window.ester?.quit) { window.ester.quit(); return; }
@@ -735,6 +765,6 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, inventory, progression, settings, raycaster, THREE, plant: beginPlanting, updateGrowth, finishProp };
+window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 Object.defineProperty(window.ESTER, 'targeted', { get: () => targeted });

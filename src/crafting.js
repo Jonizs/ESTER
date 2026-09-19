@@ -1,4 +1,4 @@
-import { icon } from './icons.js';
+import { icon, itemIcon } from './icons.js';
 import { ITEMS } from './inventory.js';
 
 /**
@@ -11,7 +11,10 @@ import { ITEMS } from './inventory.js';
  * menu takes precedence.
  *
  * The screen is the 4x4 grid in the top right, the craftable items flowing
- * around it, and what is on the bench along the bottom. The grid is floated
+ * around it, and what is held along the bottom. That last list is a *list* -
+ * the item buttons the inventory page carries, PLANT among them, are
+ * deliberately not here. This is the bench: what is on it is stock to build
+ * from, not things to go and do. The grid is floated
  * rather than placed in a column (see style.css), which is what lets the
  * recipe list run down its left and then carry on underneath it - so a long
  * list fills the page instead of stacking up in a narrow strip.
@@ -30,7 +33,7 @@ export const GRID = { w: 4, h: 4 };
  */
 export const RECIPES = [];
 
-export function createCrafting({ inventory, blocked, onOpen, onPlantItem }) {
+export function createCrafting({ inventory, blocked, onOpen }) {
   const root = document.getElementById('crafting');
   const stock = root.querySelector('#craft-stock');
   const grid = root.querySelector('#craft-grid');
@@ -112,25 +115,14 @@ export function createCrafting({ inventory, blocked, onOpen, onPlantItem }) {
         const tile = document.createElement('div');
         tile.className = 'tile';
         tile.dataset.item = entry.item;
+        // Each material is drawn in its own colour; anything without one
+        // falls back to the UI's accent.
+        if (ITEMS[entry.item].tint) tile.style.setProperty('--tint', ITEMS[entry.item].tint);
         tile.innerHTML = `
-          <div class="tile-icon">${icon(entry.item, 24)}</div>
+          <div class="tile-icon">${itemIcon(entry.item, 24)}</div>
           <div class="tile-count"></div>
           <div class="tile-label">${ITEMS[entry.item].label}</div>`;
 
-        // Anything that can be put on the isle carries its own little button
-        // for doing so - the screen closes and the sapling goes onto the
-        // cursor, positioned the same way a station is moved.
-        if (ITEMS[entry.item].plants) {
-          const plant = document.createElement('button');
-          plant.type = 'button';
-          plant.className = 'tile-action';
-          plant.textContent = 'Plant';
-          plant.addEventListener('click', (event) => {
-            event.stopPropagation();
-            onPlantItem?.(entry.item);
-          });
-          tile.append(plant);
-        }
         stock.append(tile);
       }
     }

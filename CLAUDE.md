@@ -26,8 +26,10 @@ seconds, and restarts the game on the new build if it is open - including
 repackaging `dist-exe\ESTER.exe` when that is what is running, since the
 packaged app carries its own copy of `dist/`. A fresh machine needs `git clone` once, then `SETUP.bat`.
 
-Nothing in the game is saved to disk, so there is no state to move between
-machines.
+The run *is* saved now, so an update no longer costs one: it is written down
+every few seconds and read back on launch (`src/save.js`). It lives in the
+app's own storage, on the machine it was played on - nothing is uploaded, so
+a run still does not follow him between his clones.
 
 ## History
 
@@ -62,12 +64,14 @@ with one inhabitant who walks around and works on what is there.
   - `src/panels.js` - the Tab/Q/W/E panels: overview, inventory, quest book,
     stages.
   - `src/crafting.js` - the crafting screen, opened from the workbench.
-  - `src/icons.js` - the line-art glyphs the panels and crafting both draw.
+  - `src/icons.js` - the line-art glyphs the panels and crafting both draw,
+    materials included.
   - `src/starfield.js` - the drifting motes behind every UI surface.
   - `src/fullscreen.js` - full screen on launch, in a browser.
   - `src/inventory.js` - what has been gathered, and the item list (an item
     with `plants` gets a PLANT button on its tile).
   - `src/progression.js` - quest progress and stage, both placeholders.
+  - `src/save.js` - the run, written down and read back on launch.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
   - `src/path.js` - A* across the surface cells.
   - `src/placement.js` - picking a station up and putting it down again, and
@@ -403,6 +407,25 @@ with one inhabitant who walks around and works on what is there.
   do not put the tiles back beside the agents. The framed field of tiles runs
   the height of the page, with `align-content: start` keeping them packed at
   the top of that space rather than stretched tall.
+- **Every material has an icon, and it is `itemIcon` that guarantees it.**
+  The glyphs are in `src/icons.js`, drawn as little emblems of the thing -
+  a stack of cut logs, a chunk of rock, a shoot - the way a board game marks
+  its resources, all on the same 24x24 grid at one weight of line. `icon()`
+  is strict and comes back empty for a name it does not know, which is what
+  a mistyped *tab* should do; `itemIcon()` falls back to the crate, because a
+  tile with nothing drawn on it reads as a bug and an item is the one thing
+  that can arrive without the icon set being touched. There are glyphs in
+  there for materials nothing drops yet (plank, grain, fibre, clay, ore,
+  metal, coal, crystal) - `ITEMS` in `inventory.js` is what decides what
+  actually exists, so they cost nothing until something does.
+- **A material's icon is drawn in its own colour.** `ITEMS[item].tint` is set
+  on the tile as `--tint` and the icon reads it, so a row of them is told
+  apart by colour as much as by shape. They are all luminous - the
+  no-flat-greys rule holds.
+- **Item buttons belong to the inventory page, not the crafting screen.** The
+  crafting screen's list is stock on the bench to build from; PLANT and
+  anything like it live on the Q page, where the item is a thing to go and
+  do something with. Only `#panels .tile-action` is styled, deliberately.
 - **The UI is cosmic, and it is all one recipe.** Every pane - the panels, the
   crafting screen, the pause menu - is a dark surface with the `--nebula`
   wash behind it, a faint `--stars` tile over that from the shared
@@ -427,6 +450,46 @@ with one inhabitant who walks around and works on what is there.
   `src/fullscreen.js` waits for the first click or key press, asks once, and
   never asks again - someone who leaves with F11 or Esc stays out.
 
+- **The run survives a restart, and that is the whole point of the save.**
+  `WATCH.bat` closes the game and relaunches it on the new build whenever
+  something lands on `main`, and that used to throw the run away.
+  `src/save.js` writes it to `localStorage` every five seconds and reads it
+  back before the first frame - `saves.restore()` runs at boot, not a moment
+  later, so a restored run is simply how the isle looks on launch rather than
+  something visibly rearranging itself.
+- **The autosave is on a timer, never on the frame delta.** The render loop's
+  delta is capped and stops resembling real time the moment frames stall or
+  the window goes to the back - which is exactly when the run most needs to
+  be written down already. A `setInterval` keeps its own clock, and the
+  desktop window's `backgroundThrottling: false` keeps it ticking behind
+  other windows.
+- **Three events save on the way out, because no one of them covers
+  everything.** `pagehide` is the browser's reload and tab close, but it does
+  *not* fire when the desktop shell's window is closed - that one is
+  `beforeunload`, and without it a plain close cost the last few seconds of
+  play (confirmed by driving the real Electron window). `visibilitychange`
+  catches the window merely being put to the back. `WATCH.bat` asks the
+  window to close before it insists, so the graceful path is the normal one
+  and the five-second autosave is the backstop.
+- **The Electron app is named, so both ways of launching share one save.**
+  `app.setName('ESTER')` in `electron/main.cjs`, before anything asks for a
+  path: unpinned, an unpackaged `npm start` resolves its profile to
+  `.../Electron` while the packaged `ESTER.exe` resolves it to `.../ESTER`,
+  and the two would each keep a separate run.
+- **What the save does not keep is what the agent was in the middle of.** A
+  walk and a job are both dropped, and a restored run has the agent standing
+  idle where they were. Restoring half a swing of an axe is not worth the
+  machinery.
+- **Every piece owns its `saveState`/`loadState` beside its `reset`.**
+  `inventory.js`, `person.js` and `progression.js` each have all three;
+  `save.js` only serialises what they hand it and does the prop surgery
+  itself. Anything that gains run state needs all three, or it quietly fails
+  to survive a restart - the same trap as forgetting a `reset`.
+- **`SAVE_VERSION` is a fence, not a migration.** Change the shape of what is
+  written and bump it; an older save is dropped rather than half-read. There
+  is nothing in a run yet worth migrating.
+- **DEV RESET clears the save too.** It puts the run back to how it booted,
+  so leaving the old one on disk would have the next launch quietly undo it.
 - **DEV RESET is game state only.** The pause menu's DEV RESET (`devReset` in
   `main.js`) puts the run back to how it booted - props standing, the
   workbench broken, the agent home with full needs, nothing held, nothing

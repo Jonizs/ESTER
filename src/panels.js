@@ -1,6 +1,6 @@
 import { keyLabel } from './settings.js';
 import { ITEMS } from './inventory.js';
-import { icon } from './icons.js';
+import { icon, itemIcon } from './icons.js';
 
 /**
  * The information panels, opened with their own keys: the overview (Tab), the
@@ -139,8 +139,11 @@ export function createPanels({ settings, agents, inventory, progression, blocked
         const tile = document.createElement('div');
         tile.className = 'tile';
         tile.dataset.item = entry.item;
+        // Each material is drawn in its own colour; anything without one
+        // falls back to the UI's accent.
+        if (ITEMS[entry.item].tint) tile.style.setProperty('--tint', ITEMS[entry.item].tint);
         tile.innerHTML = `
-          <div class="tile-icon">${icon(entry.item, 24)}</div>
+          <div class="tile-icon">${itemIcon(entry.item, 24)}</div>
           <div class="tile-count"></div>
           <div class="tile-label">${ITEMS[entry.item].label}</div>`;
 

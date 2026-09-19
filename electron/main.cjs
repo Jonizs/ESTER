@@ -3,6 +3,14 @@ const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 
 const isDev = process.env.ESTER_DEV === '1';
 
+// Pin the profile folder by name, before anything asks for it.
+//
+// The run is saved in the window's own storage (src/save.js), which lives in
+// this folder - and unpinned, an unpackaged `npm start` resolves it to
+// .../Electron while the packaged ESTER.exe resolves it to .../ESTER, so the
+// two would each keep a separate run. Naming the app makes both .../ESTER.
+app.setName('ESTER');
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1600,

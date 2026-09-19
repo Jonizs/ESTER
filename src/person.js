@@ -83,6 +83,36 @@ export class Person {
     this.mesh.position.copy(this.pos);
   }
 
+  /**
+   * For the save: where they are and how they are doing.
+   *
+   * What they were in the middle of is deliberately left out - a walk and a
+   * job are both dropped, and a restored run has them standing idle where
+   * they were.
+   */
+  saveState() {
+    return { x: this.x, z: this.z, stats: { ...this.stats } };
+  }
+
+  loadState(state) {
+    if (!state) return;
+
+    if (this.surface.has(`${state.x},${state.z}`)) {
+      this.x = state.x;
+      this.z = state.z;
+    }
+    this.stats = { ...this.stats, ...(state.stats ?? {}) };
+
+    // Whatever they were doing does not survive the restart.
+    this.path = [];
+    this.segment = null;
+    this.task = null;
+    this.action = null;
+
+    this.pos.set(this.x, this.groundAt(this.x, this.z), this.z);
+    this.mesh.position.copy(this.pos);
+  }
+
   groundAt(x, z) {
     const h = this.surface.get(`${x},${z}`);
     return h === undefined ? this.pos?.y ?? 0 : h + GROUND_OFFSET;

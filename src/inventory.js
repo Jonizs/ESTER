@@ -1,19 +1,21 @@
 /**
  * What the agents have gathered.
  *
- * Nothing here is written to disk - like the rest of the game it lasts as
- * long as the window does. Items are only ever added; there is nothing to
- * spend them on yet.
+ * What is held is part of the saved run (src/save.js), so this has a
+ * `saveState`/`loadState` pair beside its `reset` - anything that gains run
+ * state needs all three.
  */
 
 // Every item the game knows about, in the order the inventory lists them.
 export const ITEMS = {
-  wood:  { label: 'Wood' },
-  stone: { label: 'Stone' },
+  // `tint` is the colour its icon is drawn in, so a row of tiles is read by
+  // colour as much as by shape. They are all luminous - no flat greys.
+  wood:  { label: 'Wood',  tint: '#e6a96b' },
+  stone: { label: 'Stone', tint: '#a9bde4' },
   // Cut a tree down and some of it comes back as saplings. `plants` is the
   // prop kind the item puts on the ground, which is what gives the item its
   // PLANT button on the inventory tiles.
-  sapling: { label: 'Sapling', plants: 'sapling' }
+  sapling: { label: 'Sapling', tint: '#7fd694', plants: 'sapling' }
 };
 
 export function createInventory() {
@@ -40,6 +42,21 @@ export function createInventory() {
       if (this.count(item) < amount) return false;
       counts.set(item, this.count(item) - amount);
       return true;
+    },
+
+    /** What is held, for the save: { wood: 3 }. Empties are left out. */
+    saveState() {
+      const held = {};
+      for (const [item, count] of counts) if (count > 0) held[item] = count;
+      return held;
+    },
+
+    /** Put a saved run's items back, dropping whatever is held now. */
+    loadState(held) {
+      counts.clear();
+      for (const [item, count] of Object.entries(held ?? {})) {
+        if (ITEMS[item] && count > 0) counts.set(item, count);
+      }
     },
 
     /** Only what is actually held, for the panel: [{ item, label, count }]. */
