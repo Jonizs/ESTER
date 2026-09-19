@@ -93,6 +93,11 @@ export class OrbitCamera {
     this.rotateSpeed = this.baseRotateSpeed * scale;
   }
 
+  /** Whether the camera is being turned right now. */
+  isDragging() {
+    return this._pointers.size > 0;
+  }
+
   zoom(amount) {
     const next = this.targetDistance * (1 + amount * this.zoomSpeed);
     this.targetDistance = THREE.MathUtils.clamp(next, this.minDistance, this.maxDistance);
@@ -164,6 +169,11 @@ export class OrbitCamera {
       // Something else may own the drag - moving a station uses the same
       // press-and-move on the same canvas, and it takes precedence.
       if (this.pointerBlocked?.()) return;
+      // The camera is turned with the RIGHT button. Left-drag belongs to the
+      // selection box out on the isle, so it must never reach the orbit.
+      // A touch or a pen has no buttons to choose between, so it still
+      // orbits - and two of them still pinch.
+      if (e.pointerType === 'mouse' && e.button !== 2) return;
       dom.setPointerCapture(e.pointerId);
       this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       this.velocity.set(0, 0);

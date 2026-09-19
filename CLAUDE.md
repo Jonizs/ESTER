@@ -59,6 +59,7 @@ with one inhabitant who walks around and works on what is there.
   - `src/props.js` - the few trees and rocks, the broken workbench in the
     middle, and the yellow target tint.
   - `src/markers.js` - the ground-click wave, pooled expanding rings.
+  - `src/selectbox.js` - the left-drag box, measured in screen pixels.
   - `src/settings.js` - camera speed and keybinds, held in memory only.
   - `src/menu.js` - the Esc pause menu and its keybind page.
   - `src/panels.js` - the Tab/Q/W/E panels: overview, inventory, quest book,
@@ -153,9 +154,52 @@ with one inhabitant who walks around and works on what is there.
   explicitly refused.
 - **Every order needs the agent selected first**, walking included. A click
   on a tree, a rock, the broken bench *or* bare ground does nothing at all
-  unless an agent is selected - `ordersAllowed()` in `main.js` is the gate.
-  The one exemption is opening the *repaired* bench, because that opens a
-  screen rather than giving an order.
+  unless an agent is selected - `selectedAgent()` in `main.js` is the gate,
+  and it is who the order is *for* as much as whether there is one. The one
+  exemption is opening the *repaired* bench, because that opens a screen
+  rather than giving an order.
+- **The left button never turns the camera.** The orbit is the RIGHT button
+  (`orbitCamera.js` turns down any mouse pointerdown that is not button 2);
+  left-drag draws the selection box instead. A touch or a pen has no buttons
+  to choose between, so it still orbits, and two of them still pinch. A mouse
+  is one pointer for both buttons, so each gesture stands the other down
+  while it is running - `controls.pointerBlocked` and the box's `blocked`
+  check each other, or one drag would do both things at once.
+- **A box takes agents over props, always.** `applyBox` in `main.js` looks
+  for agents inside the rectangle first and, if it finds any, selects the one
+  nearest the middle of the box and stops - selection is single, so a box
+  over a crowd still comes out with exactly one. Only a box with no agent in
+  it is read as work. That is also why a box thrown over the whole screen is
+  a selection, not an order: the agent is in it.
+- **A box of work is one order, not many.** Everything in the box there is
+  something to do to goes to the selected agent as a queue (`workOnAll` in
+  `person.js`), and they take the nearest job each time one is finished -
+  measured from wherever they are then, not from where they started.
+  Anything unreachable or already felled is skipped rather than stalling the
+  batch, and `walkTo` calls the whole thing off. The bench is left out of a
+  box on purpose: it is a station with a cost, repaired by clicking it.
+- **The box checks what the isle hides.** `hiddenByIsland` casts one ray per
+  candidate when the button comes up, so a box dragged over the near slope
+  does not quietly take in the trees on the far side. It is a handful of
+  casts, once - the same reasoning as the hover ray, which is why neither
+  runs against the whole scene every frame.
+- **The yellow target tint is read off the agents, not written at the
+  click.** `syncTargets()` in `main.js` rebuilds the lit set every frame from
+  each agent's job and queue, so a finished job, a cancelled walk, a felled
+  tree and a whole batch all clear themselves. There is no `setTarget` any
+  more; `ESTER.targets` is the list and `ESTER.targeted` is the first of it.
+- **AGENT SWARM is a dev button, and nothing of it is saved.** It stands two
+  more agents on the isle for 30 seconds (`callSwarm` in `main.js`), counted
+  down in the frame loop and then sent home again. They are ordinary agents
+  while they are here - selectable, orderable, in the overview and in the
+  number-key slots - but `save.js` writes the one inhabitant only, and DEV
+  RESET sends them home before it puts the run back. They arrive at least two
+  cells apart, or three agents end up in a heap where a click can only reach
+  the nearest.
+- **Anything that reads `person` directly is a bug waiting for the swarm.**
+  The loop updates every agent, the label follows whoever is being watched,
+  and the stats panel shows `selectedAgent()`. `person` is still the isle's
+  own inhabitant - the one the save keeps and the one a reset puts home.
 - **There are no toasts.** The line that used to appear at the top of the
   screen was removed on request, along with everything it said. A refused
   click, an empty agent slot and a bench with too little wood are all silent

@@ -7,7 +7,7 @@ import { ACTIONS, CAMERA_SPEED, keyLabel } from './settings.js';
  * button. Esc closes the menu, backs out of the keybind page, and cancels a
  * key that is waiting to be bound - so it is never a way to get stuck.
  */
-export function createMenu({ settings, controls, onLeave, onDevReset, onChange }) {
+export function createMenu({ settings, controls, onLeave, onDevReset, onSwarm, onChange }) {
   const root = document.getElementById('menu');
   const pages = {
     main: root.querySelector('[data-page="main"]'),
@@ -101,6 +101,10 @@ export function createMenu({ settings, controls, onLeave, onDevReset, onChange }
   // DEV RESET puts the run back to 0; the menu closes itself on the way, so
   // the isle is visible again the moment it happens.
   root.querySelector('#menu-devreset').addEventListener('click', () => onDevReset?.());
+  // AGENT SWARM: two more agents on the isle for half a minute, and then
+  // they are gone again. Like DEV RESET it closes the menu on the way, so
+  // they can be seen arriving.
+  root.querySelector('#menu-swarm').addEventListener('click', () => onSwarm?.());
   root.querySelector('#menu-leave').addEventListener('click', () => onLeave?.());
 
   // --- keyboard -----------------------------------------------------------

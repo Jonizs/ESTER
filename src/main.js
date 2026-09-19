@@ -9,12 +9,14 @@ import {
   GROUND_OFFSET, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
+import { findPath } from './path.js';
 import { createMarkers } from './markers.js';
 import { createSettings, keyLabel } from './settings.js';
 import { createMenu } from './menu.js';
 import { createPanels } from './panels.js';
 import { createCrafting } from './crafting.js';
 import { createPlacement } from './placement.js';
+import { createSelectBox } from './selectbox.js';
 import { createInventory, ITEMS } from './inventory.js';
 import { createProgression } from './progression.js';
 import { createDebug } from './debug.js';
@@ -74,21 +76,42 @@ function startingCell() {
 
 const markers = createMarkers(scene);
 
-// The prop the agent is on its way to, lit up until it gets there.
-let targeted = null;
+// Everything the agents are on their way to, lit up until they get there -
+// the job in hand and the whole of a batch dragged out with the selection
+// box, so a stand of trees shows as one order rather than one tree at a time.
+const targets = new Set();
 
-function setTarget(prop) {
-  if (targeted === prop) return;
-  if (targeted) setPropHighlight(targeted, false);
-  targeted = prop;
-  if (prop) setPropHighlight(prop, true);
+/**
+ * Light the targets and clear whatever is no longer one.
+ *
+ * Read off the agents every frame rather than set by hand at the click: a
+ * finished job, a cancelled walk, a felled tree and a whole queue then all
+ * look after themselves, and nothing is left burning yellow.
+ */
+function syncTargets() {
+  const wanted = new Set();
+  for (const agent of agents) {
+    // The job in hand counts only while they are still walking to it; once
+    // they are standing over it the tint has said what it had to say.
+    if (agent.task && agent.path.length > 0 && !agent.task.prop.gone) wanted.add(agent.task.prop);
+    for (const prop of agent.queue) if (!prop.gone) wanted.add(prop);
+  }
+
+  for (const prop of targets) {
+    if (wanted.has(prop)) continue;
+    setPropHighlight(prop, false);
+    targets.delete(prop);
+  }
+  for (const prop of wanted) {
+    if (targets.has(prop)) continue;
+    setPropHighlight(prop, true);
+    targets.add(prop);
+  }
 }
 
-/** Drop the highlight once the agent has walked up to it - or lost the job. */
-function updateTarget() {
-  if (!targeted) return;
-  const arrived = person.path.length === 0;
-  if (arrived || person.task?.prop !== targeted || targeted.gone) setTarget(null);
+function clearTargets() {
+  for (const prop of targets) setPropHighlight(prop, false);
+  targets.clear();
 }
 
 /**
@@ -105,7 +128,7 @@ function castFromFront(object) {
 }
 
 function finishProp(prop) {
-  if (targeted === prop) setTarget(null);
+  if (targets.delete(prop)) setPropHighlight(prop, false);
 
   // The bench is repaired rather than carried off: it stays standing, gets
   // its missing leg back, and from then on it is the way into crafting.
@@ -142,14 +165,15 @@ function useWorkbench(prop) {
   // Opening the repaired bench is not an order, so it needs no selection -
   // it is the same as pressing Tab. Repairing it is an order, and does.
   if (prop.repaired) { crafting.open(); return; }
-  if (!ordersAllowed()) return;
-  if (person.task?.prop === prop) return;   // already on its way
+  const agent = selectedAgent();
+  if (!agent) return;
+  if (agent.task?.prop === prop) return;   // already on its way
 
   const cost = PROP_KINDS.workbench.cost;
   // The badge over the bench already says how much wood it wants and how
   // much there is, so a click without enough simply does nothing.
   if (inventory.count(cost.item) < cost.amount) return;
-  if (person.workOn(prop)) setTarget(prop);
+  agent.workOn(prop);
 }
 
 // Fill the shadow map from FRONT faces.
@@ -338,6 +362,7 @@ const menu = createMenu({
   controls,
   onLeave: leaveGame,
   onDevReset: devReset,
+  onSwarm: callSwarm,
   onChange: () => { showBindingsInHelp(); panels.showTabs(); }
 });
 
@@ -351,7 +376,10 @@ const menu = createMenu({
  */
 function devReset() {
   placement.cancel();
-  setTarget(null);
+  // Borrowed agents go first, or they would be left standing on an isle
+  // that has just been put back to how it booted.
+  for (const agent of [...agents]) if (agent.borrowed !== undefined) sendAgentHome(agent);
+  clearTargets();
 
   for (const prop of [...props]) {
     setPropHighlight(prop, false);
@@ -428,9 +456,24 @@ createStarfields();
 autoFullscreen();
 
 // The menu owns the keyboard while it is open, and a station being moved
-// owns the left-drag - both are the same gesture on the same canvas.
+// owns the drag on the canvas.
 controls.keyboardBlocked = () => menu.isOpen();
-controls.pointerBlocked = () => placement.isActive();
+// A box already being dragged out keeps the camera still even if the right
+// button is pressed as well: a mouse is one pointer, so both gestures would
+// otherwise run off the same drag.
+controls.pointerBlocked = () => placement.isActive() || selectBox.isDragging();
+
+// Dragging the left button out on the isle draws a box rather than turning
+// the camera - the orbit is on the right button now. A station being moved
+// owns the same gesture, so the box stands down while one is up.
+const selectBox = createSelectBox({
+  canvas,
+  blocked: () => (
+    menu.isOpen() || crafting.isOpen() || panels.isOpen() ||
+    placement.isActive() || controls.isDragging()
+  ),
+  onBox: (rect) => applyBox(rect)
+});
 
 function leaveGame() {
   // Whatever has happened since the last autosave, written down before the
@@ -481,13 +524,14 @@ function agentInSlot(slot) {
 }
 
 /**
- * Whether a click may order the agent about.
+ * Who an order is for, or null if nobody is selected.
  *
  * *Every* order needs a selected agent - walking somewhere as much as working
- * on something - so a stray click on the isle never moves anyone.
+ * on something - so a stray click on the isle never moves anyone. Selection
+ * is single, so there is never a question of which one it means.
  */
-function ordersAllowed() {
-  return agents.some((a) => a.selected);
+function selectedAgent() {
+  return agents.find((a) => a.selected) ?? null;
 }
 
 function handleClick(event) {
@@ -499,8 +543,9 @@ function handleClick(event) {
   for (const hit of raycaster.intersectObject(scene, true)) {
     let object = hit.object;
     while (object) {
-      // The agent itself: select it and show its stats.
-      if (object.userData.isPerson) { selectOnly(person); return; }
+      // An agent: select that one and show its stats. `userData.person` is
+      // which of them was hit - there can be more than one on the isle.
+      if (object.userData.person) { selectOnly(object.userData.person); return; }
 
       if (object.userData.propId) {
         const prop = props.find((p) => p.id === object.userData.propId);
@@ -509,8 +554,9 @@ function handleClick(event) {
           // Nothing to do to a sapling: there is no work on it, so the click
           // is simply spent rather than becoming an order to walk there.
           if (!PROP_KINDS[prop.kind].action) return;
-          if (!ordersAllowed()) return;
-          if (person.workOn(prop)) setTarget(prop);
+          const agent = selectedAgent();
+          if (!agent) return;
+          agent.workOn(prop);
           return;
         }
       }
@@ -521,17 +567,171 @@ function handleClick(event) {
     const x = Math.round(hit.point.x);
     const z = Math.round(hit.point.z);
     if (surface.has(`${x},${z}`)) {
-      if (!ordersAllowed()) return;
-      if (person.walkTo({ x, z })) {
-        setTarget(null);
-        markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
-      }
+      const agent = selectedAgent();
+      if (!agent) return;
+      if (agent.walkTo({ x, z })) markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
       return;
     }
   }
 
   // Clicked the void: nothing is selected any more.
   selectOnly(null);
+}
+
+// --- the selection box ---------------------------------------------------
+
+const boxPoint = new THREE.Vector3();
+const boxDir = new THREE.Vector3();
+const boxAt = new THREE.Vector3();
+
+/** Where a world point lands on the screen, or null if it is behind us. */
+function onScreen(point) {
+  boxPoint.copy(point).project(camera);
+  if (boxPoint.z > 1) return null;
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: rect.left + (boxPoint.x * 0.5 + 0.5) * rect.width,
+    y: rect.top + (-boxPoint.y * 0.5 + 0.5) * rect.height
+  };
+}
+
+const inBox = (box, at) => !!at &&
+  at.x >= box.left && at.x <= box.right && at.y >= box.top && at.y <= box.bottom;
+
+/**
+ * Whether the isle itself stands between the camera and a point, so a box
+ * dragged over the near slope does not quietly take in the trees on the far
+ * side as well.
+ *
+ * One cast per candidate, once, when the button comes up - there are a
+ * couple of dozen props, so this never lands in a frame's way. It is the
+ * same reasoning as the hover ray: expensive casts only where they are
+ * actually needed.
+ */
+function hiddenByIsland(point) {
+  boxDir.copy(point).sub(camera.position);
+  const distance = boxDir.length();
+  const far = raycaster.far;
+  raycaster.set(camera.position, boxDir.normalize());
+  raycaster.far = distance - 0.4;
+  const behind = raycaster.intersectObject(island, true).length > 0;
+  raycaster.far = far;
+  return behind;
+}
+
+/**
+ * What a dragged box takes in.
+ *
+ * Agents win over everything else: a box over the isle's inhabitants is a
+ * selection, never an order, and exactly one comes out of it - the one
+ * nearest the middle of the box - because selection is single.
+ *
+ * Otherwise it is a batch of work. Everything inside the box there is
+ * something to do to goes to the selected agent as one order, and they work
+ * their way through it nearest first. With nobody selected it does nothing
+ * at all, the same as every other order.
+ */
+function applyBox(box) {
+  const centre = { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
+
+  let pick = null;
+  for (const agent of agents) {
+    const at = onScreen(boxAt.copy(agent.pos).setY(agent.pos.y + 0.8));
+    if (!inBox(box, at)) continue;
+    const d = Math.hypot(at.x - centre.x, at.y - centre.y);
+    if (!pick || d < pick.d) pick = { agent, d };
+  }
+  if (pick) { selectOnly(pick.agent); return; }
+
+  const agent = selectedAgent();
+  if (!agent) return;
+
+  // The bench is left out: it is a station with a cost, repaired by clicking
+  // it, not something to sweep up with the trees. Saplings have no `action`,
+  // so they fall out on their own.
+  const batch = props.filter((prop) => {
+    if (prop.gone || prop.kind === 'workbench' || !PROP_KINDS[prop.kind]?.action) return false;
+    boxAt.copy(prop.mesh.position).setY(prop.mesh.position.y + 0.5);
+    return inBox(box, onScreen(boxAt)) && !hiddenByIsland(boxAt);
+  });
+
+  if (batch.length > 0) agent.workOnAll(batch);
+}
+
+// --- AGENT SWARM (dev) ----------------------------------------------------
+
+// Two more agents on the isle, and half a minute later they are gone again.
+// They are ordinary agents while they are here - selectable, orderable, in
+// the overview and in the number-key slots - but nothing of them is saved,
+// so a restart or a DEV RESET simply does not have them.
+const SWARM_SIZE = 2;
+const SWARM_SECONDS = 30;
+let borrowedCount = 0;
+
+/**
+ * Somewhere free to stand near `from`, with a way back from it.
+ *
+ * `apart` keeps them off each other's toes: arriving in the next cell along
+ * puts three agents in a heap where a click can only reach the nearest of
+ * them. If the isle is too crowded for that, the room is given up rather
+ * than the agent.
+ */
+function standingCellNear(from, apart = 2) {
+  let best = null;
+  for (const key of surface.keys()) {
+    const [x, z] = key.split(',').map(Number);
+    if (blocked.has(key)) continue;
+    if (agents.some((a) => Math.hypot(a.x - x, a.z - z) < apart)) continue;
+    if (props.some((p) => !p.gone && footprintCells(p.kind, p).some((c) => c.x === x && c.z === z))) continue;
+    const d = Math.hypot(x - from.x, z - from.z);
+    if (best && d >= best.d) continue;
+    // Somewhere they can actually walk out of - a ledge with no way down is
+    // no good to anyone.
+    if (!findPath(surface, from, { x, z }, { blocked })) continue;
+    best = { cell: { x, z }, d };
+  }
+  if (best) return best.cell;
+  return apart > 1 ? standingCellNear(from, 1) : null;
+}
+
+function callSwarm() {
+  for (let i = 0; i < SWARM_SIZE; i++) {
+    const cell = standingCellNear({ x: person.x, z: person.z });
+    if (!cell) break;                      // nowhere left to put them
+
+    const mate = new Person(surface, cell, { name: `Helper ${++borrowedCount}`, blocked });
+    mate.borrowed = SWARM_SECONDS;         // counted down in the frame loop
+    scene.add(mate.mesh);
+    castFromFront(mate.mesh);              // built after boot, like any other
+    agents.push(mate);
+  }
+  // Closed on the way out, so they are seen arriving rather than found later.
+  menu.close();
+}
+
+/** A borrowed agent's time is up: off the isle, and out of the lists. */
+function sendAgentHome(agent) {
+  const at = agents.indexOf(agent);
+  if (at >= 0) agents.splice(at, 1);
+
+  // Whatever they were headed for stops being a target the moment they go.
+  agent.queue = [];
+  agent.task = null;
+  agent.setSelected(false);
+
+  scene.remove(agent.mesh);
+  agent.mesh.traverse((o) => {
+    o.geometry?.dispose();
+    o.material?.dispose();
+  });
+}
+
+function updateSwarm(dt) {
+  for (const agent of [...agents]) {
+    if (agent.borrowed === undefined) continue;
+    agent.borrowed -= dt;
+    if (agent.borrowed <= 0) sendAgentHome(agent);
+  }
 }
 
 // --- the job label over the agent's head --------------------------------
@@ -541,8 +741,20 @@ const labelText = label.querySelector('.text');
 const labelFill = label.querySelector('.fill');
 const labelPos = new THREE.Vector3();
 
+/**
+ * Whose job is announced over their head. The selected agent if they are
+ * working, and otherwise whoever else is - there is one label, so with a
+ * swarm on the isle it follows the one being watched.
+ */
+function labelAgent() {
+  const chosen = selectedAgent();
+  if (chosen?.activity) return chosen;
+  return agents.find((a) => a.activity) ?? null;
+}
+
 function updateLabel() {
-  const activity = person.activity;
+  const agent = labelAgent();
+  const activity = agent?.activity;
 
   // Only actual work is announced - walking about and standing around are not.
   if (!activity) {
@@ -553,7 +765,7 @@ function updateLabel() {
   labelText.textContent = activity.action;
   labelFill.style.width = `${activity.progress * 100}%`;
 
-  labelPos.copy(person.pos);
+  labelPos.copy(agent.pos);
   labelPos.y += 2.1;
   labelPos.project(camera);
 
@@ -705,25 +917,26 @@ function meterColour(value) {
 }
 
 function updatePanel() {
-  panel.hidden = !person.selected;
-  if (panel.hidden) return;
+  const agent = selectedAgent();
+  panel.hidden = !agent;
+  if (!agent) return;
 
-  panel.querySelector('.name').textContent = person.name;
+  panel.querySelector('.name').textContent = agent.name;
 
-  const activity = person.activity;
+  const activity = agent.activity;
   activityName.textContent = activity ? activity.action : 'Idle';
   activityTime.textContent = activity ? `${activity.remaining.toFixed(1)}s` : '';
   activityFill.style.width = `${(activity?.progress ?? 0) * 100}%`;
 
   for (const meter of meters) {
-    const value = person.stats[meter.stat];
+    const value = agent.stats[meter.stat];
     meter.fill.style.width = `${value}%`;
     meter.fill.style.background = meterColour(value);
     meter.value.textContent = Math.round(value);
   }
 
   for (const trait of traits) {
-    trait.textContent = person.stats[trait.dataset.trait] ?? 'None';
+    trait.textContent = agent.stats[trait.dataset.trait] ?? 'None';
   }
 }
 
@@ -740,9 +953,10 @@ const clock = new THREE.Clock();
 function frame() {
   const delta = Math.min(clock.getDelta(), 0.1);
 
-  person.update(delta, props, finishProp);
+  for (const agent of agents) agent.update(delta, props, finishProp);
+  updateSwarm(delta);
   updateGrowth(delta);
-  updateTarget();
+  syncTargets();
   markers.update(delta);
   placement.update(delta);
   controls.update(delta);
@@ -765,6 +979,10 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp };
+window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
-Object.defineProperty(window.ESTER, 'targeted', { get: () => targeted });
+// One prop was the target when there was one agent and one job; a box can
+// light a whole stand at once, so `targets` is the list and `targeted` is
+// kept as the first of them.
+Object.defineProperty(window.ESTER, 'targets', { get: () => [...targets] });
+Object.defineProperty(window.ESTER, 'targeted', { get: () => [...targets][0] ?? null });

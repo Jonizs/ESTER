@@ -60,6 +60,9 @@ export class Person {
     this.blocked = blocked ?? new Set();              // cells they cannot enter
 
     this.mesh = buildMesh();
+    // Which agent was clicked, now that there can be more than one standing
+    // on the isle at once - `isPerson` only says that one of them was hit.
+    this.mesh.traverse((o) => { o.userData.person = this; });
     this.highlight = this.mesh.getObjectByName('selection');
     this.pos = new THREE.Vector3();
 
@@ -74,6 +77,7 @@ export class Person {
     this.path = [];
     this.segment = null;       // the step being walked, for the hop arc
     this.task = null;          // { prop, seconds, elapsed }
+    this.queue = [];           // the rest of a batch of work, nearest first
     this.action = null;        // only set while actually working
     this.stats = { ...FRESH_STATS };
 
@@ -107,6 +111,7 @@ export class Person {
     this.path = [];
     this.segment = null;
     this.task = null;
+    this.queue = [];
     this.action = null;
 
     this.pos.set(this.x, this.groundAt(this.x, this.z), this.z);
@@ -146,9 +151,28 @@ export class Person {
     return true;
   }
 
-  /** Walk over and work on a prop. */
+  /** Walk over and work on a prop. Whatever was queued behind is dropped. */
   workOn(prop) {
-    if (prop.gone) return false;
+    this.queue = [];
+    return this._begin(prop);
+  }
+
+  /**
+   * A whole batch of work, from a box dragged over the isle.
+   *
+   * The list is a queue rather than one order: the nearest job is started
+   * now and the rest are kept, and each time one is finished the next
+   * nearest to wherever they now stand is picked up. Anything unreachable
+   * is skipped rather than stalling the batch.
+   */
+  workOnAll(list) {
+    this.queue = list.filter((prop) => !prop.gone && PROP_KINDS[prop.kind]?.action);
+    return this._startNextJob();
+  }
+
+  /** Walk over and work on a prop, leaving the queue alone. */
+  _begin(prop) {
+    if (prop.gone || !PROP_KINDS[prop.kind]?.action) return false;
     // Every cell the prop stands on is somewhere to walk up beside, so a
     // station two cells wide is reached from whichever side is nearest.
     if (!this.goTo(footprintCells(prop.kind, prop), { adjacent: true })) return false;
@@ -159,8 +183,29 @@ export class Person {
     return true;
   }
 
+  /**
+   * Take the nearest job off the queue and start it. Anything felled in the
+   * meantime, or with no way to it, is dropped and the next one tried.
+   */
+  _startNextJob() {
+    while (this.queue.length > 0) {
+      let pick = 0;
+      let best = Infinity;
+      for (let i = 0; i < this.queue.length; i++) {
+        const prop = this.queue[i];
+        const d = Math.hypot(prop.x - this.x, prop.z - this.z);
+        if (d < best) { best = d; pick = i; }
+      }
+      const [prop] = this.queue.splice(pick, 1);
+      if (this._begin(prop)) return true;
+    }
+    return false;
+  }
+
   walkTo(cell) {
     if (!this.goTo(cell)) return false;
+    // Being sent somewhere calls off the batch as well as the current job.
+    this.queue = [];
     this.task = null;
     this.action = null;
     return true;
@@ -177,7 +222,8 @@ export class Person {
 
     if (this.task) {
       const { prop } = this.task;
-      if (prop.gone) { this.task = null; this.action = null; return; }
+      // Somebody else got there first: on to whatever else was queued.
+      if (prop.gone) { this.task = null; this.action = null; this._startNextJob(); return; }
 
       this.action = PROP_KINDS[prop.kind].action;
       this.mesh.rotation.y = Math.atan2(prop.x - this.x, prop.z - this.z);
@@ -187,11 +233,15 @@ export class Person {
         this.task = null;
         this.action = null;
         onFinish?.(prop);
+        // The rest of a batch follows on its own; a single order leaves the
+        // queue empty, so this does nothing at all.
+        this._startNextJob();
       }
       return;
     }
 
-    // Nothing to do. The agent waits for orders - it never finds its own work.
+    // Nothing queued and nothing to do. The agent waits for orders - it
+    // never finds its own work.
     this.action = null;
   }
 

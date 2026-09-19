@@ -102,11 +102,28 @@ html, body {
   display: block;
   width: 100vw;
   height: 100vh;
-  cursor: grab;
+  /* Left-drag draws a selection box now, so the canvas reads as something to
+     pick things out of rather than something to grab hold of. The orbit is
+     on the right button, and takes `grabbing` while it is turning. */
+  cursor: crosshair;
   touch-action: none;
 }
 
 #viewport.dragging { cursor: grabbing; }
+
+/* The left-drag selection box: the same ice-blue edge as every pane, over a
+   wash faint enough to see the isle through. */
+#select-box {
+  position: fixed;
+  z-index: 5;
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  background: rgba(122, 215, 255, 0.12);
+  box-shadow: 0 0 18px rgba(122, 215, 255, 0.25);
+  border-radius: 2px;
+}
+
+#select-box[hidden] { display: none; }
 
 #help, #loading, #agent-panel {
   position: fixed;

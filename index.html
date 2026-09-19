@@ -51,8 +51,13 @@
       <div class="bar"><span class="fill"></span></div>
     </div>
 
+    <!-- The left-drag selection box. Positioned in screen pixels by
+         src/selectbox.js; it is hidden whenever nothing is being dragged. -->
+    <div id="select-box" hidden></div>
+
     <div id="help">
-      <div><b>Drag</b> &mdash; orbit</div>
+      <div><b>Right drag</b> &mdash; orbit</div>
+      <div><b>Left drag</b> &mdash; box select</div>
       <div><b>Wheel</b> / <b data-help="zoomIn"></b> <b data-help="zoomOut"></b> &mdash; zoom</div>
       <div><b>Esc</b> &mdash; menu</div>
       <div><b data-help="resetView"></b> &mdash; reset view</div>
@@ -60,6 +65,7 @@
       <div><b>Click the agent</b> / <b data-help="selectAgent1"></b>&ndash;<b data-help="selectAgent5"></b> &mdash; select one</div>
       <div><b>Right click</b> &mdash; deselect</div>
       <div><b>With one selected</b> &mdash; click to send it, or click a tree or rock to work it</div>
+      <div><b>Box over trees and rocks</b> &mdash; the selected agent clears the lot</div>
       <div><b>Click the workbench</b> &mdash; crafting</div>
       <div><b data-help="moveStation"></b> &mdash; move whatever the cursor is over</div>
       <div><b data-help="panelOverview"></b> &mdash; overview &nbsp; <b data-help="panelInventory"></b> inventory &nbsp; <b data-help="panelQuests"></b> quests &nbsp; <b data-help="panelStages"></b> stages</div>
@@ -227,6 +233,7 @@
             <button type="button" id="menu-keybinds">KEYBINDS</button>
             <button type="button" id="menu-defaults">RESET TO DEFAULTS</button>
             <button type="button" id="menu-devreset" class="dev">DEV RESET</button>
+            <button type="button" id="menu-swarm" class="dev">AGENT SWARM</button>
             <button type="button" id="menu-resume">RESUME</button>
             <button type="button" id="menu-leave" class="danger">LEAVE GAME</button>
           </div>
