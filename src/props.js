@@ -23,9 +23,89 @@ export const PROP_KINDS = {
     seconds: 8,
     cost: { item: 'wood', amount: 10 },
     // The only prop with a hitbox: it is walked around, not over.
-    solid: true
+    solid: true,
+    // A station the player put down rather than something the isle grew:
+    // it outlines on hover and it can be picked up and moved.
+    placed: true,
+    // Two cells wide, one deep - so it needs two solid, level blocks under
+    // it. Trees and rocks have no footprint and default to their one cell.
+    footprint: { w: 2, d: 1 }
   }
 };
+
+const ONE_CELL = { w: 1, d: 1 };
+
+/** How many cells of ground a kind stands on. */
+export function footprintOf(kind) {
+  return PROP_KINDS[kind]?.footprint ?? ONE_CELL;
+}
+
+/**
+ * The cells a kind covers when its anchor is at `cell`.
+ *
+ * The anchor is the low corner, not the middle, so a 2x1 anchored at (0,0)
+ * covers (0,0) and (1,0). Everything that asks "is this cell taken" walks
+ * this rather than comparing against `prop.x/prop.z`, which is only the
+ * corner.
+ */
+export function footprintCells(kind, cell) {
+  const { w, d } = footprintOf(kind);
+  const cells = [];
+  for (let i = 0; i < w; i++) for (let j = 0; j < d; j++) cells.push({ x: cell.x + i, z: cell.z + j });
+  return cells;
+}
+
+/** Where the middle of that footprint is - where the mesh actually stands. */
+export function footprintCentre(kind, cell) {
+  const { w, d } = footprintOf(kind);
+  return { x: cell.x + (w - 1) / 2, z: cell.z + (d - 1) / 2 };
+}
+
+/**
+ * Whether a kind may stand with its anchor at `cell`, and at what height.
+ *
+ * Every cell it covers has to be solid ground, all of it at the same height -
+ * a bench half on a ledge would hang in the air - and nothing else may be
+ * standing there. Returns `{ height }` so a ground of 0 is still an answer,
+ * or null when it cannot go there.
+ */
+export function canPlace(surface, kind, cell, { props = [], ignore = null, keepClear = [] } = {}) {
+  let height = null;
+
+  for (const c of footprintCells(kind, cell)) {
+    const y = surface.get(`${c.x},${c.z}`);
+    if (y === undefined) return null;                       // off the isle
+    if (height === null) height = y;
+    else if (y !== height) return null;                     // not level
+
+    if (keepClear.some((k) => k.x === c.x && k.z === c.z)) return null;
+
+    for (const other of props) {
+      if (other === ignore || other.gone) continue;
+      if (footprintCells(other.kind, other).some((o) => o.x === c.x && o.z === c.z)) return null;
+    }
+  }
+
+  return { height };
+}
+
+/** Stand a prop with its anchor at `cell`, centred over its footprint. */
+export function placeProp(prop, cell, surface) {
+  prop.x = cell.x;
+  prop.z = cell.z;
+  const centre = footprintCentre(prop.kind, cell);
+  prop.mesh.position.set(centre.x, surface.get(`${cell.x},${cell.z}`) + GROUND_OFFSET, centre.z);
+}
+
+/** Rebuild the set of cells nothing may walk onto, from where props are now. */
+export function syncBlocked(props, blocked) {
+  blocked.clear();
+  for (const prop of props) {
+    if (prop.gone || !PROP_KINDS[prop.kind]?.solid) continue;
+    for (const c of footprintCells(prop.kind, prop)) blocked.add(`${c.x},${c.z}`);
+  }
+  return blocked;
+}
 
 const COUNTS = { tree: 9, rock: 6 };
 
@@ -35,6 +115,45 @@ export const WORKBENCH_CELL = { x: 0, z: 0 };
 // The tint a prop takes on once the agent has been set on it, until it
 // arrives. Every prop builds its own materials, so this is safe to mutate.
 const HIGHLIGHT = 0xffc83d;
+
+// The hover outline: the edges of every mesh in a placed prop, drawn in the
+// UI's ice blue. Depth testing is off so the whole shape reads at once
+// instead of half of it hiding behind the rest - it only ever shows on
+// something the cursor is already over, so there is nothing to see through.
+const OUTLINE_COLOUR = 0x8ad8ff;
+
+/** Give a prop's meshes their (hidden) edge outlines. Idempotent. */
+export function buildOutline(prop) {
+  prop.mesh.traverse((object) => {
+    // LineSegments are not meshes, so the outlines being added here are not
+    // themselves walked - and the guard keeps a rebuild from doubling up.
+    if (!object.isMesh) return;
+    if (object.children.some((c) => c.userData.isOutline)) return;
+
+    const line = new THREE.LineSegments(
+      new THREE.EdgesGeometry(object.geometry),
+      new THREE.LineBasicMaterial({
+        color: OUTLINE_COLOUR,
+        transparent: true,
+        opacity: 0.95,
+        depthTest: false
+      })
+    );
+    line.userData.isOutline = true;
+    line.renderOrder = 3;
+    line.visible = false;
+    // Never a click target, and never in the way of one.
+    line.raycast = () => {};
+    object.add(line);
+  });
+}
+
+/** Show or hide a prop's outline. */
+export function setPropOutline(prop, on) {
+  prop.mesh.traverse((object) => {
+    if (object.userData.isOutline) object.visible = on;
+  });
+}
 
 /** Light a prop up yellow, or put it back the way it was. */
 export function setPropHighlight(prop, on) {
@@ -89,7 +208,8 @@ export function createProps(surface, scene) {
         // run starts at is not hidden behind a tree from half the angles.
         const tooClose = props.some((p) => {
           const gap = p.kind === 'workbench' ? 3.6 : 2.2;
-          return Math.hypot(p.x - pick[0], p.z - pick[1]) < gap;
+          const c = footprintCentre(p.kind, p);
+          return Math.hypot(c.x - pick[0], c.z - pick[1]) < gap;
         });
         if (tooClose) continue;
         taken.add(key);
@@ -119,18 +239,22 @@ export function createProps(surface, scene) {
  * repaired clicking it opens the crafting screen.
  */
 function addWorkbench(surface, group, props, blocked) {
-  // The middle cell if the isle has one, otherwise the nearest that exists.
+  // The anchor whose footprint sits nearest the middle of the isle and is
+  // actually legal - two level cells side by side. The middle cell on its own
+  // is not enough now that the bench is two wide.
   let cell = null;
   let best = Infinity;
   for (const key of surface.keys()) {
     const [x, z] = key.split(',').map(Number);
-    const d = Math.hypot(x - WORKBENCH_CELL.x, z - WORKBENCH_CELL.z);
-    if (d < best) { best = d; cell = { x, z }; }
+    const candidate = { x, z };
+    if (!canPlace(surface, 'workbench', candidate, { props })) continue;
+    const centre = footprintCentre('workbench', candidate);
+    const d = Math.hypot(centre.x - WORKBENCH_CELL.x, centre.z - WORKBENCH_CELL.z);
+    if (d < best) { best = d; cell = candidate; }
   }
   if (!cell) return null;
 
   const mesh = new THREE.Group();
-  mesh.position.set(cell.x, surface.get(`${cell.x},${cell.z}`) + GROUND_OFFSET, cell.z);
   group.add(mesh);
 
   const prop = {
@@ -138,14 +262,16 @@ function addWorkbench(surface, group, props, blocked) {
     kind: 'workbench',
     x: cell.x,
     z: cell.z,
+    home: { x: cell.x, z: cell.z },   // where DEV RESET puts it back
     mesh,
     gone: false,
     repaired: false
   };
 
+  placeProp(prop, cell, surface);
   setWorkbenchState(prop, false);
   props.push(prop);
-  if (PROP_KINDS[prop.kind].solid) blocked.add(`${prop.x},${prop.z}`);
+  syncBlocked(props, blocked);
   return prop;
 }
 
@@ -159,6 +285,8 @@ export function setWorkbenchState(prop, repaired) {
   // the bench finds it.
   mesh.userData.propId = prop.id;
   mesh.traverse((o) => { o.userData.propId = prop.id; });
+  // The meshes are new, so their outlines are too.
+  buildOutline(prop);
 }
 
 // The tabletop, and where its underside sits - the legs are measured off

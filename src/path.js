@@ -8,6 +8,10 @@
  * `blocked` is the set of cells something solid is standing on - the
  * workbench, today. They are walked around rather than over, corners
  * included, so the agent never crosses one even diagonally.
+ *
+ * `goal` may be one cell or several. Several is what a station wider than a
+ * single cell needs: any cell of its footprint will do, so the agent walks up
+ * to whichever side of it is nearest rather than round to one corner.
  */
 
 const DIAG = Math.SQRT2;
@@ -31,6 +35,8 @@ const octile = (ax, az, bx, bz) => {
 const chebyshev = (ax, az, bx, bz) => Math.max(Math.abs(ax - bx), Math.abs(az - bz));
 
 export function findPath(surface, start, goal, { adjacent = false, blocked = EMPTY } = {}) {
+  const targets = Array.isArray(goal) ? goal : [goal];
+  if (targets.length === 0) return null;
   const heightAt = (x, z) => {
     const h = surface.get(`${x},${z}`);
     return h === undefined ? null : h;
@@ -45,19 +51,28 @@ export function findPath(surface, start, goal, { adjacent = false, blocked = EMP
   };
 
   if (heightAt(start.x, start.z) === null) return null;
-  if (start.x === goal.x && start.z === goal.z) return [];
+  if (!adjacent && targets.some((t) => t.x === start.x && t.z === start.z)) return [];
   // Walking onto something solid is not a route, only walking up beside it.
-  if (!adjacent && blocked.has(`${goal.x},${goal.z}`)) return null;
+  if (!adjacent && targets.every((t) => blocked.has(`${t.x},${t.z}`))) return null;
 
   const open = [{ x: start.x, z: start.z, f: 0 }];
   const cameFrom = new Map();
   const gScore = new Map([[startKey, 0]]);
   const closed = new Set();
 
-  // Standing diagonally beside a prop counts as being next to it.
-  const reached = (x, z) => (adjacent
-    ? chebyshev(x, z, goal.x, goal.z) === 1
-    : x === goal.x && z === goal.z);
+  // Standing diagonally beside a prop counts as being next to it. With
+  // several targets, reaching any one of them is arriving.
+  const reached = (x, z) => targets.some((t) => (adjacent
+    ? chebyshev(x, z, t.x, t.z) === 1
+    : x === t.x && z === t.z));
+
+  // The heuristic has to stay optimistic, so it measures to the nearest
+  // target - anything else can stop A* returning the shortest route.
+  const heuristic = (x, z) => {
+    let best = Infinity;
+    for (const t of targets) best = Math.min(best, octile(x, z, t.x, t.z));
+    return best;
+  };
 
   let guard = 20000;
   while (open.length && guard-- > 0) {
@@ -103,7 +118,7 @@ export function findPath(surface, start, goal, { adjacent = false, blocked = EMP
       if (cost < (gScore.get(nKey) ?? Infinity)) {
         cameFrom.set(nKey, key);
         gScore.set(nKey, cost);
-        open.push({ x: nx, z: nz, f: cost + octile(nx, nz, goal.x, goal.z) });
+        open.push({ x: nx, z: nz, f: cost + heuristic(nx, nz) });
       }
     }
   }

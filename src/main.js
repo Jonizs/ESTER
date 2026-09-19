@@ -2,13 +2,17 @@ import * as THREE from 'three';
 import { createIsland, ISLAND_RADIUS } from './island.js';
 import { createSpace } from './space.js';
 import { OrbitCamera } from './orbitCamera.js';
-import { createProps, setPropHighlight, setWorkbenchState, GROUND_OFFSET, PROP_KINDS } from './props.js';
+import {
+  createProps, setPropHighlight, setPropOutline, setWorkbenchState,
+  placeProp, footprintCells, syncBlocked, GROUND_OFFSET, PROP_KINDS
+} from './props.js';
 import { Person } from './person.js';
 import { createMarkers } from './markers.js';
 import { createSettings, keyLabel } from './settings.js';
 import { createMenu } from './menu.js';
 import { createPanels } from './panels.js';
 import { createCrafting } from './crafting.js';
+import { createPlacement } from './placement.js';
 import { createInventory } from './inventory.js';
 import { createProgression } from './progression.js';
 import { createDebug } from './debug.js';
@@ -56,7 +60,7 @@ function startingCell() {
   let best = null;
   for (const key of surface.keys()) {
     const [x, z] = key.split(',').map(Number);
-    if (props?.some((p) => p.x === x && p.z === z)) continue;
+    if (props?.some((p) => footprintCells(p.kind, p).some((c) => c.x === x && c.z === z))) continue;
     const score = -Math.hypot(x, z);
     if (!best || score > best.score) best = { x, z, score };
   }
@@ -165,7 +169,7 @@ const panels = createPanels({
   agents,
   inventory,
   progression,
-  blocked: () => menu.isOpen() || crafting.isOpen(),
+  blocked: () => menu.isOpen() || crafting.isOpen() || placement.isActive(),
   onSelect: (agent) => agent.setSelected(true)
 });
 
@@ -174,8 +178,32 @@ const panels = createPanels({
 // are: its Esc handler has to run first.
 const crafting = createCrafting({
   inventory,
-  blocked: () => menu.isOpen(),
+  blocked: () => menu.isOpen() || placement.isActive(),
   onOpen: () => panels.close()
+});
+
+// Moving a station owns Esc while it is up, so like the panels it is built
+// before the menu: capture listeners fire in the order they were added.
+const placement = createPlacement({
+  scene,
+  camera,
+  canvas,
+  surface,
+  props,
+  blocked,
+  person,
+  island,
+  blockedBy: () => menu.isOpen(),
+  onBegin: (prop) => {
+    panels.close();
+    crafting.close();
+    setHovered(prop);           // keep it outlined for the whole move
+    toast('Arrows nudge it a cell; hold DRAG to place it by hand.');
+  },
+  onEnd: () => {
+    hovered = null;
+    refreshHover();
+  }
 });
 
 const menu = createMenu({
@@ -195,10 +223,12 @@ const menu = createMenu({
  * alone; RESET TO DEFAULTS beside it is what those have.
  */
 function devReset() {
+  placement.cancel();
   setTarget(null);
 
   for (const prop of props) {
     setPropHighlight(prop, false);
+    if (prop.home) placeProp(prop, prop.home, surface);
     if (prop.kind === 'workbench') {
       setWorkbenchState(prop, false);
       prop.mesh.traverse((o) => {
@@ -209,6 +239,9 @@ function devReset() {
     prop.gone = false;
     prop.mesh.visible = true;
   }
+
+  syncBlocked(props, blocked);
+  setHovered(null);
 
   person.reset();
   inventory.reset();
@@ -261,7 +294,7 @@ const pointer = new THREE.Vector2();
 let press = null;
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (menu.isOpen() || crafting.isOpen()) return;
+  if (menu.isOpen() || crafting.isOpen() || placement.isActive()) return;
   press = { x: e.clientX, y: e.clientY, t: performance.now(), button: e.button };
 });
 
@@ -363,6 +396,74 @@ function updateLabel() {
   label.style.top = `${(-labelPos.y * 0.5 + 0.5) * window.innerHeight}px`;
 }
 
+// --- hovering a placed station ------------------------------------------
+
+// Only stations outline - `PROP_KINDS[kind].placed`. Trees and rocks are
+// scenery the isle grew, not something the player put down and can move.
+//
+// The ray runs on every pointer move, so it is cast at the props alone -
+// the island is thousands of instanced blocks and testing them every time
+// the mouse twitches is not worth it. The island is only brought in once a
+// station has actually been hit, to check nothing is standing in front of
+// it: that is rare, so the expensive cast almost never happens.
+const propsGroup = scene.getObjectByName('props');
+let hovered = null;
+let pointerAt = null;
+
+function setHovered(prop) {
+  if (hovered === prop) return;
+  if (hovered) setPropOutline(hovered, false);
+  hovered = prop;
+  if (hovered) setPropOutline(hovered, true);
+  canvas.style.cursor = hovered ? 'pointer' : '';
+}
+
+function refreshHover() {
+  // A move keeps its own station lit, whatever the cursor is over.
+  if (placement.isActive()) { setHovered(placement.prop); return; }
+  if (!pointerAt || menu.isOpen() || panels.isOpen() || crafting.isOpen()) {
+    setHovered(null);
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((pointerAt.x - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((pointerAt.y - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+
+  const hit = raycaster.intersectObject(propsGroup, true)[0];
+  const prop = hit && props.find((p) => p.id === hit.object.userData.propId);
+  if (!prop || prop.gone || !PROP_KINDS[prop.kind]?.placed) { setHovered(null); return; }
+
+  // Something hit first is something in the way - a brow of the isle between
+  // the cursor and the station, most likely.
+  const ground = raycaster.intersectObject(island, true)[0];
+  setHovered(ground && ground.distance < hit.distance ? null : prop);
+}
+
+canvas.addEventListener('pointermove', (event) => {
+  pointerAt = { x: event.clientX, y: event.clientY };
+  refreshHover();
+});
+
+canvas.addEventListener('pointerleave', () => {
+  pointerAt = null;
+  refreshHover();
+});
+
+// The move key picks up whatever the cursor is on.
+window.addEventListener('keydown', (event) => {
+  if (menu.isOpen() || placement.isActive()) return;
+  if (settings.actionFor(event.key) !== 'moveStation') return;
+  event.preventDefault();
+
+  if (!hovered) {
+    toast('Point at a station first, then press it to move it.');
+    return;
+  }
+  placement.begin(hovered);
+});
+
 // --- what the broken workbench still needs -------------------------------
 
 // Always up while the bench is broken, so the cost of repairing it is
@@ -461,6 +562,7 @@ function frame() {
   person.update(delta, props, finishProp);
   updateTarget();
   markers.update(delta);
+  placement.update(delta);
   controls.update(delta);
   updateLabel();
   updateBenchLabel();
@@ -481,6 +583,6 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, workbench, surface, markers, menu, panels, crafting, inventory, progression, settings, raycaster, THREE };
+window.ESTER = { scene, camera, renderer, controls, island, person, agents, props, workbench, blocked, surface, markers, menu, panels, crafting, placement, inventory, progression, settings, raycaster, THREE };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 Object.defineProperty(window.ESTER, 'targeted', { get: () => targeted });

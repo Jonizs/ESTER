@@ -16,6 +16,7 @@ export const ACTIONS = [
   { id: 'zoomOut', label: 'Zoom out', key: '-' },
   { id: 'resetView', label: 'Reset view', key: 'r' },
   { id: 'autoSpin', label: 'Toggle auto-spin', key: 'f' },
+  { id: 'moveStation', label: 'Move station', key: 'a' },
   { id: 'panelOverview', label: 'Overview', key: 'Tab' },
   { id: 'panelQuests', label: 'Quest book', key: 'w' },
   { id: 'panelStages', label: 'Stages', key: 'e' }

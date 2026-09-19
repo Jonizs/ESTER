@@ -66,6 +66,7 @@ with one inhabitant who walks around and works on what is there.
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
   - `src/path.js` - A* across the surface cells.
+  - `src/placement.js` - picking a station up and putting it down again.
 - **Desktop shell:** `electron/main.cjs`, with `electron/preload.cjs`
   exposing just `window.ester.quit()` for the menu's LEAVE GAME.
 - **Web deploy:** `.github/workflows/deploy-pages.yml` builds and publishes
@@ -165,6 +166,22 @@ with one inhabitant who walks around and works on what is there.
   alone. Before marking anything else solid, sweep the isle and check every
   cell is still reachable; trees and rocks standing in a line would wall a
   corner off.
+- **Props have footprints, and the anchor is the low corner, not the
+  middle.** `PROP_KINDS[kind].footprint` is how many cells a kind stands on -
+  the workbench is `{ w: 2, d: 1 }`, everything else defaults to one cell.
+  `prop.x/prop.z` is the *corner* of that rectangle, so anything asking "is
+  this cell taken" has to walk `footprintCells()` rather than compare against
+  `prop.x`; the mesh stands at `footprintCentre()`, half a cell off the
+  anchor for an even width. `canPlace()` is the one rule for where a kind may
+  stand - every cell solid, all at one height, nothing else on them - and
+  `syncBlocked()` rebuilds the pathing set from wherever the props are now.
+  Anything that moves a prop goes through `placeProp()` and then
+  `syncBlocked()`, or the agent walks through thin air.
+- **A* takes several goal cells, not one.** `findPath` accepts an array, and
+  `workOn` hands it every cell of the prop's footprint, so the agent walks up
+  to whichever side of a two-cell station is nearest instead of round to one
+  corner. The heuristic measures to the *nearest* goal - anything else stops
+  being optimistic and A* stops returning the shortest route.
 - **The workbench is walked around, corners included.** Its cell is in
   `blocked`, so `walkTo` on it returns false and a route never crosses it -
   and the diagonal check refuses a step whose shoulders are blocked too, so
@@ -228,6 +245,34 @@ with one inhabitant who walks around and works on what is there.
   enough wood. It needs nothing clicked, and it goes for good when the bench
   is repaired. It is anchored 2.3 above the bench: lower and the badge covers
   the bench itself at a wide zoom.
+- **Only `placed` props outline on hover.** `PROP_KINDS[kind].placed` marks
+  a station the player put down, as opposed to scenery the isle grew: it
+  outlines under the cursor and it can be moved. Trees and rocks do neither.
+  The outline is an `EdgesGeometry` child on every mesh, built by
+  `buildOutline()` and toggled by `setPropOutline()`, with `depthTest` off so
+  the whole shape reads at once - `setWorkbenchState` rebuilds the meshes, so
+  it rebuilds the outlines too.
+- **The hover ray skips the island until it has to.** It runs on every
+  pointer move and the island is thousands of instanced blocks, so
+  `refreshHover` casts at the props group alone; only once a station is
+  actually hit does it cast at the island as well, to check nothing is in
+  front of it. Do not "simplify" that into one cast against the whole scene.
+- **Moving a station can never leave it somewhere illegal.** `placement.js`
+  refuses a move rather than allowing an invalid position even momentarily -
+  every cell solid and level, clear of other props, and clear of the agent -
+  and flashes the footprint red instead. `blocked` is resynced on every
+  accepted move, not just when the move is committed, and a walking agent
+  whose route now crosses the station is sent to the same destination again
+  so it goes round. CANCEL puts the station back where the move started.
+- **The mover's arrows are read off the camera, not the world.** "Forward" is
+  away from whatever the camera is looking at, snapped to the nearest axis,
+  so the arrows keep meaning the same thing once the isle has been orbited.
+  The D-pad's CSS grid is keyed off each button's `data-step`, not
+  `nth-of-type` - the drag handle counts as a button too, and keying off
+  position put two of the four arrows in the wrong cells.
+- **DEV RESET puts stations back.** A placed prop carries `prop.home`, the
+  anchor it started the run at, and `devReset` walks them back to it - a
+  bench left at the far end of the isle otherwise survives the reset.
 - **A repaired bench needs its shadowSide set again.** `setWorkbenchState`
   builds fresh materials, and the front-face casting the rest of the scene got
   once at boot has to be applied to them - `finishProp` in `main.js` does it.

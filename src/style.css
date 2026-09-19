@@ -1436,3 +1436,142 @@ html, body {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+/* --- moving a placed station ---------------------------------------------
+   A D-pad low on the screen: four nudges a cell at a time around a drag
+   handle. It sits under the panels and the menu but over the isle, and it is
+   the only HUD piece that takes the pointer, so the canvas keeps the rest. */
+
+#mover {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 14px 16px 15px;
+  border-radius: 16px;
+  border: 1px solid var(--edge-lit);
+  background: linear-gradient(180deg, rgba(24, 20, 56, 0.94), rgba(7, 6, 20, 0.95));
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.66), 0 0 34px rgba(138, 216, 255, 0.16);
+  user-select: none;
+  text-align: center;
+  animation: panel-in 0.16s ease-out;
+}
+
+#mover[hidden] { display: none; }
+
+#mover .mover-head { margin-bottom: 11px; }
+
+#mover .mover-what {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  color: var(--accent);
+  text-shadow: 0 0 16px rgba(138, 216, 255, 0.4);
+}
+
+#mover .mover-hint {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* The four arrows around the handle, laid out as the cross they are. */
+#mover .pad {
+  display: grid;
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 46px);
+  gap: 6px;
+  justify-content: center;
+}
+
+/* Keyed off the step each button actually takes, not its position in the
+   markup: `nth-of-type` counts the drag handle as a button too, so it put
+   two of the four arrows in the wrong cells. */
+#mover .pad [data-step="0,1"]  { grid-area: 1 / 2; }   /* away from the camera */
+#mover .pad [data-step="-1,0"] { grid-area: 2 / 1; }
+#mover .pad #mover-drag        { grid-area: 2 / 2; }
+#mover .pad [data-step="1,0"]  { grid-area: 2 / 3; }
+#mover .pad [data-step="0,-1"] { grid-area: 3 / 2; }   /* toward the camera */
+
+#mover button {
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.12), rgba(185, 140, 255, 0.07));
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+#mover button:hover {
+  border-color: var(--edge-lit);
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.26), rgba(185, 140, 255, 0.14));
+}
+
+#mover .step {
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  line-height: 1;
+}
+
+#mover .step:active { background: rgba(138, 216, 255, 0.34); }
+
+#mover #mover-drag {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  border-color: var(--edge-lit);
+  background: linear-gradient(180deg, rgba(185, 140, 255, 0.3), rgba(138, 216, 255, 0.12));
+  cursor: grab;
+  touch-action: none;   /* the drag is ours, not the browser's scroll */
+}
+
+#mover #mover-drag.dragging {
+  cursor: grabbing;
+  box-shadow: 0 0 22px rgba(138, 216, 255, 0.45);
+  background: linear-gradient(180deg, rgba(185, 140, 255, 0.46), rgba(138, 216, 255, 0.22));
+}
+
+#mover .mover-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+#mover .mover-buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 10px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+#mover #mover-place {
+  border-color: var(--edge-lit);
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.26), rgba(138, 216, 255, 0.08));
+}
+
+#mover #mover-cancel {
+  background: linear-gradient(180deg, rgba(255, 110, 150, 0.16), rgba(255, 110, 150, 0.06));
+  border-color: rgba(255, 110, 150, 0.36);
+}
+
+#mover #mover-cancel:hover { background: linear-gradient(180deg, rgba(255, 110, 150, 0.3), rgba(255, 110, 150, 0.12)); }
+
+#mover kbd {
+  padding: 2px 5px;
+  border-radius: 5px;
+  border: 1px solid var(--edge);
+  background: rgba(4, 3, 14, 0.6);
+  color: var(--dim);
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}

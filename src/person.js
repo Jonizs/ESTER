@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { findPath } from './path.js';
-import { PROP_KINDS, GROUND_OFFSET } from './props.js';
+import { PROP_KINDS, GROUND_OFFSET, footprintCells } from './props.js';
 
 const WALK_SPEED = 2.2;        // cells per second on the level
 const HOP_SPEED = 1.5;         // slower while hopping up or down a block
@@ -119,7 +119,9 @@ export class Person {
   /** Walk over and work on a prop. */
   workOn(prop) {
     if (prop.gone) return false;
-    if (!this.goTo({ x: prop.x, z: prop.z }, { adjacent: true })) return false;
+    // Every cell the prop stands on is somewhere to walk up beside, so a
+    // station two cells wide is reached from whichever side is nearest.
+    if (!this.goTo(footprintCells(prop.kind, prop), { adjacent: true })) return false;
     this.task = { prop, seconds: PROP_KINDS[prop.kind].seconds, elapsed: 0 };
     // Nothing is shown while walking there; the label appears once the work
     // actually starts.
