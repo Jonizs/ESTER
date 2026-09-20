@@ -164,6 +164,9 @@
         <header class="craft-head">
           <div>
             <h2>Crafting</h2>
+            <p>Left click takes a stack, right click takes half. Drop it all with
+               left click, one at a time with right &mdash; or drag across the grid
+               to spread a stack out.</p>
           </div>
           <button type="button" id="crafting-close">
             <span>Close</span><kbd>Esc</kbd>
@@ -190,6 +193,12 @@
           </section>
         </div>
       </div>
+
+      <!-- The stack on the cursor. Fixed to the pointer and deliberately
+           transparent to it, so it never becomes the slot under the mouse.
+           Outside the shell because the shell animates in on a transform,
+           which would otherwise become the containing block for it. -->
+      <div id="craft-held" hidden></div>
     </div>
 
     <!-- Moving a placed station: four screen-relative nudges round a drag

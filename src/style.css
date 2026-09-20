@@ -1486,7 +1486,10 @@ html, body {
 }
 
 #crafting .grid4 .cell {
+  position: relative;
   aspect-ratio: 1;
+  display: grid;
+  place-items: center;
   border-radius: 10px;
   border: 1px solid rgba(150, 180, 255, 0.16);
   background: rgba(4, 3, 14, 0.42);
@@ -1496,6 +1499,79 @@ html, body {
 #crafting .grid4 .cell:hover {
   border-color: var(--edge-lit);
   background: rgba(138, 216, 255, 0.1);
+}
+
+/* A cell with something in it glows in that material's own colour, the same
+   way a stock slot does - so the grid reads as the same kind of slot. */
+#crafting .grid4 .cell.full {
+  border-color: color-mix(in srgb, var(--tint, var(--accent)) 45%, transparent);
+  background:
+    radial-gradient(120% 120% at 50% 15%,
+      color-mix(in srgb, var(--tint, var(--accent)) 16%, transparent), transparent 70%),
+    rgba(4, 3, 14, 0.42);
+}
+
+#crafting .grid4 .cell-icon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+#crafting .grid4 .cell-icon .icon {
+  width: 66%;
+  height: 66%;
+}
+
+/* Bottom right, the way a slot count is always read. */
+#crafting .grid4 .cell-count,
+#crafting .tile-count,
+#craft-held .held-count {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+  text-shadow: 0 1px 0 #06021a, 0 -1px 0 #06021a, 1px 0 0 #06021a, -1px 0 0 #06021a;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* The stock slot's own badge is replaced by the plain count above, so the
+   box it used to sit in has to go with it. */
+#crafting .tile-count {
+  top: auto;
+  left: auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: right;
+}
+
+/* --- the stack on the cursor ---------------------------------------------
+   It follows the pointer, so it must never be what the pointer is over -
+   `slotAt` reads the event target and would find this instead of the slot. */
+#craft-held {
+  position: fixed;
+  z-index: 12;
+  width: 42px;
+  height: 42px;
+  margin: -21px 0 0 -21px;      /* centred on the cursor */
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(2, 1, 12, 0.7));
+}
+
+#craft-held[hidden] { display: none; }
+
+#craft-held .icon {
+  width: 34px;
+  height: 34px;
 }
 
 /* --- the craftable items -------------------------------------------------- */
@@ -1586,13 +1662,39 @@ html, body {
 /* Scrolls rather than growing: everything held is reachable from here
    however much of it there is, without the grid above being pushed off the
    top of the screen. */
+/* Small, fixed-size slots rather than tiles stretched across the width: on
+   this screen an item is something to pick up and drag, so it reads as a
+   slot the size of a grid cell, not as the inventory page's big picture. */
 #crafting .tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, 58px);
+  justify-content: start;
+  gap: 7px;
   max-height: 208px;
   overflow-y: auto;
   padding-right: 6px;
+}
+
+#crafting .tile {
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+#crafting .tile-icon .icon {
+  width: 66%;
+  height: 66%;
+}
+
+/* The name would fill a slot this small, so it goes over the top of it on
+   hover rather than trying to sit inside the art. */
+#crafting .tile::after {
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  padding: 3px 1px;
+  border-radius: 6px;
+  font-size: 8px;
+  letter-spacing: 0.08em;
 }
 
 #crafting .tiles::-webkit-scrollbar { width: 8px; }
