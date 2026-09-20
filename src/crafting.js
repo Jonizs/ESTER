@@ -1,5 +1,5 @@
 import { itemIcon } from './icons.js';
-import { ITEMS, isTool, servesAs } from './inventory.js';
+import { ITEMS, isSingular, servesAs } from './inventory.js';
 
 /**
  * The crafting screen.
@@ -139,6 +139,69 @@ export const RECIPES = [
       5: 'flint', 6: 'flint', 7: 'stick',
       10: 'stick', 11: 'stick',
       14: 'stick', 15: 'stick'
+    }
+  },
+  {
+    id: 'flintShovel',
+    label: 'Flint Shovel',
+    item: 'flintShovel',
+    yield: 1,
+    slots: {
+      2: 'flint', 3: 'flint',
+      6: 'stick', 7: 'stick',
+      10: 'stick', 11: 'stick',
+      14: 'stick', 15: 'stick'
+    }
+  },
+  {
+    id: 'flintHoe',
+    label: 'Flint Hoe',
+    item: 'flintHoe',
+    yield: 1,
+    slots: {
+      1: 'flint', 2: 'flint', 3: 'stick',
+      5: 'flint', 6: 'stick',
+      10: 'stick', 11: 'stick',
+      14: 'stick', 15: 'stick'
+    }
+  },
+  {
+    // Splitting a log takes an axe, so this is the second recipe to want a
+    // tool on the grid - and the first where the tool is the axe itself.
+    id: 'plank',
+    label: 'Plank',
+    item: 'plank',
+    yield: 8,
+    slots: {
+      1: 'wood', 2: 'wood',
+      5: 'wood', 6: 'wood',
+      9: 'wood', 10: 'wood'
+    },
+    tool: 'flintAxe'
+  },
+  {
+    // A tub: walls down both sides and a floor across the bottom.
+    id: 'waterCatcher',
+    label: 'Water Catcher',
+    item: 'waterCatcher',
+    yield: 1,
+    slots: {
+      1: 'plank', 4: 'plank',
+      5: 'plank', 8: 'plank',
+      9: 'plank', 12: 'plank',
+      13: 'plank', 14: 'plank', 15: 'plank', 16: 'plank'
+    }
+  },
+  {
+    // A pail with a rope handle down its side.
+    id: 'bucket',
+    label: 'Wooden Bucket',
+    item: 'bucket',
+    yield: 1,
+    slots: {
+      1: 'plank', 3: 'plank', 4: 'rope',
+      5: 'plank', 7: 'plank', 8: 'rope',
+      9: 'plank', 10: 'plank', 11: 'plank', 12: 'rope'
     }
   }
 ];
@@ -611,7 +674,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
 
       // How much is left on the tool that would actually be used - the most
       // worn one, which is the one a craft here would take.
-      const worn = cell && isTool(cell.item) ? inventory.wear(cell.item) : null;
+      const worn = cell && isSingular(cell.item) ? inventory.wear(cell.item) : null;
       const bar = el.querySelector('.cell-wear');
       bar.hidden = !worn;
       if (worn) setWear(bar.firstElementChild, worn);
@@ -760,7 +823,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
         tile.innerHTML = `
           <div class="tile-icon">${itemIcon(entry.item, 40)}</div>
           <div class="tile-count"></div>
-          ${isTool(entry.item) ? '<div class="tile-wear"><i></i></div>' : ''}`;
+          ${isSingular(entry.item) ? '<div class="tile-wear"><i></i></div>' : ''}`;
 
         stock.append(tile);
       }
@@ -770,7 +833,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
       const tile = stock.querySelector(`[data-item="${entry.item}"]`);
       tile.querySelector('.tile-count').textContent = entry.count;
 
-      const worn = isTool(entry.item) ? inventory.wear(entry.item) : null;
+      const worn = isSingular(entry.item) ? inventory.wear(entry.item) : null;
       const bar = tile.querySelector('.tile-wear i');
       if (bar && worn) setWear(bar, worn);
     }

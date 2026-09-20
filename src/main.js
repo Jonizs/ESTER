@@ -15,6 +15,7 @@ import { createSettings, keyLabel } from './settings.js';
 import { createMenu } from './menu.js';
 import { createPanels } from './panels.js';
 import { createCrafting } from './crafting.js';
+import { createLookAt, propName } from './lookat.js';
 import { createPlacement } from './placement.js';
 import { createSelectBox } from './selectbox.js';
 import { createInventory, ITEMS } from './inventory.js';
@@ -215,6 +216,10 @@ function useWorkbench(prop) {
 // normalBias in space.js is for. This does not reproduce in headless
 // Chromium; it was confirmed on hardware with ESTER.debug.try(5).
 castFromFront(scene);
+
+// What the cursor is over, named at the top of the screen. It only draws;
+// what it says about each thing is decided in `describeProp` below.
+const lookAt = createLookAt();
 
 // --- controls --------------------------------------------------------------
 
@@ -884,6 +889,65 @@ function setHovered(prop) {
   canvas.style.cursor = hovered ? 'pointer' : '';
 }
 
+/**
+ * What the readout at the top of the screen should say about a prop.
+ *
+ * The name and its picture come from the kind; anything that changes while
+ * the run goes on - how full a catcher is, how far along a crop has got - is
+ * added by whatever owns that state, so this stays the one place a prop is
+ * described and nothing has to reach into the readout itself.
+ */
+function describeProp(prop) {
+  const kind = PROP_KINDS[prop.kind];
+  const what = { name: propName(prop), item: kind?.icon ?? null };
+
+  // A station still to be repaired says what it wants, the same as its badge.
+  if (kind?.cost && !prop.repaired) {
+    what.note = `${inventory.count(kind.cost.item)} / ${kind.cost.amount} ${ITEMS[kind.cost.item].label.toLowerCase()}`;
+  }
+  return what;
+}
+
+/**
+ * The ground itself: whichever layer of the isle the ray landed on.
+ *
+ * The instanced meshes are named `island-<layer>`, and a buried one carries
+ * `:core` on the end - `grass` and `grass:core` are the same stuff to look
+ * at, so both ends are trimmed off.
+ */
+function describeGround(hit) {
+  const layer = (hit.object.name ?? '').replace(/^island-/, '').split(':')[0];
+  if (!layer) return null;
+  return { name: layer.replace(/\b[a-z]/g, (c) => c.toUpperCase()) };
+}
+
+/**
+ * Point the pointer's ray at the scene. Returns false when there is nothing
+ * to aim at, which is the same question both the outline and the readout
+ * start from.
+ */
+function aimRay() {
+  if (!pointerAt) return false;
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((pointerAt.x - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((pointerAt.y - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  return true;
+}
+
+/** Whatever the pointer is actually over: a prop, or null for the ground. */
+function propUnderPointer() {
+  const hit = raycaster.intersectObject(propsGroup, true)[0];
+  const prop = hit && props.find((p) => p.id === hit.object.userData.propId);
+  if (!prop || prop.gone) return null;
+
+  // Something hit first is something in the way - a brow of the isle between
+  // the cursor and the prop, most likely. This is the cast that was always
+  // here, and it still only runs when a prop was actually hit.
+  const ground = raycaster.intersectObject(island, true)[0];
+  return ground && ground.distance < hit.distance ? null : prop;
+}
+
 function refreshHover() {
   // A move keeps its own station lit, whatever the cursor is over.
   if (placement.isActive()) { setHovered(placement.prop); return; }
@@ -891,20 +955,45 @@ function refreshHover() {
     setHovered(null);
     return;
   }
+  if (!aimRay()) { setHovered(null); return; }
 
-  const rect = canvas.getBoundingClientRect();
-  pointer.x = ((pointerAt.x - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -((pointerAt.y - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
+  // Only a station the player put down takes the outline.
+  const prop = propUnderPointer();
+  setHovered(prop && PROP_KINDS[prop.kind]?.placed ? prop : null);
+}
 
-  const hit = raycaster.intersectObject(propsGroup, true)[0];
-  const prop = hit && props.find((p) => p.id === hit.object.userData.propId);
-  if (!prop || prop.gone || !PROP_KINDS[prop.kind]?.placed) { setHovered(null); return; }
+/**
+ * The readout at the top of the screen, run from the frame loop rather than
+ * from the pointer.
+ *
+ * Naming the ground needs a cast at the isle and the isle is thousands of
+ * instanced blocks (0.6ms a cast against 0.01ms for the props), so it is
+ * throttled. It cannot be throttled on the pointer move itself: a move that
+ * lands inside the window is simply dropped, and with no further move to
+ * retry the readout never catches up - which is exactly what it did. The
+ * frame loop always comes round again.
+ */
+const LOOK_EVERY_MS = 80;
+let lookedAt = 0;
 
-  // Something hit first is something in the way - a brow of the isle between
-  // the cursor and the station, most likely.
+function updateLookAt() {
+  if (placement.isActive()) { lookAt.show(describeProp(placement.prop)); return; }
+  if (!pointerAt || menu.isOpen() || panels.isOpen() || crafting.isOpen()) {
+    lookAt.hide();
+    return;
+  }
+
+  const now = performance.now();
+  if (now - lookedAt < LOOK_EVERY_MS) return;
+  lookedAt = now;
+
+  if (!aimRay()) { lookAt.hide(); return; }
+
+  const prop = propUnderPointer();
+  if (prop) { lookAt.show(describeProp(prop)); return; }
+
   const ground = raycaster.intersectObject(island, true)[0];
-  setHovered(ground && ground.distance < hit.distance ? null : prop);
+  lookAt.show(ground ? describeGround(ground) : null);
 }
 
 canvas.addEventListener('pointermove', (event) => {
@@ -1054,6 +1143,7 @@ function frame() {
   // the screen is up - the overlay takes the clicks - but AGENT SWARM sends
   // its two home on a timer, and one of those may be who opened it.
   if (crafting.isOpen() && !someoneAt(workbench)) crafting.close();
+  updateLookAt();
   crafting.update();
 
   renderer.render(scene, camera);
@@ -1069,7 +1159,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { ITEMS, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
+window.ESTER = { ITEMS, lookAt, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 // One prop was the target when there was one agent and one job; a box can
 // light a whole stand at once, so `targets` is the list and `targeted` is

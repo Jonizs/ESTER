@@ -307,7 +307,131 @@ export const MATERIAL_ART = {
       // the bit, catching the light
     + '<path d="M5.5 10.3l1.9 3.5" fill="none" stroke="#c3ccdd" stroke-width="1.1" stroke-linecap="round"/>'
       // the binding, over where head meets haft
-    + '<path d="M11 12.6l4.3.4-.5 2.6-4.5-.5z" fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.2" stroke-linejoin="round"/>'
+    + '<path d="M11 12.6l4.3.4-.5 2.6-4.5-.5z" fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.2" stroke-linejoin="round"/>',
+
+  // Planks: three sawn boards stacked, seen end-on and a little from above,
+  // so the pale end grain shows against the barked faces. Flat boards with
+  // no end showing read as a stack of anything.
+  plank:
+      '<path d="M3.4 14.8l4.2-2.4 13 2.6-4.2 2.4z" fill="#e0b070" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M3.4 14.8v2.6l13 2.6v-2.6z" fill="#a8763f" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M16.4 17.4l4.2-2.4v2.6l-4.2 2.4z" fill="#8a5c30" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M3.4 10.6l4.2-2.4 13 2.6-4.2 2.4z" fill="#e8bd80" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M3.4 10.6v2.6l13 2.6v-2.6z" fill="#b8854c" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M16.4 13.2l4.2-2.4v2.6l-4.2 2.4z" fill="#95653a" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M3.4 6.4l4.2-2.4 13 2.6-4.2 2.4z" fill="#f0c88e" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M3.4 6.4V9l13 2.6V9z" fill="#c28f54" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M16.4 9l4.2-2.4V9.2L16.4 11.6z" fill="#9c6c3f" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>',
+
+  // Wheat: one ear on its stalk, the grains stepped up both sides in pairs
+  // with an awn off each. A solid teardrop reads as a leaf, and it is the
+  // stepping that makes it a cereal.
+  wheat:
+      '<path d="M12 21.4V9.6" fill="none" stroke="#b8923c" stroke-width="1.6" stroke-linecap="round"/>'
+    + '<path d="M8.6 17.4c-1.6-1-2.4-2.3-2.4-3.9 1.8.2 3 1 3.6 2.5M15.4 15.6c1.6-1 2.4-2.3 2.4-3.9-1.8.2-3 1-3.6 2.5"'
+    + ' fill="none" stroke="#c9a94e" stroke-width="1.25" stroke-linecap="round"/>'
+      // the grains, in pairs up the ear
+    + '<path d="M11.2 14.6c-1.5-.3-2.4-1.3-2.5-2.9 1.6-.2 2.6.7 2.9 2.5z'
+    + 'M12.8 12.9c1.5-.3 2.4-1.3 2.5-2.9-1.6-.2-2.6.7-2.9 2.5z'
+    + 'M11.2 10.9c-1.5-.3-2.4-1.3-2.5-2.9 1.6-.2 2.6.7 2.9 2.5z'
+    + 'M12.8 9.2c1.5-.3 2.4-1.3 2.5-2.9-1.6-.2-2.6.7-2.9 2.5z'
+    + 'M12 7.4c-.9-1.3-.9-2.7 0-4.2.9 1.5.9 2.9 0 4.2z"'
+    + ' fill="#f0d07a" stroke="#6b5116" stroke-width="1.15" stroke-linejoin="round"/>'
+      // the awns
+    + '<path d="M9.1 11.1L6.6 9.2M10.7 7.4L8.2 5.5M14.9 9.4l2.5-1.9M13.3 5.7l2.5-1.9"'
+    + ' fill="none" stroke="#d8b962" stroke-width="1" stroke-linecap="round"/>',
+
+  // Wheat seeds: a small heap of grains, each a pointed oval with a crease
+  // down it. Drawn loose rather than in a pouch - a pouch is a container,
+  // and what is held is the seed.
+  seeds:
+      '<path d="M6.6 17.4c-2 0-3.2-1-3.4-2.8 2-.6 3.4.2 4 2.2z" fill="#cfe08a" stroke="#3f4a18" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M11.4 19.4c-1.9.6-3.3 0-4-1.7 1.7-1.2 3.3-.8 4.4.9z" fill="#b9cd6e" stroke="#3f4a18" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M17.6 17c-1.2 1.6-2.7 1.9-4.3 1 .8-1.9 2.3-2.5 4.1-1.6z" fill="#cfe08a" stroke="#3f4a18" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M10.2 13.4c-1.9.6-3.3 0-4-1.7 1.7-1.2 3.3-.8 4.4.9z" fill="#dcea9e" stroke="#3f4a18" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M18.8 11.9c-.6 1.9-1.9 2.7-3.7 2.3.2-2 1.4-2.9 3.4-2.6z" fill="#b9cd6e" stroke="#3f4a18" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M14.4 7.9c.6 1.9 0 3.3-1.7 4-1.2-1.7-.8-3.3.9-4.4z" fill="#dcea9e" stroke="#3f4a18" stroke-width="1.15" stroke-linejoin="round"/>'
+      // the crease down each one
+    + '<path d="M4.4 15.2l2 1.2M8.4 18.2l2.2.6M14.6 17.2l2.2-.8M7.2 12.2l2.2.6M16.4 13.4l1.6-1.4M13.5 11.2l.5-2.2"'
+    + ' fill="none" stroke="#7d8c3a" stroke-width="0.95" stroke-linecap="round"/>',
+
+  // Flint shovel: a broad flint blade hafted on a stick. Wide and square
+  // ended where the axe is wedge shaped, so the two are not the same
+  // silhouette at tile size.
+  flintShovel:
+      '<path d="M10.2 3.6l3 .2-1.5 11.4-2.6-.4z" fill="#a86f3d" stroke="#2c1a0e" stroke-width="1.3" stroke-linejoin="round"/>'
+    + '<path d="M10.9 4.6l1.1.1-1.3 9.8-1-.2z" fill="#c99359"/>'
+      // the binding
+    + '<path d="M9.2 12.1l4.1.5-.4 2.5-4.1-.5z" fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.2" stroke-linejoin="round"/>'
+      // the blade
+    + '<path d="M7.4 14.9l8.4 1-1.5 6.1-6.7-.8z" fill="#5a6478"/>'
+    + '<path d="M7.4 14.9l8.4 1-.5 2-7.5-.9z" fill="#8794ad"/>'
+    + '<path d="M15.8 15.9l-1.5 6.1-3.3-.4.9-5.3z" fill="#3c4457"/>'
+    + '<path d="M7.4 14.9l8.4 1-1.5 6.1-6.7-.8z"'
+    + ' fill="none" stroke="#151a27" stroke-width="1.4" stroke-linejoin="round"/>'
+    + '<path d="M7.8 17l7.5.9M11.9 16.2l-.9 5.3"'
+    + ' fill="none" stroke="#151a27" stroke-width="1.1" stroke-linejoin="round"/>'
+      // the ground edge along the bottom
+    + '<path d="M8.4 20.6l5.6.7" fill="none" stroke="#c3ccdd" stroke-width="1.05" stroke-linecap="round"/>',
+
+  // Flint hoe: the blade set across the end of the haft rather than along
+  // it, which is the whole difference between a hoe and an axe.
+  flintHoe:
+      // the haft, running corner to corner
+      '<path d="M4.6 20.8L15.4 6.4l2.3 1.7L7 22.5z"'
+    + ' fill="#a86f3d" stroke="#2c1a0e" stroke-width="1.3" stroke-linejoin="round"/>'
+    + '<path d="M6.2 20.3L15.8 7.5" fill="none" stroke="#c99359" stroke-width="0.9" stroke-linecap="round"/>'
+      // the blade, hung across the top of it
+    + '<path d="M9.9 5.2l9.8-1.8 1.1 4.3-8.9 2.6z" fill="#5a6478"/>'
+    + '<path d="M9.9 5.2l9.8-1.8.4 1.7-9.6 2z" fill="#8794ad"/>'
+    + '<path d="M19.7 3.4l1.1 4.3-3.4 1-.6-4.7z" fill="#3c4457"/>'
+    + '<path d="M9.9 5.2l9.8-1.8 1.1 4.3-8.9 2.6z"'
+    + ' fill="none" stroke="#151a27" stroke-width="1.4" stroke-linejoin="round"/>'
+    + '<path d="M10.1 7.1l9.6-2M16.8 4.1l.6 4.7"'
+    + ' fill="none" stroke="#151a27" stroke-width="1.1" stroke-linejoin="round"/>'
+    + '<path d="M10.7 8.8l7.4-2.1" fill="none" stroke="#c3ccdd" stroke-width="1.05" stroke-linecap="round"/>'
+      // the binding at the joint
+    + '<path d="M12.4 6.2l2.6 1.9-1.9 2.5-2.6-1.9z" fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.2" stroke-linejoin="round"/>',
+
+  // A wooden bucket: staves down the sides, a hoop round the middle and a
+  // rope over the top. Tapered, or it is a barrel.
+  bucket:
+      '<path d="M5.2 6.4h13.6l-1.9 14.4a1.2 1.2 0 01-1.2 1H8.3a1.2 1.2 0 01-1.2-1z" fill="#c99359"/>'
+      // the staves
+    + '<path d="M9.4 6.6l-.7 15M12 6.6v15M14.6 6.6l.7 15"'
+    + ' fill="none" stroke="#8a5c30" stroke-width="1" stroke-linecap="round"/>'
+      // the inside of the rim, so it reads as open
+    + '<ellipse cx="12" cy="6.4" rx="6.8" ry="1.9" fill="#6b451f" stroke="#2c1a0e" stroke-width="1.3"/>'
+    + '<ellipse cx="12" cy="6.6" rx="4.9" ry="1.15" fill="#3d2712"/>'
+    + '<path d="M5.2 6.4h13.6l-1.9 14.4a1.2 1.2 0 01-1.2 1H8.3a1.2 1.2 0 01-1.2-1z"'
+    + ' fill="none" stroke="#2c1a0e" stroke-width="1.4" stroke-linejoin="round"/>'
+      // the hoop
+    + '<path d="M6.3 14.3h11.4" fill="none" stroke="#2c1a0e" stroke-width="2.4"/>'
+    + '<path d="M6.3 14.3h11.4" fill="none" stroke="#a8763f" stroke-width="1.3"/>'
+      // the rope handle
+    + '<path d="M5.6 7.6c1.4-4.3 4-6.4 7.8-6.4 2.6 0 4.4.9 5.4 2.7"'
+    + ' fill="none" stroke="#3d2c10" stroke-width="2.6" stroke-linecap="round"/>'
+    + '<path d="M5.6 7.6c1.4-4.3 4-6.4 7.8-6.4 2.6 0 4.4.9 5.4 2.7"'
+    + ' fill="none" stroke="#d3b167" stroke-width="1.4" stroke-linecap="round"/>',
+
+  // A water catcher: the open tub of planks it is, with the water it has
+  // caught sitting in it. The water is what says what it is for.
+  waterCatcher:
+      '<path d="M3.6 8.2h16.8l-1.6 12.2a1.4 1.4 0 01-1.4 1.2H6.6a1.4 1.4 0 01-1.4-1.2z" fill="#c99359"/>'
+      // the water inside, drawn before the near wall so it sits in the tub
+    + '<path d="M5.1 11.4h13.8l-1 8.9a1.1 1.1 0 01-1.1.9H7.2a1.1 1.1 0 01-1.1-.9z" fill="#3f9fd8"/>'
+    + '<path d="M5.1 11.4h13.8l-.3 2.4H5.4z" fill="#6fc4ee"/>'
+      // the staves
+    + '<path d="M8 8.4l-.5 13M12 8.4v13M16 8.4l.5 13"'
+    + ' fill="none" stroke="#8a5c30" stroke-width="1" stroke-linecap="round" opacity="0.55"/>'
+    + '<path d="M3.6 8.2h16.8l-1.6 12.2a1.4 1.4 0 01-1.4 1.2H6.6a1.4 1.4 0 01-1.4-1.2z"'
+    + ' fill="none" stroke="#2c1a0e" stroke-width="1.4" stroke-linejoin="round"/>'
+      // the rim, open to the sky
+    + '<ellipse cx="12" cy="8.2" rx="8.4" ry="2.2" fill="#6b451f" stroke="#2c1a0e" stroke-width="1.35"/>'
+    + '<ellipse cx="12" cy="8.4" rx="6.4" ry="1.4" fill="#3f9fd8"/>'
+      // a drop falling into it
+    + '<path d="M12 1.2c1.5 1.8 2.2 3.1 2.2 4a2.2 2.2 0 01-4.4 0c0-.9.7-2.2 2.2-4z"'
+    + ' fill="#6fc4ee" stroke="#15496e" stroke-width="1.2" stroke-linejoin="round"/>'
 };
 
 /** An `<svg>` holding one of the glyphs above. */

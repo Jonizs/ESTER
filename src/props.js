@@ -18,6 +18,8 @@ export const PROP_KINDS = {
     action: 'Cutting down a tree',
     seconds: 6,
     yield: { item: 'wood', amount: 3 },
+    // What the readout at the top of the screen draws beside its name.
+    icon: 'wood',
     // Some of what comes down comes back as something to replant. The roll
     // is 0 to 2, so a felled tree is not a guaranteed replacement.
     drops: [{ item: 'sapling', min: 0, max: 2 }]
@@ -30,9 +32,10 @@ export const PROP_KINDS = {
     placed: true,
     portable: true,
     item: 'sapling',
+    icon: 'sapling',
     grows: 'tree'
   },
-  rock: { label: 'rock', action: 'Picking up a rock',   seconds: 7, yield: { item: 'stone', amount: 2 } },
+  rock: { label: 'rock', action: 'Picking up a rock', seconds: 7, icon: 'stone', yield: { item: 'stone', amount: 2 } },
   // Weeds. Small, quick, and the only thing on the isle that gives fibre -
   // there is no fixed `yield`, only the roll, so a clump is 1 or 2 and never
   // nothing. `gap` is its own: weeds come up in patches, and holding them to
@@ -43,7 +46,13 @@ export const PROP_KINDS = {
     action: 'Pulling up weeds',
     seconds: 3,
     gap: 1.1,
-    drops: [{ item: 'fibre', min: 1, max: 2 }]
+    icon: 'fibre',
+    // Fibre always, and sometimes a seed off the head of one - which is
+    // where wheat comes from at all, so a weed is worth pulling twice over.
+    drops: [
+      { item: 'fibre', min: 1, max: 2 },
+      { item: 'seeds', min: 0, max: 1 }
+    ]
   },
   // The workbench is not harvested - it is repaired once, and then it is a
   // door into the crafting screen rather than a job.

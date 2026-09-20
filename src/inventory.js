@@ -33,18 +33,67 @@ export const ITEMS = {
   rope:   { label: 'Fibre Rope', tint: '#e0c27f' },
   stick:  { label: 'Stick',  tint: '#c99359' },
 
+  plank:  { label: 'Plank',  tint: '#e0b070' },
+  seeds:  { label: 'Wheat Seeds', tint: '#cfe08a' },
+  wheat:  { label: 'Wheat',  tint: '#f0d07a' },
+
   /**
    * Tools. `uses` is what a fresh one carries and `serves` is what it can
    * stand in for in a recipe - an axe does a knife's work, and the knife
    * does not do the axe's, which is the whole reason this is a list rather
    * than a rank.
+   *
+   * `wields` marks the ones an agent can carry and work with, and `work` is
+   * what that does: `speed` multiplies how fast the job goes, `drops` is
+   * what extra comes off it, and `wear` is what one job costs the tool.
    */
-  flintKnife: { label: 'Flint Knife', tint: '#a8c4e8', uses: 10,  serves: ['flintKnife'] },
-  flintAxe:   { label: 'Flint Axe',   tint: '#93b8f0', uses: 120, serves: ['flintKnife', 'flintAxe'] }
+  flintKnife: {
+    label: 'Flint Knife', tint: '#a8c4e8', uses: 10, serves: ['flintKnife'], wields: true,
+    work: { weed: { speed: 1.25, wear: 1, drops: [{ item: 'seeds', min: 1, max: 1 }] } }
+  },
+  flintAxe: {
+    label: 'Flint Axe', tint: '#93b8f0', uses: 120, serves: ['flintKnife', 'flintAxe'], wields: true,
+    work: { tree: { speed: 1.15, wear: 3, drops: [{ item: 'wood', min: 1, max: 1 }] } }
+  },
+  flintShovel: {
+    label: 'Flint Shovel', tint: '#9ec0d8', uses: 120, serves: ['flintShovel'], wields: true
+  },
+  // The hoe does no gathering of its own; what it is for is the ground.
+  // `tills` is what lets a click on grass turn it over - see main.js.
+  flintHoe: {
+    label: 'Flint Hoe', tint: '#b9d09a', uses: 120, serves: ['flintHoe'], wields: true, tills: true
+  },
+
+  /**
+   * A vessel carries liquid rather than wear. It is kept one by one for the
+   * same reason a tool is: a full bucket and an empty one are not the same
+   * thing, however alike they look on a shelf.
+   */
+  bucket: {
+    label: 'Wooden Bucket', tint: '#d8b98a', capacity: 200, wields: true, holds: 'water'
+  },
+
+  // An item that puts a station on the ground, the way a sapling does.
+  waterCatcher: { label: 'Water Catcher', tint: '#8ad8ff', plants: 'waterCatcher' }
 };
 
 /** Whether an item is worn down by use rather than spent outright. */
 export const isTool = (item) => !!ITEMS[item]?.uses;
+
+/** Whether an item carries liquid about with it. */
+export const isVessel = (item) => !!ITEMS[item]?.capacity;
+
+/**
+ * Whether each one of an item is its own thing rather than one of a count.
+ *
+ * A tool has wear and a bucket has what is in it, and neither is a number
+ * you can average over a stack - so both are kept one by one. A fresh tool
+ * starts full and an empty bucket starts empty, which is the only difference
+ * between them as far as the ledger is concerned.
+ */
+export const isSingular = (item) => isTool(item) || isVessel(item);
+const freshCharge = (item) => (isTool(item) ? ITEMS[item].uses : 0);
+const fullCharge = (item) => ITEMS[item].uses ?? ITEMS[item].capacity;
 
 /** Whether one item will do the work a recipe asks a named tool for. */
 export const servesAs = (item, needed) => !!ITEMS[item]?.serves?.includes(needed);
@@ -67,15 +116,15 @@ export function createInventory() {
   return {
     /** Number held, zero if none have ever been picked up. */
     count(item) {
-      if (isTool(item)) return kits.get(item)?.length ?? 0;
+      if (isSingular(item)) return kits.get(item)?.length ?? 0;
       return counts.get(item) ?? 0;
     },
 
     add(item, amount = 1) {
       if (!ITEMS[item]) return;
-      if (isTool(item)) {
+      if (isSingular(item)) {
         const list = kits.get(item) ?? [];
-        for (let i = 0; i < amount; i++) list.push(ITEMS[item].uses);
+        for (let i = 0; i < amount; i++) list.push(freshCharge(item));
         kits.set(item, list);
         return;
       }
@@ -91,7 +140,7 @@ export function createInventory() {
     /** Spend items. Returns false, changing nothing, if there are too few. */
     take(item, amount = 1) {
       if (this.count(item) < amount) return false;
-      if (isTool(item)) {
+      if (isSingular(item)) {
         // The most worn go first, so a nearly spent tool is used up rather
         // than a fresh one being broken open.
         const list = kits.get(item);
@@ -124,7 +173,7 @@ export function createInventory() {
     wear(item) {
       const at = worstOf(item);
       if (at < 0) return null;
-      return { left: kits.get(item)[at], max: ITEMS[item].uses };
+      return { left: kits.get(item)[at], max: fullCharge(item) };
     },
 
     /** What is held, for the save. Empties are left out. */
@@ -144,16 +193,16 @@ export function createInventory() {
       kits.clear();
 
       for (const [item, count] of Object.entries(state?.held ?? {})) {
-        if (ITEMS[item] && !isTool(item) && count > 0) counts.set(item, count);
+        if (ITEMS[item] && !isSingular(item) && count > 0) counts.set(item, count);
       }
       for (const [item, list] of Object.entries(state?.tools ?? {})) {
-        if (!isTool(item) || !Array.isArray(list)) continue;
+        if (!isSingular(item) || !Array.isArray(list)) continue;
         // Clamped to what a fresh one carries: a save written before a tool's
         // `uses` was retuned must not hand back one that lasts longer than
         // the game now says it can.
         const kept = list
-          .map((left) => Math.min(Math.round(left), ITEMS[item].uses))
-          .filter((left) => left > 0);
+          .map((left) => Math.max(0, Math.min(Math.round(left), fullCharge(item))))
+          .filter((left) => left > 0 || isVessel(item));
         if (kept.length) kits.set(item, kept);
       }
     },

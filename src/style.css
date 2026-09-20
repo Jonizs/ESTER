@@ -1387,6 +1387,87 @@ html, body {
   border-style: dashed;
 }
 
+/* --- what the cursor is over ----------------------------------------------
+   A small bar at the top middle naming whatever is under the pointer. It
+   takes no clicks - it is a readout, and the canvas underneath keeps every
+   gesture. */
+
+#lookat {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 168px;
+  max-width: min(420px, 80vw);
+  padding: 8px 14px 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--edge);
+  background: rgba(6, 5, 18, 0.74);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 22px rgba(2, 1, 12, 0.45);
+  pointer-events: none;
+  user-select: none;
+}
+
+#lookat[hidden] { display: none; }
+
+#lookat .lookat-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(233, 241, 255, 0.1);
+  background: rgba(233, 241, 255, 0.05);
+}
+
+#lookat .lookat-icon[hidden] { display: none; }
+
+#lookat .lookat-text { min-width: 0; }
+
+#lookat .lookat-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#lookat .lookat-note {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#lookat .lookat-note[hidden] { display: none; }
+
+#lookat .lookat-bar {
+  margin-top: 5px;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(6, 5, 18, 0.8);
+  border: 1px solid rgba(233, 241, 255, 0.08);
+  overflow: hidden;
+}
+
+#lookat .lookat-bar[hidden] { display: none; }
+
+#lookat .lookat-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.12s ease;
+}
+
 /* --- the crafting screen -------------------------------------------------
    Opened by clicking the repaired workbench, never by a key - so it has no
    rail of tabs, just the one page. */

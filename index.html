@@ -155,6 +155,17 @@
       </div>
     </div>
 
+    <!-- What the cursor is over, named at the top of the screen. Filled in
+         by src/lookat.js off the hover ray. -->
+    <div id="lookat" hidden>
+      <div class="lookat-icon"></div>
+      <div class="lookat-text">
+        <div class="lookat-name"></div>
+        <div class="lookat-note" hidden></div>
+        <div class="lookat-bar" hidden><i></i></div>
+      </div>
+    </div>
+
     <!-- The crafting screen. No key opens it - the repaired workbench on the
          isle does, through src/crafting.js. -->
     <div id="crafting" hidden>
