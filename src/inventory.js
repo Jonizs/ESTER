@@ -1,9 +1,16 @@
 /**
- * What the agents have gathered.
+ * What the agents have gathered, and what has been made from it.
  *
  * What is held is part of the saved run (src/save.js), so this has a
  * `saveState`/`loadState` pair beside its `reset` - anything that gains run
  * state needs all three.
+ *
+ * Most of it is a plain count: five wood is five wood and one is as good as
+ * another. A **tool** is not. A flint knife with three uses left and a fresh
+ * one are both "a flint knife" to look at, but they are not the same thing,
+ * so tools are kept as a list of what is left on each one rather than as a
+ * number. `count()` still answers how many there are, which is what every
+ * tile, recipe and check already asks for.
  */
 
 // Every item the game knows about, in the order the inventory lists them.
@@ -16,49 +23,138 @@ export const ITEMS = {
   // prop kind the item puts on the ground, which is what gives the item its
   // PLANT button on the inventory tiles.
   sapling: { label: 'Sapling', tint: '#7fd694', plants: 'sapling' },
-  // Nothing on the isle drops these - they are knocked off stone at the
-  // workbench, and they are the first thing that is made rather than found.
-  pebble: { label: 'Pebble', tint: '#cbd6ef' }
+  // Pulled out of the weeds growing across the isle.
+  fibre: { label: 'Fibre', tint: '#d9cd8a' },
+
+  // --- made at the bench ---------------------------------------------------
+  pebble: { label: 'Pebble', tint: '#cbd6ef' },
+  gravel: { label: 'Gravel', tint: '#aebbd6' },
+  flint:  { label: 'Flint',  tint: '#7f9ad0' },
+  rope:   { label: 'Fibre Rope', tint: '#e0c27f' },
+  stick:  { label: 'Stick',  tint: '#c99359' },
+
+  /**
+   * Tools. `uses` is what a fresh one carries and `serves` is what it can
+   * stand in for in a recipe - an axe does a knife's work, and the knife
+   * does not do the axe's, which is the whole reason this is a list rather
+   * than a rank.
+   */
+  flintKnife: { label: 'Flint Knife', tint: '#a8c4e8', uses: 10,  serves: ['flintKnife'] },
+  flintAxe:   { label: 'Flint Axe',   tint: '#93b8f0', uses: 120, serves: ['flintKnife', 'flintAxe'] }
 };
 
+/** Whether an item is worn down by use rather than spent outright. */
+export const isTool = (item) => !!ITEMS[item]?.uses;
+
+/** Whether one item will do the work a recipe asks a named tool for. */
+export const servesAs = (item, needed) => !!ITEMS[item]?.serves?.includes(needed);
+
 export function createInventory() {
+  // Plain materials: item -> how many.
   const counts = new Map();
+  // Tools: item -> [uses left on each one]. The length is how many there are.
+  const kits = new Map();
+
+  /** The most worn one of a kind, which is the one that gets used next. */
+  function worstOf(item) {
+    const list = kits.get(item);
+    if (!list?.length) return -1;
+    let at = 0;
+    for (let i = 1; i < list.length; i++) if (list[i] < list[at]) at = i;
+    return at;
+  }
 
   return {
     /** Number held, zero if none have ever been picked up. */
     count(item) {
+      if (isTool(item)) return kits.get(item)?.length ?? 0;
       return counts.get(item) ?? 0;
     },
 
     add(item, amount = 1) {
       if (!ITEMS[item]) return;
+      if (isTool(item)) {
+        const list = kits.get(item) ?? [];
+        for (let i = 0; i < amount; i++) list.push(ITEMS[item].uses);
+        kits.set(item, list);
+        return;
+      }
       counts.set(item, this.count(item) + amount);
     },
 
     /** Drop everything, for a fresh run. */
     reset() {
       counts.clear();
+      kits.clear();
     },
 
     /** Spend items. Returns false, changing nothing, if there are too few. */
     take(item, amount = 1) {
       if (this.count(item) < amount) return false;
+      if (isTool(item)) {
+        // The most worn go first, so a nearly spent tool is used up rather
+        // than a fresh one being broken open.
+        const list = kits.get(item);
+        list.sort((a, b) => a - b).splice(0, amount);
+        return true;
+      }
       counts.set(item, this.count(item) - amount);
       return true;
     },
 
-    /** What is held, for the save: { wood: 3 }. Empties are left out. */
+    /**
+     * Wear one use off a tool, retiring it when it runs out. Returns false
+     * if there is none of that tool to use.
+     *
+     * The most worn one is always what is picked up, so a pile of knives is
+     * worked through one at a time instead of all of them ending up part
+     * used - and the tile's wear bar, which shows that same one, is telling
+     * the truth about what the next craft will cost.
+     */
+    useTool(item) {
+      const at = worstOf(item);
+      if (at < 0) return false;
+      const list = kits.get(item);
+      list[at] -= 1;
+      if (list[at] <= 0) list.splice(at, 1);
+      return true;
+    },
+
+    /** How worn the next one to be used is: `{ left, max }`, or null. */
+    wear(item) {
+      const at = worstOf(item);
+      if (at < 0) return null;
+      return { left: kits.get(item)[at], max: ITEMS[item].uses };
+    },
+
+    /** What is held, for the save. Empties are left out. */
     saveState() {
       const held = {};
       for (const [item, count] of counts) if (count > 0) held[item] = count;
-      return held;
+
+      const tools = {};
+      for (const [item, list] of kits) if (list.length) tools[item] = [...list];
+
+      return { held, tools };
     },
 
     /** Put a saved run's items back, dropping whatever is held now. */
-    loadState(held) {
+    loadState(state) {
       counts.clear();
-      for (const [item, count] of Object.entries(held ?? {})) {
-        if (ITEMS[item] && count > 0) counts.set(item, count);
+      kits.clear();
+
+      for (const [item, count] of Object.entries(state?.held ?? {})) {
+        if (ITEMS[item] && !isTool(item) && count > 0) counts.set(item, count);
+      }
+      for (const [item, list] of Object.entries(state?.tools ?? {})) {
+        if (!isTool(item) || !Array.isArray(list)) continue;
+        // Clamped to what a fresh one carries: a save written before a tool's
+        // `uses` was retuned must not hand back one that lasts longer than
+        // the game now says it can.
+        const kept = list
+          .map((left) => Math.min(Math.round(left), ITEMS[item].uses))
+          .filter((left) => left > 0);
+        if (kept.length) kits.set(item, kept);
       }
     },
 

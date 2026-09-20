@@ -28,7 +28,10 @@ const KEY = 'ester:save';
 
 // Bumped whenever the shape below changes. An older save is dropped rather
 // than half-read - there is nothing here worth a migration yet.
-const SAVE_VERSION = 1;
+//
+// 2: the inventory grew tools, which carry how worn each one is, so what it
+//    writes went from `{ wood: 3 }` to `{ held, tools }`.
+const SAVE_VERSION = 2;
 
 // How often the run is written down while it is being played.
 //

@@ -1,5 +1,5 @@
 import { itemIcon } from './icons.js';
-import { ITEMS } from './inventory.js';
+import { ITEMS, isTool, servesAs } from './inventory.js';
 
 /**
  * The crafting screen.
@@ -69,6 +69,11 @@ const colOf = (index) => index % GRID.w;
  * and 16. What it will not do is wrap: slots 4 and 5 are the end of one row
  * and the start of the next, which is not two side by side and does not
  * match.
+ *
+ * `tool` is the exception to all of that: a recipe that names one wants that
+ * tool *somewhere* on the grid and does not care where, so its cell is
+ * lifted out before the shape is trimmed. A tool is not spent either - it
+ * loses one use per craft and is gone when it runs out.
  */
 export const RECIPES = [
   {
@@ -77,6 +82,64 @@ export const RECIPES = [
     item: 'pebble',
     yield: 8,
     slots: { 1: 'stone', 2: 'stone' }
+  },
+  {
+    id: 'gravel',
+    label: 'Gravel',
+    item: 'gravel',
+    yield: 4,
+    slots: { 1: 'pebble', 2: 'pebble', 5: 'pebble', 6: 'pebble' }
+  },
+  {
+    id: 'flint',
+    label: 'Flint',
+    item: 'flint',
+    yield: 1,
+    slots: {
+      1: 'pebble', 2: 'pebble',
+      5: 'gravel', 6: 'gravel',
+      9: 'gravel', 10: 'gravel'
+    }
+  },
+  {
+    id: 'rope',
+    label: 'Fibre Rope',
+    item: 'rope',
+    yield: 2,
+    slots: {
+      1: 'fibre', 2: 'fibre',
+      5: 'fibre', 6: 'fibre',
+      9: 'fibre', 10: 'fibre'
+    }
+  },
+  {
+    id: 'flintKnife',
+    label: 'Flint Knife',
+    item: 'flintKnife',
+    yield: 1,
+    slots: { 1: 'flint', 5: 'rope' }
+  },
+  {
+    // The first recipe that needs a tool rather than only materials: two
+    // wood and a knife to cut them with, wherever the knife is put.
+    id: 'stick',
+    label: 'Stick',
+    item: 'stick',
+    yield: 4,
+    slots: { 1: 'wood', 2: 'wood' },
+    tool: 'flintKnife'
+  },
+  {
+    id: 'flintAxe',
+    label: 'Flint Axe',
+    item: 'flintAxe',
+    yield: 1,
+    slots: {
+      1: 'flint', 2: 'flint', 3: 'stick',
+      5: 'flint', 6: 'flint', 7: 'stick',
+      10: 'stick', 11: 'stick',
+      13: 'stick', 14: 'stick'
+    }
   }
 ];
 
@@ -336,12 +399,25 @@ export function createCrafting({ inventory, blocked, onOpen }) {
    */
   function match() {
     const filled = cells.map((cell, i) => (cell ? i : -1)).filter((i) => i >= 0);
-    const laid = shapeFrom(filled, (i) => cells[i].item);
-    if (!laid) return null;
+    if (filled.length === 0) return null;
 
     for (const recipe of RECIPES) {
       const want = shapeOf(recipe);
-      if (!want || want.w !== laid.w || want.h !== laid.h) continue;
+      if (!want) continue;
+
+      // A tool sits outside the shape: it is wanted somewhere on the grid
+      // and nowhere in particular, so its cell is lifted out before the
+      // rest is trimmed. Anything the tool `serves` will do - an axe
+      // answers for a knife, and a knife does not answer for an axe.
+      let toolAt = -1;
+      if (recipe.tool) {
+        toolAt = filled.find((i) => servesAs(cells[i].item, recipe.tool)) ?? -1;
+        if (toolAt < 0) continue;
+      }
+
+      const shapeCells = filled.filter((i) => i !== toolAt);
+      const laid = shapeFrom(shapeCells, (i) => cells[i].item);
+      if (!laid || want.w !== laid.w || want.h !== laid.h) continue;
 
       let same = true;
       for (let r = 0; r < want.h && same; r++) {
@@ -349,9 +425,10 @@ export function createCrafting({ inventory, blocked, onOpen }) {
           if (want.rows[r][c] !== laid.rows[r][c]) { same = false; break; }
         }
       }
-      // Every filled cell answered for one of the recipe's, so the filled
-      // cells are exactly what the craft spends.
-      if (same) return { recipe, used: filled };
+      // Every other filled cell answered for one of the recipe's, so those
+      // cells are exactly what the craft spends - the tool is not among
+      // them, because it is worn rather than spent.
+      if (same) return { recipe, used: shapeCells, toolAt };
     }
     return null;
   }
@@ -368,7 +445,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   function takeOutput({ toInventory = false } = {}) {
     const found = match();
     if (!found) return;
-    const { recipe, used } = found;
+    const { recipe, used, toolAt } = found;
 
     // Onto the cursor, so it lands wherever the next click puts it - which
     // is the same rule as everything else here. A hand already full of
@@ -383,6 +460,11 @@ export function createCrafting({ inventory, blocked, onOpen }) {
       cell.count -= 1;
       if (cell.count <= 0) cells[i] = null;
     }
+
+    // A tool is worn, not spent: its cell keeps its count, and the cell
+    // only empties when the tool actually breaks - which `reconcile` does on
+    // its own, because the ledger is then one short of what the grid shows.
+    if (toolAt >= 0) inventory.useTool(cells[toolAt].item);
 
     // The yield lands in the ledger either way. What shift changes is only
     // whether the cursor then lays claim to it: `held` is a view over the
@@ -399,6 +481,9 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   // copied. It is a drawing and nothing else: the cells are not filled, and
   // anything actually on the grid is drawn over the top of it.
   let showcase = null;
+  // Which cell of a shown recipe is the "anywhere" tool, so it can be drawn
+  // as loose rather than as part of the shape. Set by `demo()`.
+  let toolDemoAt = -1;
 
   /** Where a shown recipe's items would go: `cell index -> item`. */
   function demo() {
@@ -414,7 +499,29 @@ export function createCrafting({ inventory, blocked, onOpen }) {
         if (shape.rows[r][c]) out.set(r * GRID.w + c, shape.rows[r][c]);
       }
     }
+
+    // A tool goes in the first cell the shape left alone, marked apart from
+    // the rest - it is wanted on the grid, not in that cell, and the drawing
+    // has to say so or it reads as part of the shape.
+    if (recipe.tool) {
+      for (let i = 0; i < cells.length; i++) {
+        if (!out.has(i)) { out.set(i, recipe.tool); toolDemoAt = i; break; }
+      }
+    } else {
+      toolDemoAt = -1;
+    }
     return out;
+  }
+
+  /**
+   * Draw a wear bar: how much of the tool is left, and green through to red
+   * as it goes. The colour is written here rather than in the stylesheet
+   * because it has to follow the same number the width does.
+   */
+  function setWear(bar, { left, max }) {
+    const f = Math.max(0, Math.min(1, left / max));
+    bar.style.width = `${f * 100}%`;
+    bar.style.background = `hsl(${Math.round(120 * f)} 72% 55%)`;
   }
 
   // --- the grid ------------------------------------------------------------
@@ -424,7 +531,8 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     cell.className = 'cell';
     cell.dataset.cell = i;
     cell.innerHTML =
-      '<div class="cell-icon"></div><div class="cell-count"></div><div class="cell-aim"></div>';
+      '<div class="cell-icon"></div><div class="cell-count"></div><div class="cell-aim"></div>'
+      + '<div class="cell-wear"><i></i></div>';
     grid.append(cell);
   }
   const cellEls = [...grid.querySelectorAll('.cell')];
@@ -440,7 +548,9 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     const back = clearableCell();
     const shown = showcase ? demo() : null;
     const key = [
-      cells.map((c) => (c ? `${c.item}:${c.count}` : '-')).join(','),
+      // A tool's wear is in the key too, or a knife's bar would only move
+      // when its stack size changed.
+      cells.map((c) => (c ? `${c.item}:${c.count}:${inventory.wear(c.item)?.left ?? ''}` : '-')).join(','),
       aim ? [...aim].map(([i, n]) => `${i}=${n}`).join(',') : '',
       back,
       showcase ?? ''
@@ -464,6 +574,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
       el.classList.toggle('aim', !!aimed);
       el.classList.toggle('ghost', !!dragGhost);
       el.classList.toggle('demo', !!shown?.has(i));
+      el.classList.toggle('loose', shown?.has(i) && i === toolDemoAt);
       el.classList.toggle('back', i === back);
       el.dataset.label = cell ? ITEMS[cell.item]?.label ?? cell.item : '';
       if (art && ITEMS[art]?.tint) el.style.setProperty('--tint', ITEMS[art].tint);
@@ -473,6 +584,13 @@ export function createCrafting({ inventory, blocked, onOpen }) {
       el.querySelector('.cell-count').textContent = cell && cell.count > 1 ? cell.count : '';
       // A swap has no number to show, only the cell lit - see `preview`.
       el.querySelector('.cell-aim').textContent = adding ? `+${adding}` : '';
+
+      // How much is left on the tool that would actually be used - the most
+      // worn one, which is the one a craft here would take.
+      const worn = cell && isTool(cell.item) ? inventory.wear(cell.item) : null;
+      const bar = el.querySelector('.cell-wear');
+      bar.hidden = !worn;
+      if (worn) setWear(bar.firstElementChild, worn);
     });
   }
 
@@ -554,7 +672,13 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     // shown on the grid - both written onto the cards already there.
     for (const recipe of RECIPES) {
       const card = recipeList.querySelector(`[data-recipe="${recipe.id}"]`);
-      const enough = [...recipeCost(recipe)].every(([item, n]) => inventory.count(item) >= n);
+      // The tool counts too: two wood is not enough to make sticks if there
+      // is nothing on the isle to cut them with.
+      const haveTool = !recipe.tool || Object.keys(ITEMS).some(
+        (item) => servesAs(item, recipe.tool) && inventory.count(item) > 0
+      );
+      const enough = haveTool
+        && [...recipeCost(recipe)].every(([item, n]) => inventory.count(item) >= n);
       card.classList.toggle('short', !enough);
       card.classList.toggle('showing', showcase === recipe.id);
     }
@@ -611,14 +735,20 @@ export function createCrafting({ inventory, blocked, onOpen }) {
         if (ITEMS[entry.item].tint) tile.style.setProperty('--tint', ITEMS[entry.item].tint);
         tile.innerHTML = `
           <div class="tile-icon">${itemIcon(entry.item, 40)}</div>
-          <div class="tile-count"></div>`;
+          <div class="tile-count"></div>
+          ${isTool(entry.item) ? '<div class="tile-wear"><i></i></div>' : ''}`;
 
         stock.append(tile);
       }
     }
 
     for (const entry of entries) {
-      stock.querySelector(`[data-item="${entry.item}"] .tile-count`).textContent = entry.count;
+      const tile = stock.querySelector(`[data-item="${entry.item}"]`);
+      tile.querySelector('.tile-count').textContent = entry.count;
+
+      const worn = isTool(entry.item) ? inventory.wear(entry.item) : null;
+      const bar = tile.querySelector('.tile-wear i');
+      if (bar && worn) setWear(bar, worn);
     }
   }
 

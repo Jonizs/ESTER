@@ -33,6 +33,18 @@ export const PROP_KINDS = {
     grows: 'tree'
   },
   rock: { label: 'rock', action: 'Picking up a rock',   seconds: 7, yield: { item: 'stone', amount: 2 } },
+  // Weeds. Small, quick, and the only thing on the isle that gives fibre -
+  // there is no fixed `yield`, only the roll, so a clump is 1 or 2 and never
+  // nothing. `gap` is its own: weeds come up in patches, and holding them to
+  // the same 2.2 cells the trees keep would scatter a dozen of them evenly
+  // across the isle like planted crops.
+  weed: {
+    label: 'weeds',
+    action: 'Pulling up weeds',
+    seconds: 3,
+    gap: 1.1,
+    drops: [{ item: 'fibre', min: 1, max: 2 }]
+  },
   // The workbench is not harvested - it is repaired once, and then it is a
   // door into the crafting screen rather than a job.
   workbench: {
@@ -261,7 +273,11 @@ export function syncBlocked(props, blocked) {
   return blocked;
 }
 
-const COUNTS = { tree: 9, rock: 6 };
+const COUNTS = { tree: 9, rock: 6, weed: 14 };
+
+/** How much room a kind keeps from whatever is already standing. */
+const DEFAULT_GAP = 2.2;
+const BENCH_GAP = 3.6;
 
 /** Where the broken workbench stands: the middle of the isle. */
 export const WORKBENCH_CELL = { x: 0, z: 0 };
@@ -374,8 +390,14 @@ export function createProps(surface, scene) {
         // Keep props apart so the isle reads as sparse, not as a thicket -
         // and keep a wider clearing around the workbench, so the thing the
         // run starts at is not hidden behind a tree from half the angles.
+        // The wider of the two kinds' own gaps, so a weed may come up close
+        // to another weed without being allowed to crowd a tree - and the
+        // bench keeps its clearing from everything.
         const tooClose = props.some((p) => {
-          const gap = p.kind === 'workbench' ? 3.6 : 2.2;
+          const gap = p.kind === 'workbench'
+            ? BENCH_GAP
+            : Math.max(PROP_KINDS[p.kind]?.gap ?? DEFAULT_GAP,
+                       PROP_KINDS[kind]?.gap ?? DEFAULT_GAP);
           const c = footprintCentre(p.kind, p);
           return Math.hypot(c.x - pick[0], c.z - pick[1]) < gap;
         });
@@ -589,6 +611,32 @@ function buildProp(kind, salt) {
     g.add(tip);
 
     g.rotation.y = rand(salt, 11) * Math.PI;
+    return g;
+  }
+
+  if (kind === 'weed') {
+    // A low tuft: a few blades leaning out of one cell, none of them taller
+    // than a third of a block, so it reads as ground cover rather than as
+    // something to walk around. They are turned off the salt, which is what
+    // keeps a patch of them from looking stamped out of one mould.
+    const BLADES = [
+      { w: 0.14, h: 0.40, x: 0.00, z: 0.02, lean: 0.10, tint: 0x5f9a4a },
+      { w: 0.12, h: 0.31, x: 0.21, z: -0.12, lean: -0.34, tint: 0x6fa855 },
+      { w: 0.12, h: 0.34, x: -0.20, z: 0.13, lean: 0.38, tint: 0x548f43 },
+      { w: 0.11, h: 0.24, x: 0.10, z: 0.22, lean: -0.22, tint: 0x77b05c },
+      { w: 0.11, h: 0.27, x: -0.13, z: -0.19, lean: 0.28, tint: 0x67a251 }
+    ];
+
+    BLADES.forEach((b, i) => {
+      const h = b.h * (0.8 + rand(salt * 13 + i, 23) * 0.45);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(b.w, h, b.w), mat(b.tint));
+      blade.position.set(b.x, h / 2, b.z);
+      blade.rotation.z = b.lean;
+      blade.castShadow = true;
+      g.add(blade);
+    });
+
+    g.rotation.y = rand(salt, 17) * Math.PI * 2;
     return g;
   }
 

@@ -244,6 +244,20 @@ with one inhabitant who walks around and works on what is there.
   they work, so it must be a readable sentence ("Cutting down a tree"), never
   an internal state name. It is `null` whenever no work is under way - walking
   and standing idle say nothing at all, and `person.activity` is null then too.
+- **Weeds are the only fibre on the isle.** A clump is five short blades in
+  one cell (`buildProp` in `props.js`), pulled up in 3 seconds for 1 to 2
+  fibre. They have no `yield`, only `drops`, so a clump is never nothing.
+  They also carry their own `gap`: 1.1 cells rather than the 2.2 the trees
+  and rocks keep, because weeds come up in patches and holding them to the
+  wider gap spread a dozen of them evenly over the isle like planted crops.
+  The scatter takes the *wider* of the two kinds' gaps, so a weed may crowd
+  another weed without being allowed to crowd a tree.
+- **Judge a prop by the pixels it is worth clicking on, not by how it looks
+  from three cells away.** The first weeds were thin enough to be 9px across
+  at the default zoom and a click on the middle of one missed it. Measure it:
+  project the prop's `Box3` to the screen at the default camera distance and
+  fire a ray at the middle. Weeds are 21px across and 11 of 14 hit, which is
+  the bar - rocks manage 3 of 6.
 - **A felled tree drops saplings, 0 to 2.** `PROP_KINDS.tree.drops` is the
   roll, beside the wood `yield`, and `finishProp` in `main.js` walks it - so
   anything else that should drop more than one thing needs no new code. The
@@ -372,6 +386,26 @@ with one inhabitant who walks around and works on what is there.
   start of the next, so they are not two side by side and do not match. Check
   that case after touching the matcher; it is the one an "is the next slot
   along filled" shortcut gets wrong.
+- **A tool is worn, not spent, and a recipe wants it anywhere.** `tool` on a
+  recipe names one that has to be *somewhere* on the grid; its cell is lifted
+  out before the shape is trimmed, so it can sit in any free slot. It is not
+  in `used`, so nothing is taken from it - `takeOutput` calls `useTool`
+  instead, which takes one use off it. When it breaks, the ledger is one
+  short of what the grid shows and `reconcile` empties the cell on its own;
+  nothing has to notice.
+- **`serves` is a list, not a rank.** `ITEMS[tool].serves` is what a tool can
+  stand in for, so the flint axe serves both `flintAxe` and `flintKnife`
+  while the knife serves only itself - an axe does a knife's work and the
+  knife does not do the axe's. A rank would have made every later tool
+  answer for every earlier one, which is not what was asked for.
+- **Tools are kept one by one, because they are not interchangeable.**
+  `inventory.js` holds plain materials as a count and tools as a list of how
+  much is left on each, and `count()` answers for both. The *most worn* is
+  always the one used next (`useTool`, `take`), so a pile of knives is worked
+  through one at a time rather than all of them ending up part used - and the
+  wear bar on the slot, which shows that same one, is telling the truth about
+  what the next craft costs. Anything that gains a tool needs `uses` in
+  `ITEMS`, and that is all.
 - **A slot has to hold the right item, not exactly one of it.** One of each
   laid-out slot is spent per craft, so a grid loaded with stacks is worked
   through a craft at a time rather than refusing to match.
@@ -640,7 +674,8 @@ with one inhabitant who walks around and works on what is there.
   merely correct.
 - **`SAVE_VERSION` is a fence, not a migration.** Change the shape of what is
   written and bump it; an older save is dropped rather than half-read. There
-  is nothing in a run yet worth migrating.
+  is nothing in a run yet worth migrating. It is at 2: the inventory grew
+  tools, so what it writes went from `{ wood: 3 }` to `{ held, tools }`.
 - **DEV RESET clears the save too.** It puts the run back to how it booted,
   so leaving the old one on disk would have the next launch quietly undo it.
 - **DEV RESET is game state only.** The pause menu's DEV RESET (`devReset` in
