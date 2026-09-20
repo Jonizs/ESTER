@@ -1511,6 +1511,50 @@ html, body {
     rgba(4, 3, 14, 0.42);
 }
 
+/* --- aiming a drag --------------------------------------------------------
+   Every cell a drag is about to fill says so while the button is still
+   down: the cell lights up, an empty one shows a greyed picture of what is
+   coming, and the badge says how many it is getting. Letting go does
+   exactly what was drawn - both come out of the same `plan()`. */
+
+#crafting .grid4 .cell.aim {
+  border-color: var(--accent);
+  background:
+    radial-gradient(120% 120% at 50% 15%, rgba(138, 216, 255, 0.2), transparent 70%),
+    rgba(4, 3, 14, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(138, 216, 255, 0.35), 0 0 12px rgba(138, 216, 255, 0.2);
+}
+
+/* What is coming, rather than what is there. */
+#crafting .grid4 .cell.ghost .cell-icon { opacity: 0.4; }
+
+#crafting .grid4 .cell-aim {
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--accent);
+  text-shadow: 0 1px 0 #06021a, 0 -1px 0 #06021a, 1px 0 0 #06021a, -1px 0 0 #06021a;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* Shift held over a full cell with an empty hand: clicking would send that
+   stack back to the inventory, and dragging on would sweep up the rest. In
+   rose rather than the accent, because it is the one gesture here that
+   takes something off the bench. */
+#crafting .grid4 .cell.back {
+  border-color: var(--accent-3);
+  background:
+    radial-gradient(120% 120% at 50% 15%, rgba(255, 154, 213, 0.18), transparent 70%),
+    rgba(4, 3, 14, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 154, 213, 0.32);
+}
+
+#crafting .grid4 .cell.back .cell-icon { opacity: 0.55; }
+
 #crafting .grid4 .cell-icon {
   display: grid;
   place-items: center;

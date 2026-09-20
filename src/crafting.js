@@ -166,31 +166,87 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   }
 
   /**
-   * Spread the held stack over the cells a drag went across.
+   * How a drag would fall out: `index -> how many go in that cell`.
+   *
+   * Worked out rather than done, because the same answer is what the grid
+   * draws *while* the drag is still going - the cells about to be filled
+   * light up and say how many they are getting, so a drag is aimed rather
+   * than guessed at. `spread` then applies exactly what was shown.
    *
    * `each` is how many go in every cell - an even share for a left drag, one
    * apiece for a right drag. Whatever will not divide stays on the cursor,
    * the way it does in the game everyone learned this from. Cells already
-   * holding something else are skipped rather than swapped: a drag is a
+   * holding something else are left out rather than swapped: a drag is a
    * broad gesture and swapping four things at once is never what was meant.
    */
+  function plan(indices, mode) {
+    const share = new Map();
+    if (!held) return share;
+
+    const open = indices.filter((i) => !cells[i] || cells[i].item === held.item);
+    if (open.length === 0) return share;
+
+    const each = mode === 'one' ? 1 : Math.floor(held.count / open.length);
+    if (each < 1) return share;
+
+    let left = held.count;
+    for (const i of open) {
+      if (left < each) break;
+      share.set(i, each);
+      left -= each;
+    }
+    return share;
+  }
+
+  /** Lay the held stack out the way `plan` said it would fall. */
   function spread(indices, mode) {
     if (!held) return;
-    const open = indices.filter((i) => !cells[i] || cells[i].item === held.item);
-    if (open.length === 0) return;
-
-    const each = mode === 'one'
-      ? 1
-      : Math.floor(held.count / open.length);
-    if (each < 1) return;
-
-    for (const i of open) {
-      if (held.count < each) break;
-      if (cells[i]) cells[i].count += each;
-      else cells[i] = { item: held.item, count: each };
-      held.count -= each;
+    for (const [i, n] of plan(indices, mode)) {
+      if (cells[i]) cells[i].count += n;
+      else cells[i] = { item: held.item, count: n };
+      held.count -= n;
     }
     if (held && held.count <= 0) held = null;
+  }
+
+  /**
+   * Put a cell's whole stack back in the inventory - shift click, and shift
+   * drag to sweep several at once.
+   *
+   * Emptying the cell *is* the return: the grid was only ever a view over
+   * what is held, so what the cell stops showing is back in the stock row
+   * on the next frame with nothing changing hands.
+   */
+  function clearCell(index) {
+    if (!cells[index]) return false;
+    cells[index] = null;
+    return true;
+  }
+
+  /**
+   * What the grid should draw right now on top of what is in it: the cells a
+   * drag is about to fill, and how many each is getting.
+   *
+   * A drag that has only touched one cell has not become a drag yet, so what
+   * it previews is what a plain click there would do - the whole stack on
+   * the left button, one on the right. A cell holding something else is
+   * still aimed at (the left button swaps with it) but has no number to
+   * show, which is `null`.
+   */
+  function preview() {
+    if (!drag || drag.mode === 'clear' || !held) return null;
+
+    if (drag.indices.length > 1) {
+      return plan(drag.indices, drag.button === 0 ? 'even' : 'one');
+    }
+
+    const i = drag.indices[0];
+    const cell = cells[i];
+    if (cell && cell.item !== held.item) {
+      // The left button swaps; the right button will not touch it.
+      return drag.button === 0 ? new Map([[i, null]]) : new Map();
+    }
+    return new Map([[i, drag.button === 0 ? held.count : 1]]);
   }
 
   // --- the grid ------------------------------------------------------------
@@ -199,29 +255,50 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     const cell = document.createElement('div');
     cell.className = 'cell';
     cell.dataset.cell = i;
-    cell.innerHTML = '<div class="cell-icon"></div><div class="cell-count"></div>';
+    cell.innerHTML =
+      '<div class="cell-icon"></div><div class="cell-count"></div><div class="cell-aim"></div>';
     grid.append(cell);
   }
   const cellEls = [...grid.querySelectorAll('.cell')];
 
-  // Only redrawn when what is in the grid actually changes - the frame loop
-  // calls update() and rewriting sixteen lots of SVG every frame would throw
-  // the hover away sixty times a second.
+  // Only redrawn when what the grid should *look* like changes - the frame
+  // loop calls update() and rewriting sixteen lots of SVG every frame would
+  // throw the hover away sixty times a second. The aim of a drag and the
+  // shift cue are both in the key, because both are drawn on the cells.
   let gridKey = null;
 
   function updateGrid() {
-    const key = cells.map((c) => (c ? `${c.item}:${c.count}` : '-')).join(',');
+    const aim = preview();
+    const back = clearableCell();
+    const key = [
+      cells.map((c) => (c ? `${c.item}:${c.count}` : '-')).join(','),
+      aim ? [...aim].map(([i, n]) => `${i}=${n}`).join(',') : '',
+      back
+    ].join('|');
     if (key === gridKey) return;
     gridKey = key;
 
     cells.forEach((cell, i) => {
       const el = cellEls[i];
+      const aimed = aim?.has(i);
+      const adding = aimed ? aim.get(i) : null;
+      // An empty cell a drag is about to fill shows what is coming, greyed
+      // back, so the shape of the drag is readable before it is let go.
+      const ghost = !cell && adding ? held.item : null;
+      const shown = cell?.item ?? ghost;
+
       el.classList.toggle('full', !!cell);
+      el.classList.toggle('aim', !!aimed);
+      el.classList.toggle('ghost', !!ghost);
+      el.classList.toggle('back', i === back);
       el.dataset.label = cell ? ITEMS[cell.item]?.label ?? cell.item : '';
-      if (cell && ITEMS[cell.item]?.tint) el.style.setProperty('--tint', ITEMS[cell.item].tint);
+      if (shown && ITEMS[shown]?.tint) el.style.setProperty('--tint', ITEMS[shown].tint);
       else el.style.removeProperty('--tint');
-      el.querySelector('.cell-icon').innerHTML = cell ? itemIcon(cell.item, 40) : '';
+
+      el.querySelector('.cell-icon').innerHTML = shown ? itemIcon(shown, 40) : '';
       el.querySelector('.cell-count').textContent = cell && cell.count > 1 ? cell.count : '';
+      // A swap has no number to show, only the cell lit - see `preview`.
+      el.querySelector('.cell-aim').textContent = adding ? `+${adding}` : '';
     });
   }
 
@@ -357,13 +434,39 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   // A drag is only a drag once it has crossed more than one cell; a press
   // and release on a single cell is an ordinary click. That is the same rule
   // Minecraft uses, and it is what lets the two gestures share a button.
+  //
+  // A shift drag is the exception: it takes effect cell by cell as it goes,
+  // because it is a sweep rather than a share and there is nothing to work
+  // out on the way back up.
   let drag = null;
+
+  // Which cell the cursor is over and whether shift is down, so an empty
+  // hand hovering a full cell with shift held can say that clicking it would
+  // send that stack back. Without the cue the gesture is invisible, and a
+  // sweep that clears the grid is not something to find out by accident.
+  let hoverIndex = null;
+  let shiftDown = false;
+
+  /** The cell shift-clicking would return right now, or -1 for none. */
+  function clearableCell() {
+    if (!shiftDown || held || hoverIndex === null) return -1;
+    return cells[hoverIndex] ? hoverIndex : -1;
+  }
 
   function pointerDown(event) {
     if (event.button !== 0 && event.button !== 2) return;
     const slot = slotAt(event.target);
     if (!slot) return;
     event.preventDefault();
+
+    // Shift with an empty hand sends a stack back where it came from, and
+    // holds the sweep open so dragging on clears whatever else it crosses.
+    if (event.shiftKey && !held && slot.type === 'grid') {
+      drag = { mode: 'clear', button: event.button, indices: [slot.index] };
+      clearCell(slot.index);
+      render();
+      return;
+    }
 
     if (!held) {
       // An empty hand takes: the whole stack, or half of it.
@@ -386,30 +489,41 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     }
 
     // A full hand over the grid: this may turn into a drag, so what happens
-    // is decided on the way back up.
-    drag = { button: event.button, indices: [slot.index] };
+    // is decided on the way back up. What it *would* do is drawn on the
+    // cells in the meantime - see `preview`.
+    drag = { mode: 'spread', button: event.button, indices: [slot.index] };
     render();
   }
 
   function pointerMove(event) {
     pointer = { x: event.clientX, y: event.clientY };
-    if (drag) {
-      const slot = slotAt(event.target);
-      if (slot?.type === 'grid' && !drag.indices.includes(slot.index)) {
-        drag.indices.push(slot.index);
-      }
+    const slot = slotAt(event.target);
+    hoverIndex = slot?.type === 'grid' ? slot.index : null;
+
+    if (drag && slot?.type === 'grid' && !drag.indices.includes(slot.index)) {
+      drag.indices.push(slot.index);
+      // A sweep empties as it goes; a share only shows what it is aiming at.
+      if (drag.mode === 'clear') clearCell(slot.index);
     }
+
     updateHeld();
+    if (isOpen()) updateGrid();
   }
 
   function pointerUp(event) {
     if (!drag) return;
-    const { button, indices } = drag;
+    const { mode, button, indices } = drag;
     drag = null;
 
-    if (indices.length > 1) spread(indices, button === 0 ? 'even' : 'one');
-    else if (button === 0) putAll(indices[0]);
-    else putOne(indices[0]);
+    if (mode === 'clear') {
+      // Every cell it crossed was emptied on the way; nothing is left to do.
+    } else if (indices.length > 1) {
+      spread(indices, button === 0 ? 'even' : 'one');
+    } else if (button === 0) {
+      putAll(indices[0]);
+    } else {
+      putOne(indices[0]);
+    }
 
     render();
     event.preventDefault?.();
@@ -417,9 +531,22 @@ export function createCrafting({ inventory, blocked, onOpen }) {
 
   root.addEventListener('pointerdown', pointerDown);
   root.addEventListener('pointermove', pointerMove);
+  root.addEventListener('pointerleave', () => { hoverIndex = null; if (isOpen()) updateGrid(); });
   window.addEventListener('pointerup', pointerUp);
   // The right button is a game gesture here, not a browser menu.
   root.addEventListener('contextmenu', (event) => event.preventDefault());
+
+  // Shift is only watched for the cue above, so it costs nothing while the
+  // screen is shut. `getModifierState` rather than the key name, or a press
+  // of the other shift reads as a release of the first.
+  function trackShift(event) {
+    const down = event.getModifierState?.('Shift') ?? false;
+    if (down === shiftDown) return;
+    shiftDown = down;
+    if (isOpen()) updateGrid();
+  }
+  window.addEventListener('keydown', trackShift);
+  window.addEventListener('keyup', trackShift);
 
   const isOpen = () => !root.hidden;
 
@@ -451,6 +578,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     held = null;
     cells.fill(null);
     drag = null;
+    hoverIndex = null;
     root.hidden = true;
     updateHeld();
   }
