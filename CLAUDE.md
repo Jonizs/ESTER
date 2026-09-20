@@ -718,8 +718,9 @@ with one inhabitant who walks around and works on what is there.
   merely correct.
 - **`SAVE_VERSION` is a fence, not a migration.** Change the shape of what is
   written and bump it; an older save is dropped rather than half-read. There
-  is nothing in a run yet worth migrating. It is at 2: the inventory grew
-  tools, so what it writes went from `{ wood: 3 }` to `{ held, tools }`.
+  is nothing in a run yet worth migrating. It is at 3: the inventory grew
+  tools (`{ wood: 3 }` became `{ held, tools }`), then agents gained a
+  carried tool and props gained water and what is sown in them.
 - **DEV RESET clears the save too.** It puts the run back to how it booted,
   so leaving the old one on disk would have the next launch quietly undo it.
 - **DEV RESET is game state only.** The pause menu's DEV RESET (`devReset` in
