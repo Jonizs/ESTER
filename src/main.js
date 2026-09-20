@@ -5,7 +5,7 @@ import { OrbitCamera } from './orbitCamera.js';
 import {
   createProps, setPropHighlight, setPropOutline, setWorkbenchState,
   canMove, canPlace, placeProp, footprintCells, syncBlocked,
-  spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds,
+  spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds, setWaterLevel,
   GROUND_OFFSET, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
@@ -95,7 +95,11 @@ function syncTargets() {
   for (const agent of agents) {
     // The job in hand counts only while they are still walking to it; once
     // they are standing over it the tint has said what it had to say.
-    if (agent.task && agent.path.length > 0 && !agent.task.prop.gone) wanted.add(agent.task.prop);
+    // A job on a bare cell - tilling a patch of grass - has no prop to
+    // light up, so `task.prop` is null and there is nothing to add.
+    if (agent.task?.prop && agent.path.length > 0 && !agent.task.prop.gone) {
+      wanted.add(agent.task.prop);
+    }
     for (const prop of agent.queue) if (!prop.gone) wanted.add(prop);
   }
 
@@ -266,6 +270,158 @@ function wieldable() {
   return Object.keys(ITEMS).filter((item) => ITEMS[item].wields && inventory.count(item) > 0);
 }
 
+/**
+ * Working the ground: tilling it, sowing it, watering it, reaping it.
+ *
+ * All of it is a click with the right tool in hand and an agent selected,
+ * which is the same rule as every other order - the agent walks over, spends
+ * a moment and then the thing happens. `doAt` in `person.js` is the job;
+ * everything below only says what to do when they get there.
+ */
+const TILL_SECONDS = 4;
+const REAP_SECONDS = 5;
+const FILL_SECONDS = 2;
+
+/** The tool an agent is holding, if it is one that does this job. */
+function holding(agent, test) {
+  const item = agent?.tool && ITEMS[agent.tool.item];
+  return item && test(item) ? item : null;
+}
+
+/** A click on bare ground with a hoe in hand: turn it over. */
+function tillGround(agent, cell) {
+  if (!holding(agent, (t) => t.tills)) return false;
+  // Only the grass, and only where nothing already stands.
+  if (!canPlace(surface, 'farmland', cell, { props })) return false;
+
+  return agent.doAt(cell, {
+    seconds: TILL_SECONDS,
+    action: 'Turning the ground over',
+    then: () => {
+      if (!canPlace(surface, 'farmland', cell, { props })) return;
+      const plot = spawnProp('farmland', cell, { surface, group: propsGroup, props });
+      plot.water = PROP_KINDS.farmland.water.start;
+      plot.growth = 0;
+      // A seed goes in while the ground is open, if there is one to sow.
+      // Nothing is spent when there is not; the plot is simply bare.
+      plot.sown = inventory.take('seeds', 1);
+      castFromFront(plot.mesh);
+      syncBlocked(props, blocked);
+      wearTool(agent, 1);
+    }
+  });
+}
+
+/** Is this plot's crop ready to come up? */
+const ripe = (plot) => plot.sown && plot.growth >= PROP_KINDS.farmland.growSeconds;
+
+/**
+ * A click on a plot with a hoe: reap it if it is ready, and otherwise put it
+ * back to grass. A crop still growing is left alone - turning a field over
+ * by accident three minutes in is not something to make easy.
+ */
+function workFarmland(agent, plot) {
+  if (!holding(agent, (t) => t.tills)) return false;
+  if (plot.sown && !ripe(plot)) return false;
+
+  const reaping = ripe(plot);
+  return agent.doAt(plot, {
+    seconds: reaping ? REAP_SECONDS : TILL_SECONDS,
+    action: reaping ? 'Reaping the wheat' : 'Putting the ground back',
+    then: () => {
+      if (plot.gone) return;
+      wearTool(agent, 1);
+
+      if (reaping) {
+        for (const drop of [
+          { item: 'wheat', min: 3, max: 4 },
+          { item: 'seeds', min: 2, max: 3 },
+          { item: 'fibre', min: 1, max: 2 }
+        ]) {
+          inventory.add(drop.item, drop.min + Math.floor(Math.random() * (drop.max - drop.min + 1)));
+        }
+        // Reaped, not dug up: the plot stays, bare and ready to be sown.
+        plot.sown = false;
+        plot.growth = 0;
+        return;
+      }
+
+      removeProp(plot, propsGroup, props);
+      syncBlocked(props, blocked);
+    }
+  });
+}
+
+/** A click on a water source with a bucket in hand: fill it up. */
+function fillBucket(agent, source) {
+  const bucket = holding(agent, (t) => t.holds === 'water');
+  if (!bucket || agent.tool.left >= bucket.capacity) return false;
+  if ((source.water ?? 0) <= 0) return false;
+
+  return agent.doAt(source, {
+    seconds: FILL_SECONDS,
+    action: 'Filling the bucket',
+    adjacent: true,
+    then: () => {
+      if (agent.tool?.item !== 'bucket') return;
+      const room = bucket.capacity - agent.tool.left;
+      const drawn = Math.min(room, source.water ?? 0);
+      source.water -= drawn;
+      agent.tool.left += drawn;
+    }
+  });
+}
+
+/** A click on a plot with water in the bucket: pour it in. */
+function waterFarmland(agent, plot) {
+  const bucket = holding(agent, (t) => t.holds === 'water');
+  if (!bucket || agent.tool.left <= 0) return false;
+  if (plot.water >= PROP_KINDS.farmland.water.max) return false;
+
+  return agent.doAt(plot, {
+    seconds: FILL_SECONDS,
+    action: 'Watering the ground',
+    then: () => {
+      if (plot.gone || agent.tool?.item !== 'bucket') return;
+      const room = PROP_KINDS.farmland.water.max - plot.water;
+      const poured = Math.min(room, agent.tool.left);
+      plot.water += poured;
+      agent.tool.left -= poured;
+    }
+  });
+}
+
+/**
+ * The crops and the catchers, ticked once a frame.
+ *
+ * A plot only grows while it has water, and drinks as it does - run out and
+ * everything simply stops until somebody brings more, which is the whole of
+ * the rule. Both are counted off the frame delta because both are things
+ * happening in the world, the same as a sapling coming up.
+ */
+function updateGround(dt) {
+  const plot = PROP_KINDS.farmland;
+
+  for (const prop of props) {
+    if (prop.gone) continue;
+
+    if (prop.kind === 'waterCatcher') {
+      const max = PROP_KINDS.waterCatcher.water.max;
+      prop.water = Math.min(max, (prop.water ?? 0) + PROP_KINDS.waterCatcher.catches * dt);
+      setWaterLevel(prop, prop.water / max);
+      continue;
+    }
+
+    if (prop.kind !== 'farmland' || !prop.sown) continue;
+    if (prop.growth >= plot.growSeconds) continue;
+
+    const thirst = (plot.drinksPerMinute / 60) * dt;
+    if ((prop.water ?? 0) < thirst) continue;     // dry: it simply waits
+    prop.water -= thirst;
+    prop.growth = Math.min(plot.growSeconds, prop.growth + dt);
+  }
+}
+
 // --- controls --------------------------------------------------------------
 
 const settings = createSettings();
@@ -397,12 +553,14 @@ function beginPlanting(item) {
   const cell = freeCellNear(kind, plantedAt ?? { x: person.x, z: person.z });
   if (!cell) return false;                    // nowhere left on the isle for it
 
-  const prop = spawnProp(kind, cell, {
-    surface,
-    group: propsGroup,
-    props,
-    extra: { growth: 0, growSeconds: rollGrowSeconds() }
-  });
+  // What a fresh one starts with is the kind's business: a sapling starts a
+  // clock, a tub starts empty. Handing a sapling's clock to everything is
+  // what would put a water catcher into `updateGrowth`.
+  const extra = {};
+  if (PROP_KINDS[kind].grows) { extra.growth = 0; extra.growSeconds = rollGrowSeconds(); }
+  if (PROP_KINDS[kind].water) extra.water = PROP_KINDS[kind].water.start;
+
+  const prop = spawnProp(kind, cell, { surface, group: propsGroup, props, extra });
   castFromFront(prop.mesh);
   syncBlocked(props, blocked);
 
@@ -658,6 +816,21 @@ function handleClick(event) {
       if (object.userData.propId) {
         const prop = props.find((p) => p.id === object.userData.propId);
         if (prop && prop.kind === 'workbench') { useWorkbench(prop); return; }
+
+        // The ground and the water are worked with what is in hand rather
+        // than by the prop's own `action`, so they are asked first: a plot
+        // is a hoe's job or a bucket's depending on who is standing there.
+        if (prop && !prop.gone && prop.kind === 'farmland') {
+          const agent = selectedAgent();
+          if (agent) { waterFarmland(agent, prop) || workFarmland(agent, prop); }
+          return;
+        }
+        if (prop && !prop.gone && prop.kind === 'waterCatcher') {
+          const agent = selectedAgent();
+          if (agent) fillBucket(agent, prop);
+          return;
+        }
+
         if (prop && !prop.gone) {
           // Nothing to do to a sapling: there is no work on it, so the click
           // is simply spent rather than becoming an order to walk there.
@@ -685,6 +858,10 @@ function handleClick(event) {
       if (queueing(event)) return;
       const agent = selectedAgent();
       if (!agent) return;
+      // A hoe turns bare ground over rather than walking onto it. Anything
+      // else - no hoe, a cell that cannot be tilled - falls through to the
+      // walk, so a click on the grass never simply does nothing.
+      if (tillGround(agent, { x, z })) return;
       if (agent.walkTo({ x, z })) markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
       return;
     }
@@ -961,6 +1138,23 @@ function describeProp(prop) {
   if (kind?.cost && !prop.repaired) {
     what.note = `${inventory.count(kind.cost.item)} / ${kind.cost.amount} ${ITEMS[kind.cost.item].label.toLowerCase()}`;
   }
+
+  // Anything that holds liquid says how much and what of, which is what the
+  // readout was built for in the first place.
+  if (kind?.water) {
+    const ml = Math.floor(prop.water ?? 0);
+    what.note = `${ml} / ${kind.water.max} ml \u00b7 Water`;
+    what.bar = { value: ml, max: kind.water.max, colour: '#3f9fd8' };
+  }
+
+  // And a sown plot says how far along it is, or that it has run dry.
+  if (prop.kind === 'farmland' && prop.sown) {
+    const pct = Math.floor((prop.growth / kind.growSeconds) * 100);
+    const dry = (prop.water ?? 0) < (kind.drinksPerMinute / 60);
+    what.name = ripe(prop) ? 'Ripe Wheat' : 'Wheat';
+    what.item = ripe(prop) ? 'wheat' : 'seeds';
+    what.note = `${what.note} \u00b7 ${ripe(prop) ? 'ready' : `${pct}%${dry ? ' \u00b7 dry' : ''}`}`;
+  }
   return what;
 }
 
@@ -1234,6 +1428,7 @@ function frame() {
   // the screen is up - the overlay takes the clicks - but AGENT SWARM sends
   // its two home on a timer, and one of those may be who opened it.
   if (crafting.isOpen() && !someoneAt(workbench)) crafting.close();
+  updateGround(delta);
   updateLookAt();
   crafting.update();
 
@@ -1250,7 +1445,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { ITEMS, lookAt, wield, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
+window.ESTER = { ITEMS, lookAt, wield, tillGround, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 // One prop was the target when there was one agent and one job; a box can
 // light a whole stand at once, so `targets` is the list and `targeted` is

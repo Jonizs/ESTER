@@ -31,7 +31,8 @@ const KEY = 'ester:save';
 //
 // 2: the inventory grew tools, which carry how worn each one is, so what it
 //    writes went from `{ wood: 3 }` to `{ held, tools }`.
-const SAVE_VERSION = 2;
+// 3: agents carry a tool, and props gained water and what is sown in them.
+const SAVE_VERSION = 3;
 
 // How often the run is written down while it is being played.
 //
@@ -75,6 +76,14 @@ export function createSaves({
         if (prop.growSeconds !== undefined) {
           entry.growth = prop.growth ?? 0;
           entry.growSeconds = prop.growSeconds;
+        }
+        // Worked ground and anything that holds liquid. A plot's `growth` is
+        // seconds of watered growing rather than a sapling's countdown, so
+        // it is written beside `sown` and read back the same way.
+        if (prop.water !== undefined) entry.water = prop.water;
+        if (prop.sown !== undefined) {
+          entry.sown = !!prop.sown;
+          entry.growth = prop.growth ?? 0;
         }
         // What its shape was rolled from, so it comes back the same one.
         if (prop.salt !== undefined) entry.salt = prop.salt;
@@ -133,6 +142,11 @@ export function createSaves({
         if (entry.growSeconds !== undefined) {
           extra.growth = entry.growth ?? 0;
           extra.growSeconds = entry.growSeconds;
+        }
+        if (entry.water !== undefined) extra.water = entry.water;
+        if (entry.sown !== undefined) {
+          extra.sown = entry.sown;
+          extra.growth = entry.growth ?? 0;
         }
         if (entry.salt !== undefined) extra.salt = entry.salt;
         const prop = spawnProp(entry.kind, entry, { surface, group: propsGroup, props, extra });

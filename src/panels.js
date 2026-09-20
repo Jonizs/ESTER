@@ -1,5 +1,6 @@
 import { keyLabel } from './settings.js';
 import { ITEMS } from './inventory.js';
+import { PROP_KINDS } from './props.js';
 import { icon, itemIcon } from './icons.js';
 
 /**
@@ -157,7 +158,9 @@ export function createPanels({ settings, agents, inventory, progression, blocked
           const plant = document.createElement('button');
           plant.type = 'button';
           plant.className = 'tile-action';
-          plant.textContent = 'Plant';
+          // A sapling is planted; a station is put down. Same button, and
+          // the kind is what says which word to use.
+          plant.textContent = PROP_KINDS[ITEMS[entry.item].plants]?.placed ? 'Place' : 'Plant';
           plant.addEventListener('click', (event) => {
             event.stopPropagation();
             onPlantItem?.(entry.item);

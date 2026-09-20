@@ -54,6 +54,37 @@ export const PROP_KINDS = {
       { item: 'seeds', min: 0, max: 1 }
     ]
   },
+  /**
+   * Tilled ground. It is a prop rather than a change to the isle's blocks
+   * because everything about it is run state - what is sown, how far along
+   * it is, how much water is left - and props are what the save already
+   * carries. It is flat and walkable, so it is not `solid`.
+   */
+  farmland: {
+    label: 'farmland',
+    placed: true,          // outlines on hover, like a station
+    icon: 'seeds',
+    // What it holds: 200ml is a bucketful, and a fresh plot starts with 50.
+    water: { start: 50, max: 200 },
+    // Five minutes of *watered* growing, at 20ml a minute.
+    growSeconds: 300,
+    drinksPerMinute: 20
+  },
+
+  /**
+   * A tub that fills itself. Placed out of the inventory like a sapling, and
+   * from then on it is somewhere to fill a bucket from.
+   */
+  waterCatcher: {
+    label: 'water catcher',
+    placed: true,
+    portable: true,
+    item: 'waterCatcher',
+    icon: 'waterCatcher',
+    catches: 1,            // millilitres a second
+    water: { start: 0, max: 500 }
+  },
+
   // The workbench is not harvested - it is repaired once, and then it is a
   // door into the crafting screen rather than a job.
   workbench: {
@@ -238,6 +269,22 @@ export function spawnProp(kind, cell, { surface, group, props, extra = {} }) {
 export function tagProp(prop) {
   prop.mesh.userData.propId = prop.id;
   prop.mesh.traverse((o) => { o.userData.propId = prop.id; });
+}
+
+/**
+ * How much water a prop is holding, as a fraction, drawn in its tub.
+ *
+ * The mesh is scaled rather than rebuilt: this runs every frame a catcher is
+ * filling, and rebuilding the geometry sixty times a second to move a
+ * surface up by a millimetre would be absurd.
+ */
+export function setWaterLevel(prop, fraction) {
+  const water = prop.mesh.getObjectByName('water');
+  if (!water) return;
+  const f = Math.max(0.001, Math.min(1, fraction));
+  // The tub is 0.52 deep with a 0.1 floor; the surface rises from the floor.
+  water.scale.y = f * 0.46;
+  water.position.y = 0.1 + (f * 0.46) / 2;
 }
 
 /** Take a prop out of the world for good. */
@@ -620,6 +667,52 @@ function buildProp(kind, salt) {
     g.add(tip);
 
     g.rotation.y = rand(salt, 11) * Math.PI;
+    return g;
+  }
+
+  if (kind === 'farmland') {
+    // A shallow tray of turned soil, a hair proud of the grass so it reads
+    // as worked ground rather than as a hole. The furrows are what say it
+    // has been hoed.
+    const soil = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.12, 0.96), mat(0x6b4a2c));
+    soil.position.y = 0.05;
+    soil.receiveShadow = true;
+    g.add(soil);
+
+    for (let i = -1; i <= 1; i++) {
+      const furrow = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.05, 0.14), mat(0x553a21));
+      furrow.position.set(0, 0.11, i * 0.28);
+      g.add(furrow);
+    }
+    return g;
+  }
+
+  if (kind === 'waterCatcher') {
+    // Four walls and a floor, open to the sky. The water inside is a
+    // separate mesh so it can be raised and lowered as it fills - it is
+    // named, which is how `setCatcherLevel` finds it again.
+    const WALL = 0x8a5c30;
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 0.9), mat(WALL));
+    floor.position.y = 0.05;
+    floor.castShadow = true;
+    g.add(floor);
+
+    for (const [dx, dz, w, d] of [[0, 0.44, 0.9, 0.08], [0, -0.44, 0.9, 0.08],
+                                  [0.44, 0, 0.08, 0.9], [-0.44, 0, 0.08, 0.9]]) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 0.52, d), mat(0xa8763f));
+      wall.position.set(dx, 0.26, dz);
+      wall.castShadow = true;
+      g.add(wall);
+    }
+
+    const water = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 1, 0.8),
+      mat(0x3f9fd8, { transparent: true, opacity: 0.85 })
+    );
+    water.name = 'water';
+    water.scale.y = 0.001;
+    water.position.y = 0.1;
+    g.add(water);
     return g;
   }
 

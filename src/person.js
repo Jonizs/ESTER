@@ -267,6 +267,31 @@ export class Person {
     return true;
   }
 
+  /**
+   * A one-off job with its own ending: go somewhere, spend a moment, then do
+   * the thing. Tilling a patch of grass, filling a bucket and watering a
+   * crop are all this - work that is not *harvesting a prop*, which is all
+   * `workOn` has ever been able to say.
+   *
+   * `target` is a prop to stand beside or a cell to stand on. It replaces
+   * whatever was in hand and clears the queue, like any other single order.
+   */
+  doAt(target, { seconds = 1, action = null, then = null, adjacent = false } = {}) {
+    const cells = target.kind
+      ? footprintCells(target.kind, target)
+      : [{ x: target.x, z: target.z }];
+    if (!this.goTo(cells, { adjacent })) return false;
+
+    this.queue = [];
+    this.task = {
+      prop: target.kind ? target : null,
+      at: { x: target.x, z: target.z },
+      seconds, elapsed: 0, action, then
+    };
+    this.action = null;        // nothing is said until they get there
+    return true;
+  }
+
   walkTo(cell) {
     if (!this.goTo(cell)) return false;
     // Being sent somewhere calls off the batch as well as the current job.
@@ -286,18 +311,23 @@ export class Person {
     }
 
     if (this.task) {
-      const { prop } = this.task;
+      const { prop, at } = this.task;
       // Somebody else got there first: on to whatever else was queued.
-      if (prop.gone) { this.task = null; this.action = null; this._startNextJob(); return; }
+      if (prop?.gone) { this.task = null; this.action = null; this._startNextJob(); return; }
 
-      this.action = PROP_KINDS[prop.kind].action;
-      this.mesh.rotation.y = Math.atan2(prop.x - this.x, prop.z - this.z);
+      // A job with its own `then` says what it is; a plain one on a prop
+      // takes the line off the kind, which is where it has always been.
+      this.action = this.task.action ?? PROP_KINDS[prop.kind].action;
+      const face = prop ?? at;
+      this.mesh.rotation.y = Math.atan2(face.x - this.x, face.z - this.z);
 
       this.task.elapsed += dt;
       if (this.task.elapsed >= this.task.seconds) {
+        const done = this.task.then;
         this.task = null;
         this.action = null;
-        onFinish?.(prop);
+        if (done) done();
+        else onFinish?.(prop);
         // The rest of a batch follows on its own; a single order leaves the
         // queue empty, so this does nothing at all.
         this._startNextJob();
