@@ -36,7 +36,10 @@ export const ITEMS = {
   plank:  { label: 'Plank',  tint: '#e0b070' },
   // Turned out of the ground with a shovel.
   dirt:   { label: 'Dirt',   tint: '#c08a5a' },
-  seeds:  { label: 'Wheat Seeds', tint: '#cfe08a' },
+  // Seeds are sown rather than planted: they go into ground that has
+  // already been turned over, so `sows` names the kind of prop they may go
+  // into rather than a prop of their own to stand on the isle.
+  seeds:  { label: 'Wheat Seeds', tint: '#cfe08a', sows: 'farmland' },
   wheat:  { label: 'Wheat',  tint: '#f0d07a' },
 
   /**

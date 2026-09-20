@@ -6,7 +6,8 @@ import {
   createProps, setPropHighlight, setPropOutline, setWorkbenchState,
   canMove, canPlace, placeProp, footprintCells, syncBlocked,
   spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds, setWaterLevel,
-  GROUND_OFFSET, PROP_KINDS
+  setCropStage, cropStageOf, buildOutline, tagProp,
+  GROUND_OFFSET, FARMLAND_SINK, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
 import { findPath } from './path.js';
@@ -16,6 +17,7 @@ import { createMenu } from './menu.js';
 import { createPanels } from './panels.js';
 import { createCrafting } from './crafting.js';
 import { createLookAt, propName } from './lookat.js';
+import { createHighlight, HIGHLIGHT_PLAIN, HIGHLIGHT_WORK } from './highlight.js';
 import { createWield } from './wield.js';
 import { createPlacement } from './placement.js';
 import { createSelectBox } from './selectbox.js';
@@ -254,6 +256,13 @@ function wieldable() {
  * a moment and then the thing happens. `doAt` in `person.js` is the job;
  * everything below only says what to do when they get there.
  */
+// What the cursor is over, declared up here rather than beside the hover
+// code that owns it: a restored run rebuilds its crops before the first
+// frame, and anything that rebuilds a prop's meshes has to ask whether it is
+// the one currently outlined. `setHovered` is still the only thing that
+// writes it.
+let hovered = null;
+
 const TILL_SECONDS = 4;
 const REAP_SECONDS = 5;
 const FILL_SECONDS = 2;
@@ -264,31 +273,62 @@ function holding(agent, test) {
   return item && test(item) ? item : null;
 }
 
-/** A click on bare ground with a hoe in hand: turn it over. */
-function tillGround(agent, cell) {
+/**
+ * Whether this patch of ground could be turned over right now.
+ *
+ * Asked without starting anything, because the cursor asks it too: a shift
+ * held over the grass lights the cell up green, and it may only do that
+ * where the click would actually work.
+ */
+function canTill(agent, cell) {
   if (!holding(agent, (t) => t.tills)) return false;
   // Only the grass, and only where nothing already stands.
-  if (!canPlace(surface, 'farmland', cell, { props })) return false;
+  return !!canPlace(surface, 'farmland', cell, { props });
+}
+
+/** A click on bare ground with a hoe in hand: turn it over. */
+function tillGround(agent, cell) {
+  if (!canTill(agent, cell)) return false;
 
   return agent.doAt(cell, {
     seconds: TILL_SECONDS,
+    // Beside the cell, not on it. Standing on the plot they have just made
+    // puts an agent between the cursor and it, and a plot that cannot be
+    // hovered cannot be sown or watered either.
+    adjacent: true,
     action: 'Turning the ground over',
     then: () => {
       // Still a hoe in hand, and still bare ground - a walk takes time, and
       // both can have changed by the time they get there.
-      if (!holding(agent, (t) => t.tills)) return;
-      if (!canPlace(surface, 'farmland', cell, { props })) return;
+      if (!canTill(agent, cell)) return;
       const plot = spawnProp('farmland', cell, { surface, group: propsGroup, props });
       plot.water = PROP_KINDS.farmland.water.start;
       plot.growth = 0;
-      // A seed goes in while the ground is open, if there is one to sow.
-      // Nothing is spent when there is not; the plot is simply bare.
-      plot.sown = inventory.take('seeds', 1);
+      // Turned over and left bare: seeds are sown from the inventory, which
+      // is a gesture of its own rather than something that happens by
+      // accident because there was one in the pack.
+      plot.sown = false;
+      openPlot(plot);
       castFromFront(plot.mesh);
       syncBlocked(props, blocked);
       wearTool(agent, 1);
     }
   });
+}
+
+/**
+ * The dent under a plot: the block it stands on is pressed down so the soil
+ * reads as ground that has been opened rather than a tray sitting on the
+ * grass. The heightmap is left alone - it is a few centimetres, not a dug
+ * block - so nothing about pathing or placement changes.
+ */
+function openPlot(plot) {
+  island.userData.sinkBlock(plot.x, plot.z, FARMLAND_SINK);
+}
+
+/** And closing it again: the block comes back up when the plot goes. */
+function closePlot(plot) {
+  island.userData.raiseBlock(plot.x, plot.z);
 }
 
 const DIG_SECONDS = 5;
@@ -369,6 +409,7 @@ function workFarmland(agent, plot) {
   const reaping = ripe(plot);
   return agent.doAt(plot, {
     seconds: reaping ? REAP_SECONDS : TILL_SECONDS,
+    adjacent: true,
     action: reaping ? 'Reaping the wheat' : 'Putting the ground back',
     then: () => {
       if (plot.gone || !holding(agent, (t) => t.tills)) return;
@@ -385,9 +426,11 @@ function workFarmland(agent, plot) {
         // Reaped, not dug up: the plot stays, bare and ready to be sown.
         plot.sown = false;
         plot.growth = 0;
+        setCropStage(plot, null);
         return;
       }
 
+      closePlot(plot);
       removeProp(plot, propsGroup, props);
       syncBlocked(props, blocked);
     }
@@ -422,6 +465,7 @@ function waterFarmland(agent, plot) {
 
   return agent.doAt(plot, {
     seconds: FILL_SECONDS,
+    adjacent: true,
     action: 'Watering the ground',
     then: () => {
       if (plot.gone || agent.tool?.item !== 'bucket') return;
@@ -454,14 +498,38 @@ function updateGround(dt) {
       continue;
     }
 
-    if (prop.kind !== 'farmland' || !prop.sown) continue;
-    if (prop.growth >= plot.growSeconds) continue;
+    if (prop.kind !== 'farmland') continue;
+    if (!prop.sown) { showCrop(prop, null); continue; }
 
-    const thirst = (plot.drinksPerMinute / 60) * dt;
-    if ((prop.water ?? 0) < thirst) continue;     // dry: it simply waits
-    prop.water -= thirst;
-    prop.growth = Math.min(plot.growSeconds, prop.growth + dt);
+    if (prop.growth < plot.growSeconds) {
+      const thirst = (plot.drinksPerMinute / 60) * dt;
+      // Dry: it simply waits. Nothing is drunk and nothing grows, which is
+      // the whole of the rule.
+      if ((prop.water ?? 0) >= thirst) {
+        prop.water -= thirst;
+        prop.growth = Math.min(plot.growSeconds, prop.growth + dt);
+      }
+    }
+
+    showCrop(prop, cropStageOf(prop.growth / plot.growSeconds));
   }
+}
+
+/**
+ * Draw what is growing in a plot at the stage it has reached.
+ *
+ * The blades are only rebuilt when the stage actually changes - five times
+ * over the whole five minutes - and the new meshes then have to be given
+ * everything the prop's own meshes were given when it was built: the front
+ * face shadow pass, the prop id so a click on a blade still finds the plot,
+ * and an outline so hovering it lights the crop as well as the soil.
+ */
+function showCrop(plot, stage) {
+  if (!setCropStage(plot, stage)) return;
+  castFromFront(plot.mesh);
+  tagProp(plot);
+  buildOutline(plot);
+  if (hovered === plot) setPropOutline(plot, true);
 }
 
 // --- controls --------------------------------------------------------------
@@ -491,6 +559,7 @@ const panels = createPanels({
   blocked: () => menu.isOpen() || crafting.isOpen() || wield.isOpen() || placement.isActive(),
   onSelect: (agent) => selectOnly(agent),
   onPlantItem: (item) => beginPlanting(item),
+  onSowItem: (item) => beginSowing(item),
   onEquipItem: (item) => wield.chooseAgent(item)
 });
 
@@ -671,8 +740,13 @@ function devReset() {
   for (const prop of [...props]) {
     setPropHighlight(prop, false);
     // Anything the run itself put on the isle - a planted sapling, or the
-    // tree one grew into - goes away rather than being reset in place.
-    if (prop.spawned) { removeProp(prop, propsGroup, props); continue; }
+    // tree one grew into - goes away rather than being reset in place. A
+    // plot takes its dent with it.
+    if (prop.spawned) {
+      if (prop.kind === 'farmland') closePlot(prop);
+      removeProp(prop, propsGroup, props);
+      continue;
+    }
     if (prop.home) placeProp(prop, prop.home, surface);
     if (prop.kind === 'workbench') {
       setWorkbenchState(prop, false);
@@ -685,6 +759,7 @@ function devReset() {
 
   syncBlocked(props, blocked);
   setHovered(null);
+  cancelSowing();
   plantedAt = null;
 
   person.reset();
@@ -726,7 +801,17 @@ const saves = createSaves({
     setWorkbenchState(prop, repaired);
     castFromFront(prop.mesh);
   },
-  onSpawn: (prop) => castFromFront(prop.mesh)
+  onSpawn: (prop) => {
+    castFromFront(prop.mesh);
+    // A plot is a dent in the isle and a crop at some stage of coming up,
+    // and neither of those is in the prop itself - both are rebuilt from
+    // what was saved.
+    if (prop.kind !== 'farmland') return;
+    openPlot(prop);
+    if (prop.sown) {
+      showCrop(prop, cropStageOf((prop.growth ?? 0) / PROP_KINDS.farmland.growSeconds));
+    }
+  }
 });
 
 // Before the first frame, so a restored run is simply how the isle looks on
@@ -805,8 +890,9 @@ canvas.addEventListener('pointerup', (e) => {
   if (Math.hypot(e.clientX - started.x, e.clientY - started.y) > 6) return;
   if (performance.now() - started.t > 500) return;
 
-  // Right click clears the selection, wherever it lands.
-  if (started.button === 2) { selectOnly(null); return; }
+  // Right click clears the selection, wherever it lands - and puts the
+  // seeds away, since it is already the "never mind" button.
+  if (started.button === 2) { cancelSowing(); selectOnly(null); return; }
   if (started.button === 0) handleClick(e);
 });
 
@@ -860,6 +946,18 @@ function handleClick(event) {
   pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
 
+  // Seeds on the cursor take the click before anything else does: on a plot
+  // they go in, and anywhere else they go back in the pack. A click that
+  // sometimes sowed and sometimes marched an agent across the isle would be
+  // the worst of both.
+  if (sowing) {
+    const plot = propUnderPointer();
+    if (!canSow(plot)) { cancelSowing(); return; }
+    sowPlot(plot);
+    lookedAt = 0;
+    return;
+  }
+
   for (const hit of raycaster.intersectObject(scene, true)) {
     let object = hit.object;
     while (object) {
@@ -903,9 +1001,11 @@ function handleClick(event) {
       object = object.parent;
     }
 
-    // Otherwise walk to whatever patch of island was clicked.
-    const x = Math.round(hit.point.x);
-    const z = Math.round(hit.point.z);
+    // Otherwise walk to whatever patch of island was clicked. The block is
+    // read off the face rather than the point, so clicking the side of a
+    // ledge means that block and not the column standing in front of it -
+    // the same answer the cursor's own brackets are drawn around.
+    const { x, z } = blockAt(hit);
     if (surface.has(`${x},${z}`)) {
       // Ctrl is the queue gesture, so a miss with it held leaves the queue
       // alone rather than calling the whole thing off and walking there.
@@ -1174,8 +1274,101 @@ function updateLabel() {
 // the mouse twitches is not worth it. The island is only brought in once a
 // station has actually been hit, to check nothing is standing in front of
 // it: that is rare, so the expensive cast almost never happens.
-let hovered = null;
 let pointerAt = null;
+
+// The corner brackets around whatever the cursor is over - a block of the
+// isle as much as a prop. White is "this is what you are pointing at"; any
+// other colour is a gesture that is armed and would work here.
+const highlight = createHighlight(scene);
+
+const measured = new THREE.Box3();
+
+/** A world-space box around everything drawn in an object. */
+function boxOf(object) {
+  return measured.setFromObject(object);
+}
+
+/**
+ * The same for a prop, minus the parts that are not shape.
+ *
+ * A plot carries an invisible pad so it can be hovered out of its dent, and
+ * boxing that would draw the brackets around a hand's breadth of thin air
+ * over the grass.
+ */
+function propBox(prop) {
+  measured.makeEmpty();
+  prop.mesh.updateWorldMatrix(true, true);
+  prop.mesh.traverse((object) => {
+    if (!object.isMesh || object.userData.isHitPad) return;
+    measured.expandByObject(object);
+  });
+  return measured.isEmpty() ? boxOf(prop.mesh) : measured;
+}
+
+const blockPoint = new THREE.Vector3();
+
+/**
+ * Which block of the isle a ray hit.
+ *
+ * The hit point is ON the surface, so rounding it is a coin toss at every
+ * face. Stepping a hair back along the face's own normal puts the point
+ * inside the block it belongs to, which is what makes a click on the side
+ * of a ledge name that block rather than the column in front of it. The
+ * isle's meshes are axis aligned and untransformed, so the geometry normal
+ * is already the world one.
+ */
+function blockAt(hit) {
+  blockPoint.copy(hit.point);
+  const normal = hit.normal ?? hit.face?.normal;
+  if (normal) blockPoint.addScaledVector(normal, -0.05);
+  return {
+    x: Math.round(blockPoint.x),
+    y: Math.round(blockPoint.y),
+    z: Math.round(blockPoint.z)
+  };
+}
+
+/**
+ * Sowing: the seeds are on the cursor, and the next click on a plot puts
+ * them in.
+ *
+ * It is deliberately not the mover. A sapling has to be *positioned* - it
+ * needs room, and where exactly it goes matters - so it earns arrows. A
+ * seed only ever goes into ground that has already been turned over, and
+ * the plot is the position, so all that is left is which plot. Nobody has
+ * to walk over: the ground is already open.
+ */
+let sowing = false;
+
+function beginSowing(item) {
+  if (!ITEMS[item]?.sows || inventory.count(item) < 1) return false;
+  sowing = true;
+  panels.close();
+  lookedAt = 0;
+  return true;
+}
+
+function cancelSowing() {
+  sowing = false;
+}
+
+/** Whether the seeds on the cursor could go into this plot. */
+function canSow(plot) {
+  return sowing && !!plot && !plot.gone && plot.kind === 'farmland'
+    && !plot.sown && inventory.count('seeds') > 0;
+}
+
+function sowPlot(plot) {
+  if (!canSow(plot)) return false;
+  if (!inventory.take('seeds', 1)) return false;
+  plot.sown = true;
+  plot.growth = 0;
+  showCrop(plot, 0);
+  // The cursor keeps its seeds so a row of plots goes in one after another,
+  // and puts them away on its own once there are none left.
+  if (inventory.count('seeds') < 1) cancelSowing();
+  return true;
+}
 
 function setHovered(prop) {
   if (hovered === prop) return;
@@ -1210,14 +1403,21 @@ function describeProp(prop) {
     what.bar = { value: ml, max: kind.water.max, colour: '#3f9fd8' };
   }
 
-  // And a sown plot says how far along it is, or that it has run dry.
+  // And a sown plot says how far along it is, or that it has run dry. The
+  // bar becomes the crop's rather than the water's: how full the ground is
+  // is still in the line, and how far along the wheat is is the thing being
+  // watched.
   if (prop.kind === 'farmland' && prop.sown) {
     const pct = Math.floor((prop.growth / kind.growSeconds) * 100);
     const dry = (prop.water ?? 0) < (kind.drinksPerMinute / 60);
     what.name = ripe(prop) ? 'Ripe Wheat' : 'Wheat';
     what.item = ripe(prop) ? 'wheat' : 'seeds';
     what.note = `${what.note} \u00b7 ${ripe(prop) ? 'ready' : `${pct}%${dry ? ' \u00b7 dry' : ''}`}`;
+    what.bar = { value: prop.growth, max: kind.growSeconds, colour: ripe(prop) ? '#e8cc63' : '#6aa84f' };
   }
+
+  // Bare turned ground that the seeds on the cursor could go into says so.
+  if (canSow(prop)) what.note = `${what.note ?? ''} \u00b7 click to sow`.trim();
   return what;
 }
 
@@ -1304,9 +1504,14 @@ const LOOK_EVERY_MS = 80;
 let lookedAt = 0;
 
 function updateLookAt() {
-  if (placement.isActive()) { lookAt.show(describeProp(placement.prop)); return; }
+  if (placement.isActive()) {
+    lookAt.show(describeProp(placement.prop));
+    highlight.showBox(propBox(placement.prop));
+    return;
+  }
   if (!pointerAt || menu.isOpen() || panels.isOpen() || crafting.isOpen() || wield.isOpen()) {
     lookAt.hide();
+    highlight.hide();
     return;
   }
 
@@ -1314,7 +1519,7 @@ function updateLookAt() {
   if (now - lookedAt < LOOK_EVERY_MS) return;
   lookedAt = now;
 
-  if (!aimRay()) { lookAt.hide(); return; }
+  if (!aimRay()) { lookAt.hide(); highlight.hide(); return; }
 
   // The agents stand in the scene rather than in the props group, so they
   // are asked about on their own - and asked first, because someone standing
@@ -1322,25 +1527,71 @@ function updateLookAt() {
   for (const agent of agents) {
     if (raycaster.intersectObject(agent.mesh, true)[0]) {
       lookAt.show(describeAgent(agent));
+      highlight.showBox(boxOf(agent.mesh));
       return;
     }
   }
 
   const prop = propUnderPointer();
-  if (prop) { lookAt.show(describeProp(prop)); return; }
+  if (prop) {
+    lookAt.show(describeProp(prop));
+    // A plot waiting for the seeds on the cursor lights up: that is the
+    // whole of what says where they may go.
+    highlight.showBox(propBox(prop), canSow(prop) ? HIGHLIGHT_WORK : HIGHLIGHT_PLAIN);
+    return;
+  }
 
   const ground = raycaster.intersectObject(island, true)[0];
-  lookAt.show(ground ? describeGround(ground) : null);
+  if (!ground) { lookAt.show(null); highlight.hide(); return; }
+
+  lookAt.show(describeGround(ground));
+
+  // Shift held over the grass: the cell that click would work is lit, and
+  // only when the click would actually do something. An armed gesture that
+  // lights ground it cannot work would be worse than no mark at all.
+  const block = blockAt(ground);
+  highlight.showCell(block.x, block.y, block.z, armedOn(block) ? HIGHLIGHT_WORK : HIGHLIGHT_PLAIN);
 }
+
+/** Would a shift click on this cell do anything, for whoever is selected? */
+function armedOn(cell) {
+  if (!shiftHeld) return false;
+  const agent = selectedAgent();
+  if (!agent) return false;
+  return canTill(agent, cell) || !!canDig(agent, cell);
+}
+
+/**
+ * Shift, tracked for the cursor rather than for a click.
+ *
+ * The mark has to appear when the key goes down and not wait for the mouse
+ * to move, so pressing or releasing it clears the throttle and the next
+ * frame works the answer out again.
+ */
+let shiftHeld = false;
+
+function setShift(down) {
+  if (shiftHeld === down) return;
+  shiftHeld = down;
+  lookedAt = 0;
+}
+
+window.addEventListener('keydown', (event) => { if (event.key === 'Shift') setShift(true); });
+window.addEventListener('keyup', (event) => { if (event.key === 'Shift') setShift(false); });
+// Coming back to the window with the key already up - or already down - is
+// otherwise never noticed.
+window.addEventListener('blur', () => setShift(false));
 
 canvas.addEventListener('pointermove', (event) => {
   pointerAt = { x: event.clientX, y: event.clientY };
+  setShift(event.shiftKey);
   refreshHover();
 });
 
 canvas.addEventListener('pointerleave', () => {
   pointerAt = null;
   refreshHover();
+  highlight.hide();
 });
 
 // The wield key: with an agent selected it asks what they should carry.
@@ -1503,7 +1754,8 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { ITEMS, lookAt, wield, tillGround, digGround, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
+window.ESTER = { ITEMS, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
+  beginSowing, sowPlot, canSow, showCrop, blockAt, propBox, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 // One prop was the target when there was one agent and one job; a box can
 // light a whole stand at once, so `targets` is the list and `targeted` is

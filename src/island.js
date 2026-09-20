@@ -236,6 +236,52 @@ export function createIsland() {
    * agent's feet go. Returns the layer that came out, or null if that block
    * was not there to take.
    */
+  /**
+   * Press the top block of a column down into the ground, or let it back up.
+   *
+   * Tilled soil has to be a dent rather than a tray standing on the grass,
+   * and the grass block's own top face is opaque: anything drawn below it is
+   * simply hidden. So the block itself is pressed down - the instance matrix
+   * is scaled and shifted so its top face sits `depth` lower while its
+   * bottom stays put - and the neighbours' side faces, which were coincident
+   * before, become the turf walls of the dent.
+   *
+   * `surface` is deliberately NOT moved: the column is still the same height
+   * as far as pathing, prop placement and where an agent's feet go are
+   * concerned. It is a dent of a few centimetres, not a dug block - that is
+   * `digBlock`.
+   */
+  const sunk = new Map();
+
+  group.userData.sinkBlock = (x, z, depth) => {
+    const column = columns.get(`${x},${z}`);
+    if (!column) return false;
+    const found = blocks.get(key(x, column.top, z));
+    if (!found) return false;
+
+    sunk.set(`${x},${z}`, { y: column.top, mesh: found.mesh, index: found.index });
+    const m = new THREE.Matrix4()
+      .makeTranslation(x * BLOCK, column.top * BLOCK - depth / 2, z * BLOCK)
+      .multiply(new THREE.Matrix4().makeScale(1, 1 - depth, 1));
+    found.mesh.setMatrixAt(found.index, m);
+    found.mesh.instanceMatrix.needsUpdate = true;
+    return true;
+  };
+
+  group.userData.raiseBlock = (x, z) => {
+    const was = sunk.get(`${x},${z}`);
+    if (!was) return false;
+    sunk.delete(`${x},${z}`);
+    // Only if it is still the same block: a column dug out from under a
+    // plot has nothing to put back.
+    const found = blocks.get(key(x, was.y, z));
+    if (!found || found.mesh !== was.mesh) return false;
+    found.mesh.setMatrixAt(found.index, new THREE.Matrix4()
+      .makeTranslation(x * BLOCK, was.y * BLOCK, z * BLOCK));
+    found.mesh.instanceMatrix.needsUpdate = true;
+    return true;
+  };
+
   group.userData.digBlock = (x, z) => {
     const column = columns.get(`${x},${z}`);
     if (!column) return null;
@@ -256,6 +302,9 @@ export function createIsland() {
     found.mesh.computeBoundingSphere();
 
     column.top = y - 1;
+    // Whatever was pressed down here is gone with it, so there is nothing
+    // left to let back up.
+    sunk.delete(`${x},${z}`);
     surface.set(`${x},${z}`, column.top);
     group.userData.blockCount -= 1;
     return found.layer;

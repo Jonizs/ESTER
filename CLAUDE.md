@@ -67,6 +67,7 @@ with one inhabitant who walks around and works on what is there.
   - `src/crafting.js` - the crafting screen, opened from the workbench:
     the grid, the recipes and what the grid adds up to.
   - `src/lookat.js` - the bar at the top naming whatever is under the cursor.
+  - `src/highlight.js` - the corner brackets around whatever it is naming.
   - `src/wield.js` - handing a tool to an agent, from either end.
   - `src/icons.js` - the line-art glyphs the panels and crafting both draw,
     materials included.
@@ -281,6 +282,26 @@ with one inhabitant who walks around and works on what is there.
   pointer does, rather than appearing to announce something. `describeProp`,
   `describeAgent` and `describeGround` in `main.js` are what it says; the
   module only draws.
+- **The corner brackets are the cursor, and the colour is the gesture.**
+  `src/highlight.js` draws twelve corners with three short arms each around
+  whatever is under the pointer - a block of the isle as much as a prop.
+  Corners rather than a full wire box, because a complete cage over a block
+  of grass reads as a selection and this is only a cursor. White at 0.55 is
+  "this is what you are pointing at"; green at 0.9 is a gesture that is
+  armed and would work *here* - shift with a tool that can till or dig this
+  cell, or seeds on the cursor over a plot that can take them. It never
+  lights ground the click would refuse: a mark that sometimes lies is worse
+  than no mark. It rides the same throttled pass as the readout, and
+  pressing or releasing shift clears the throttle so the mark appears with
+  the key rather than waiting for the mouse to move.
+- **Which block a ray hit is read off the FACE, not the point.** The hit
+  point is on the surface, so rounding it is a coin toss at every face.
+  `blockAt` in `main.js` steps a hair back along the face's own normal
+  first, which is what makes a click on the side of a ledge mean that block
+  rather than the column standing in front of it. The isle's meshes are axis
+  aligned and untransformed, so the geometry normal is already the world
+  one. The cursor's brackets and the click read the same answer, which is
+  the point: an armed shift must light the cell it would actually work.
 - **The readout runs off the frame loop, never off the pointer.** Naming the
   ground needs a cast at the isle and the isle is thousands of instanced
   blocks - 0.6ms a cast against 0.01ms for the props - so it is throttled to
@@ -320,10 +341,50 @@ with one inhabitant who walks around and works on what is there.
   crashed on it, because a cell has nothing to light yellow.
 - **Farmland is a prop, not a change to the isle.** Everything about it is
   run state - what is sown, how far along, how much water is left - and props
-  are what the save already carries. A hoe turns grass over (sowing a seed as
-  it goes, if there is one), puts a bare plot back to grass, and reaps a ripe
-  one; a crop still growing is left alone, because turning a field over by
-  accident three minutes in is not something to make easy.
+  are what the save already carries. A hoe turns grass over, puts a bare plot
+  back to grass, and reaps a ripe one; a crop still growing is left alone,
+  because turning a field over by accident three minutes in is not something
+  to make easy. It does **not** sow: a plot comes up bare and dry, and the
+  seed is a gesture of its own.
+- **A plot is a DENT, and that needs the block itself moved.** Soil drawn on
+  top of the grass reads as a tray standing on it, and soil drawn below the
+  grass is simply invisible - the block's own top face is opaque and in
+  front of it. So `island.sinkBlock` presses the top block down (the
+  instance matrix is scaled and shifted; its bottom stays put) and the
+  neighbours' side faces, coincident until then, become the turf rim of the
+  dent. `raiseBlock` puts it back, and everything that takes a plot away has
+  to call it - reaping does not, since the plot stays and is only bare;
+  putting the ground back does, and so does DEV RESET. Digging the column
+  out drops the record of it, so there is nothing left to put back. The
+  heightmap is deliberately NOT
+  moved: it is 0.16 of a block, not a dug one, so pathing, prop placement
+  and where an agent's feet go all stay exactly as they were. The soil is
+  drawn the full cell across, the same hair oversized the isle's own cubes
+  are, so there is no seam at the edge for the grass to show through.
+- **A prop may carry a hitbox that has nothing to do with its shape.**
+  `hitPad` in `props.js` is an invisible mesh, and an invisible mesh is
+  still raycast - three.js stopped skipping them. A plot needs one because a
+  dent is *below* the grass: at anything but a steep angle the rim is in the
+  way and the plot could not be hovered at all. It is marked `isHitPad`, and
+  `buildOutline` and `propBox` both skip it - tracing the edges of a box
+  nobody can see draws a cage around thin air.
+- **Seeds are sown from the inventory, and that is not the mover.** A
+  sapling has to be *positioned* - it needs room, and where exactly it goes
+  matters - so it earns arrows and a PLACE button. A seed only ever goes
+  into ground already turned over, so the plot is the position and all that
+  is left is which plot: `sows` in `ITEMS` puts a PLANT button on the tile,
+  the screen closes, and the next click on a plot sows it. No agent, no
+  walk - the ground is already open. The cursor keeps its seeds so a row
+  goes in one after another, and puts them away on its own when they run
+  out, on a click that is not a plot, or on a right click.
+- **A crop is a stage, not a stretched mesh.** `setCropStage` in `props.js`
+  rebuilds the blades every 20% of the way to ripe - five times over five
+  minutes, so it costs nothing per frame - and the sixth stage, gold with
+  heads on, arrives only at 100% rather than at 99%. Rebuilding a prop's
+  meshes means handing the new ones everything the built ones got:
+  `castFromFront`, `tagProp` so a click on a blade still finds the plot, and
+  `buildOutline`. `showCrop` in `main.js` is the one place that does all
+  four.
 - **The isle can be dug into, but never dug away.** `digBlock` in
   `island.js` takes the top block off a column: the instance is scaled to
   nothing rather than the mesh rebuilt (an `InstancedMesh` cannot lose a
@@ -346,6 +407,13 @@ with one inhabitant who walks around and works on what is there.
   quiet: swapping a shovel for a hoe mid-walk wore the *hoe* down for the
   shovel's dig, because the job's `then` read whatever was in hand at the
   end.
+- **Ground work is done from BESIDE the cell, never on top of it.**
+  `doAt` takes `adjacent`, and tilling, reaping, putting a plot back and
+  watering all pass it. An agent standing on the plot they have just made is
+  between the cursor and it: the readout names them instead of the plot and
+  a click selects them instead of sowing it, which is what "farmland cannot
+  be hovered" turned out to be. Digging already stood aside for its own
+  reason - they are taking away the ground they would be standing on.
 - **Tilling is a SHIFT click on the ground; a plain click is still a walk.**
   `tilling(event)` in `main.js` is the one test, beside `queueing` - shift
   and shift alone, because ctrl is already the queue and means something
@@ -358,8 +426,10 @@ with one inhabitant who walks around and works on what is there.
   reaping it, watering it, putting it back to grass - are plain clicks, since
   a prop under the cursor is not ambiguous the way bare ground is.
 - **A crop only grows while it has water, and that is the whole rule.** Five
-  minutes of *watered* growing at 20ml a minute, from the 50ml a fresh plot
-  starts with, so an unwatered one stops dead at 150 seconds and waits.
+  minutes of *watered* growing at 20ml a minute - and a fresh plot is dry,
+  so a sown one sits at 0% until somebody brings a bucket. Turned ground
+  holds no water of its own and nothing drinks until something is sown in
+  it, so a bare plot never loses a drop.
   `updateGround` in `main.js` ticks that and the catchers filling, off the
   frame delta, the same as a sapling coming up.
 - **A water catcher's level is a scaled mesh, not a rebuilt one.**

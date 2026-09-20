@@ -64,8 +64,10 @@ export const PROP_KINDS = {
     label: 'farmland',
     placed: true,          // outlines on hover, like a station
     icon: 'seeds',
-    // What it holds: 200ml is a bucketful, and a fresh plot starts with 50.
-    water: { start: 50, max: 200 },
+    // What it holds: 200ml is a bucketful, and a fresh plot is dry - turned
+    // ground holds no water of its own, and nothing drinks until something
+    // is sown in it.
+    water: { start: 0, max: 200 },
     // Five minutes of *watered* growing, at 20ml a minute.
     growSeconds: 300,
     drinksPerMinute: 20
@@ -368,6 +370,8 @@ export function buildOutline(prop) {
     // LineSegments are not meshes, so the outlines being added here are not
     // themselves walked - and the guard keeps a rebuild from doubling up.
     if (!object.isMesh) return;
+    // A hitbox is not a shape: outlining one draws a cage around thin air.
+    if (object.userData.isHitPad) return;
     if (object.children.some((c) => c.userData.isOutline)) return;
 
     const line = new THREE.LineSegments(
@@ -638,6 +642,99 @@ function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...opts });
 }
 
+/** How far the block under a plot is pressed down to make the dent. */
+export const FARMLAND_SINK = 0.16;
+
+/**
+ * A block of nothing, there to be hit by a ray and by nothing else.
+ *
+ * An invisible mesh is still raycast - three.js stopped skipping them - so
+ * this gives a prop a hitbox that has nothing to do with how big it looks.
+ * It is marked so the outline builder leaves it alone: tracing the edges of
+ * a box nobody can see would draw a cage around thin air.
+ */
+function hitPad(w, h, d, y) {
+  const pad = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  pad.position.y = y;
+  pad.visible = false;
+  pad.userData.isHitPad = true;
+  return pad;
+}
+
+/**
+ * What is growing in a plot, drawn at one of six stages.
+ *
+ * A crop is a stage rather than a height so it reads as a plant changing
+ * rather than a mesh being stretched: every 20% of the way to ripe it comes
+ * up taller, and the last one turns gold and puts out heads. The blades are
+ * rebuilt only when the stage actually changes - four times over five
+ * minutes - so this costs nothing per frame.
+ *
+ * `stage` is null for bare ground. Returns true when something changed, so
+ * the caller knows to re-tag the new meshes.
+ */
+const CROP_STAGES = 6;
+
+export function setCropStage(prop, stage) {
+  if (prop.cropStage === stage) return false;
+  prop.cropStage = stage;
+
+  const old = prop.mesh.getObjectByName('crop');
+  if (old) prop.mesh.remove(old);
+  if (stage === null || stage === undefined) return true;
+
+  const crop = new THREE.Group();
+  crop.name = 'crop';
+
+  const t = stage / (CROP_STAGES - 1);
+  const h = 0.10 + t * 0.62;
+  // Green while it is growing, gold once it is ready.
+  const green = new THREE.Color(0x6aa84f);
+  const tint = green.clone().lerp(new THREE.Color(0xd8b24a), Math.max(0, t - 0.4) / 0.6);
+
+  const TUFTS = [[-0.26, -0.29], [0.02, -0.29], [0.28, -0.29],
+                 [-0.26, 0.00], [0.02, 0.00], [0.28, 0.00],
+                 [-0.26, 0.29], [0.02, 0.29], [0.28, 0.29]];
+
+  TUFTS.forEach(([x, z], i) => {
+    const tall = h * (0.82 + rand(prop.salt * 7 + i, 31) * 0.36);
+    const geo = new THREE.BoxGeometry(0.09, tall, 0.09);
+    geo.translate(0, tall / 2, 0);
+    const blade = new THREE.Mesh(geo, mat(tint.getHex()));
+    // Out of the soil at the bottom of the dent, not off the grass.
+    blade.position.set(x, -0.08, z);
+    blade.castShadow = true;
+    crop.add(blade);
+
+    // Ripe: a head on every stalk, which is what says it is ready without
+    // having to read the number at the top of the screen.
+    if (stage === CROP_STAGES - 1) {
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.17, 0.15), mat(0xe8cc63));
+      head.position.set(x, -0.08 + tall + 0.06, z);
+      head.castShadow = true;
+      crop.add(head);
+    }
+  });
+
+  prop.mesh.add(crop);
+  return true;
+}
+
+/**
+ * Which of the six stages a plot is showing, from how far along it is.
+ *
+ * Five stages of twenty percent each while it grows, and the sixth is ripe -
+ * so the gold only arrives when the crop is actually ready to come up, not
+ * at 99%.
+ */
+export function cropStageOf(fraction) {
+  if (fraction >= 1) return CROP_STAGES - 1;
+  return Math.min(CROP_STAGES - 2, Math.floor(fraction * (CROP_STAGES - 1)));
+}
+
 function buildProp(kind, salt) {
   const g = new THREE.Group();
 
@@ -671,19 +768,31 @@ function buildProp(kind, salt) {
   }
 
   if (kind === 'farmland') {
-    // A shallow tray of turned soil, a hair proud of the grass so it reads
-    // as worked ground rather than as a hole. The furrows are what say it
-    // has been hoed.
-    const soil = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.12, 0.96), mat(0x6b4a2c));
-    soil.position.y = 0.05;
+    // A dent, not a tray. The soil fills the whole cell and its surface sits
+    // below the grass around it - `island.sinkBlock` presses the block down
+    // to make the room, and the neighbours' sides become the turf rim. It is
+    // drawn the same hair oversized the isle's own cubes are, so there is no
+    // seam at the edge of the cell for the grass to show through.
+    const soil = new THREE.Mesh(new THREE.BoxGeometry(1.004, 0.16, 1.004), mat(0x6b4a2c));
+    soil.position.y = -FARMLAND_SINK;
     soil.receiveShadow = true;
     g.add(soil);
 
+    // The furrows are what say it has been hoed. They sit a hair proud of
+    // the soil and still well under the rim.
     for (let i = -1; i <= 1; i++) {
-      const furrow = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.05, 0.14), mat(0x553a21));
-      furrow.position.set(0, 0.11, i * 0.28);
+      const furrow = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.04, 0.13), mat(0x553a21));
+      furrow.position.set(0, -0.06, i * 0.29);
+      furrow.receiveShadow = true;
       g.add(furrow);
     }
+
+    // And a block of nothing over the top of it, purely to be hit by the
+    // cursor. A dent is *below* the grass, so a ray coming in at anything
+    // but a steep angle meets the rim first and the plot could not be
+    // hovered at all - which is exactly what a sunken plot would feel like
+    // without this. It is never drawn and never casts.
+    g.add(hitPad(1, 0.36, 1, 0));
     return g;
   }
 

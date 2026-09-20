@@ -62,7 +62,7 @@ function meterColour(value) {
 
 const title = (word) => word[0].toUpperCase() + word.slice(1);
 
-export function createPanels({ settings, agents, inventory, progression, blocked, onSelect, onPlantItem, onEquipItem }) {
+export function createPanels({ settings, agents, inventory, progression, blocked, onSelect, onPlantItem, onSowItem, onEquipItem }) {
   const root = document.getElementById('panels');
   const pages = new Map();
   const tabButtons = new Map();
@@ -166,6 +166,21 @@ export function createPanels({ settings, agents, inventory, progression, blocked
             onPlantItem?.(entry.item);
           });
           tile.append(plant);
+        }
+
+        // Seeds go into ground that has already been turned over, so their
+        // button arms the cursor rather than opening the mover: the screen
+        // closes and the next click on a plot sows it.
+        if (ITEMS[entry.item].sows) {
+          const sow = document.createElement('button');
+          sow.type = 'button';
+          sow.className = 'tile-action';
+          sow.textContent = 'Plant';
+          sow.addEventListener('click', (event) => {
+            event.stopPropagation();
+            onSowItem?.(entry.item);
+          });
+          tile.append(sow);
         }
 
         // A tool is something somebody carries, so its button asks who. The
