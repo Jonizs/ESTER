@@ -24,7 +24,7 @@ export const ITEMS = {
   // PLANT button on the inventory tiles.
   sapling: { label: 'Sapling', tint: '#7fd694', plants: 'sapling' },
   // Pulled out of the weeds growing across the isle.
-  fibre: { label: 'Fibre', tint: '#d9cd8a' },
+  fibre: { label: 'Fibre', tint: '#bcd07a' },
 
   // --- made at the bench ---------------------------------------------------
   pebble: { label: 'Pebble', tint: '#cbd6ef' },

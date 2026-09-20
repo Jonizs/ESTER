@@ -629,8 +629,20 @@ function buildProp(kind, salt) {
 
     BLADES.forEach((b, i) => {
       const h = b.h * (0.8 + rand(salt * 13 + i, 23) * 0.45);
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(b.w, h, b.w), mat(b.tint));
-      blade.position.set(b.x, h / 2, b.z);
+
+      // The blade turns about its FOOT, not its middle. A box rotated about
+      // its centre swings its base off the ground - that is what left every
+      // weed hovering, one corner at a time - so the geometry is pushed up
+      // by half its height first and the mesh then sits at ground level.
+      const geo = new THREE.BoxGeometry(b.w, h, b.w);
+      geo.translate(0, h / 2, 0);
+
+      // Even pivoted at the foot, a lean tips the base square up on one
+      // side: its corners end up at +/-(w/2)*sin(lean). Sinking the blade by
+      // exactly that much puts the raised corner back on the grass and
+      // buries the opposite one, so the blade meets the ground either way.
+      const blade = new THREE.Mesh(geo, mat(b.tint));
+      blade.position.set(b.x, -(b.w / 2) * Math.abs(Math.sin(b.lean)), b.z);
       blade.rotation.z = b.lean;
       blade.castShadow = true;
       g.add(blade);

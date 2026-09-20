@@ -195,39 +195,67 @@ export const MATERIAL_ART = {
       // the struck edge, catching the light
     + '<path d="M15.6 7.4l3 5.4" fill="none" stroke="#c3ccdd" stroke-width="1.1" stroke-linecap="round"/>',
 
-  // Fibre: a handful of stripped stalks, bound in the middle. Loose ends at
-  // both ends and a tie across the waist, which is what stops it reading as
-  // a paintbrush or a sheaf of wheat.
+  // Fibre: a fan of blades bound near the foot, the way a handful of pulled
+  // weeds actually sits in the hand - splayed out from one tie rather than
+  // held parallel. Each blade is a lens: one curve out to the tip and one
+  // back, bowed either side of the line from the binding.
+  //
+  // The straight-stalk version this replaced read as a paintbrush, because
+  // parallel lines under a band is what a brush is. The fan is what makes it
+  // plant matter.
   fibre:
-      '<path d="M5.9 3.6c1.8 3.6 2.3 7.1 1.6 10.5M10.2 2.9c.7 3.8.7 7.5 0 11.2'
-    + 'M14.4 3.3c-.6 3.7-.4 7.3.6 10.8M18 4.6c-1.7 3.3-2.4 6.6-2.2 9.9"'
-    + ' fill="none" stroke="#b8a85e" stroke-width="1.5" stroke-linecap="round"/>'
-    + '<path d="M7.4 14.6c-1.3 2.6-2.5 4.4-3.6 5.5M10.3 15c-.2 2.6-.6 4.6-1.3 6.1'
-    + 'M13.6 14.8c.7 2.5 1.5 4.4 2.5 5.8M16.4 13.9c1.4 2.2 2.7 3.8 3.9 4.9"'
-    + ' fill="none" stroke="#8a7c3e" stroke-width="1.35" stroke-linecap="round"/>'
-      // the tie
-    + '<path d="M5.7 13.3h12.6a1.5 1.5 0 010 3H5.7a1.5 1.5 0 010-3z"'
-    + ' fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.25" stroke-linejoin="round"/>'
-    + '<path d="M7 14.2h9.8" fill="none" stroke="#f0e7b4" stroke-width="0.9" stroke-linecap="round"/>',
+      // the blades, back to front so the near ones overlap the far ones
+      '<path d="M7.5 18.5Q15.9 13.3 20.5 4.5Q12.1 9.7 7.5 18.5z" fill="#6f9e34"/>'
+    + '<path d="M7.5 18.5Q14.3 12 17 3Q10.2 9.5 7.5 18.5z" fill="#8ab844"/>'
+    + '<path d="M7.5 18.5Q11.9 11.5 12 3.2Q7.6 10.2 7.5 18.5z" fill="#a3cc57"/>'
+    + '<path d="M7.5 18.5Q9.5 11.5 7.5 4.5Q5.5 11.5 7.5 18.5z" fill="#7aa93a"/>'
+    + '<path d="M7.5 18.5Q15.4 16.4 21 10.5Q13.1 12.6 7.5 18.5z" fill="#96c24c"/>'
+      // one outline over the whole fan, so it reads as one bundle
+    + '<path d="M7.5 18.5Q15.9 13.3 20.5 4.5Q12.1 9.7 7.5 18.5z'
+    + 'M7.5 18.5Q14.3 12 17 3Q10.2 9.5 7.5 18.5z'
+    + 'M7.5 18.5Q11.9 11.5 12 3.2Q7.6 10.2 7.5 18.5z'
+    + 'M7.5 18.5Q9.5 11.5 7.5 4.5Q5.5 11.5 7.5 18.5z'
+    + 'M7.5 18.5Q15.4 16.4 21 10.5Q13.1 12.6 7.5 18.5z"'
+    + ' fill="none" stroke="#2c3d12" stroke-width="1.1" stroke-linejoin="round"/>'
+      // the cut ends, poking out below the tie
+    + '<path d="M6.1 18.2l-1.3 3.4M8 18.6l-.5 3.4M9.6 17.9l.8 3.2"'
+    + ' fill="none" stroke="#5c7d2a" stroke-width="1.3" stroke-linecap="round"/>'
+      // the tie, across the foot of the fan
+    + '<path d="M4.4 17.5l7.2-3.3" fill="none" stroke="#2c3d12" stroke-width="4.5" stroke-linecap="round"/>'
+    + '<path d="M4.4 17.5l7.2-3.3" fill="none" stroke="#c9a94e" stroke-width="3" stroke-linecap="round"/>'
+    + '<path d="M5.2 16.6l5.6-2.6" fill="none" stroke="#e6cd84" stroke-width="0.95" stroke-linecap="round"/>',
 
-  // Fibre rope: a coil, seen from the side, with the lay of the strands
-  // running across it. Three turns rather than a spiral - a spiral at this
-  // size reads as a snail.
+  // Fibre rope: a coil, flat on, the way rope is stowed - the turns running
+  // across the middle and doubling back at each end, with the free end
+  // hanging out from under it. The three stacked bars this replaced read as
+  // a ladder, or as the wood.
+  //
+  // The turns are drawn as alternating bands rather than as lines ruled over
+  // one flat shape: at tile size a ruled line closes up and the coil goes
+  // back to being a striped barrel, where bands of two tones stay reading as
+  // separate lengths of rope lying against each other.
   rope:
-      '<path d="M4.2 7.1h15.6a2.3 2.3 0 010 4.6H4.2a2.3 2.3 0 010-4.6z"'
-    + ' fill="#c9a85c" stroke="#3d2c10" stroke-width="1.3" stroke-linejoin="round"/>'
-    + '<path d="M4.2 12.1h15.6a2.3 2.3 0 010 4.6H4.2a2.3 2.3 0 010-4.6z"'
-    + ' fill="#e0c27f" stroke="#3d2c10" stroke-width="1.3" stroke-linejoin="round"/>'
-    + '<path d="M4.2 17.1h15.6a2.3 2.3 0 010 4.6H4.2a2.3 2.3 0 010-4.6z"'
-    + ' fill="#b3924a" stroke="#3d2c10" stroke-width="1.3" stroke-linejoin="round"/>'
-      // the lay of the strands
-    + '<path d="M6.5 8.1l1.4 2.6M10.1 8.1l1.4 2.6M13.7 8.1l1.4 2.6'
-    + 'M6.5 13.1l1.4 2.6M10.1 13.1l1.4 2.6M13.7 13.1l1.4 2.6'
-    + 'M6.5 18.1l1.4 2.6M10.1 18.1l1.4 2.6M13.7 18.1l1.4 2.6"'
-    + ' fill="none" stroke="#7d6329" stroke-width="0.95" stroke-linecap="round"/>'
-      // the free end, tucked under the top turn
-    + '<path d="M19.4 4.2c1.6 1 1.8 2 .6 2.9" fill="none" stroke="#b3924a"'
-    + ' stroke-width="1.6" stroke-linecap="round"/>',
+      // the coil
+      '<path d="M8.6 5.4h6.8a6.3 6.3 0 010 12.6H8.6a6.3 6.3 0 010-12.6z" fill="#c9a85c"/>'
+      // the turns across the middle, every other one caught by the light
+    + '<path d="M8.7 5.5h1.7v12.4H8.7zM12.1 5.5h1.7v12.4h-1.7zM15.5 5.5h1.7v12.4h-1.7z"'
+    + ' fill="#e0c27f"/>'
+    + '<path d="M8.7 5.5v12.4M10.4 5.5v12.4M12.1 5.5v12.4M13.8 5.5v12.4M15.5 5.5v12.4M17.2 5.5v12.4"'
+    + ' fill="none" stroke="#7d6329" stroke-width="0.8"/>'
+      // where the turns double back, nested at both ends
+    + '<path d="M8.6 5.5C4.4 5.5 4.4 17.9 8.6 17.9M8.6 8C6.5 8 6.5 15.4 8.6 15.4'
+    + 'M8.6 10.4C8.1 10.4 8.1 13 8.6 13'
+    + 'M15.4 5.5c4.2 0 4.2 12.4 0 12.4M15.4 8c2.1 0 2.1 7.4 0 7.4'
+    + 'M15.4 10.4c.5 0 .5 2.6 0 2.6"'
+    + ' fill="none" stroke="#3d2c10" stroke-width="1.15" stroke-linecap="round"/>'
+      // the outline, over all of it
+    + '<path d="M8.6 5.4h6.8a6.3 6.3 0 010 12.6H8.6a6.3 6.3 0 010-12.6z"'
+    + ' fill="none" stroke="#3d2c10" stroke-width="1.45" stroke-linejoin="round"/>'
+      // the free end, out from under the coil
+    + '<path d="M12 18c.3 2.5 1.5 3.9 3.5 4.4" fill="none" stroke="#3d2c10"'
+    + ' stroke-width="3.6" stroke-linecap="round"/>'
+    + '<path d="M12 18c.3 2.5 1.5 3.9 3.5 4.4" fill="none" stroke="#d3b167"'
+    + ' stroke-width="2.1" stroke-linecap="round"/>',
 
   // A stick: one shaved length of wood with the stub of a side branch, laid
   // on the diagonal so it fills a square tile. Drawn as strokes rather than

@@ -252,6 +252,14 @@ with one inhabitant who walks around and works on what is there.
   wider gap spread a dozen of them evenly over the isle like planted crops.
   The scatter takes the *wider* of the two kinds' gaps, so a weed may crowd
   another weed without being allowed to crowd a tree.
+- **A leaning mesh turns about its FOOT, not its middle.** A box rotated
+  about its centre swings its base off the ground, which is what left every
+  weed blade hovering at one corner. Push the geometry up by half its height
+  first (`geo.translate(0, h / 2, 0)`) so the pivot is the foot, and then
+  sink it by `(w / 2) * |sin(lean)|` - a lean still tips the base square up
+  on one side by exactly that, so sinking it puts the raised corner back on
+  the grass and buries the opposite one. Check it by measuring: no blade's
+  `Box3.min.y` may be above the cell's ground.
 - **Judge a prop by the pixels it is worth clicking on, not by how it looks
   from three cells away.** The first weeds were thin enough to be 9px across
   at the default zoom and a click on the middle of one missed it. Measure it:
@@ -571,7 +579,13 @@ with one inhabitant who walks around and works on what is there.
   they are still read at a glance, and shapes that look fine at 64px turn to
   mush. Earlier line-art attempts are worth not repeating: logs drawn lying
   down read as a row of buttons, a battery, or a bowtie, and a rock drawn as
-  an outline with one crease reads as an empty bag.
+  an outline with one crease reads as an empty bag. Two more of the same:
+  fibre drawn as parallel stalks under a band is a *paintbrush*, because
+  that is what parallel lines under a band are - what makes it plant matter
+  is fanning the blades out of one tie. And a coil of rope ruled with lines
+  over one flat shape closes up into a striped barrel at tile size; drawing
+  the turns as alternating bands of two tones keeps them reading as separate
+  lengths lying against each other.
 - **An inventory slot is a picture, a count and nothing else.** The tile is
   square, the art is drawn to 62% of it, the count sits in a badge in the top
   right corner, and what the material is *called* is on the tile as
