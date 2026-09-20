@@ -1691,23 +1691,35 @@ html, body {
   color: var(--ink);
 }
 
-/* Block flow rather than a grid on purpose: the 4x4 grid below floats right,
-   and only normal flow lets the craftable items run down its left and then
-   carry on underneath it once there are more than fit beside it. */
+/* Three regions that each hold their own ground: the recipe list down the
+   left, the bench up the right, and what is held along the bottom.
+   `overflow: hidden` on the body is what makes the *list* scroll rather than
+   the page - the bench and the inventory stay put however many recipes there
+   are, which is the whole point of it.
+
+   This replaced a floated bench with the recipes flowing around and under it.
+   That kept a long list out of a narrow strip, but the price was scrolling
+   the whole screen to reach the inventory. A scroll box does the same job
+   without moving anything else, so the float is gone and the cards no longer
+   need to reach under the grid. */
 #crafting .craft-body {
   flex: 1;
   min-height: 0;
-  display: block;
-  padding: 24px 28px 28px;
-  overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0 26px;
+  padding: 24px 28px 24px;
+  overflow: hidden;
 }
 
 /* --- the 4x4 grid, top right --------------------------------------------- */
 
 #crafting .craft-grid {
-  float: right;
+  grid-column: 2;
+  grid-row: 1;
   width: 384px;
-  margin: 0 0 22px 26px;
+  align-self: start;
 }
 
 /* The grid, the arrow and the output slot in a row - the shape of a bench
@@ -1983,17 +1995,35 @@ html, body {
 
 /* --- the craftable items -------------------------------------------------- */
 
-/* Inline-block cards, so they wrap around the floated grid instead of being
-   held in a column beside it the way a grid or flex container would be. */
-#crafting .recipes {
-  font-size: 0;            /* no gaps between the inline-block cards */
+/* The list is its own column now and scrolls inside it. The section is a
+   flex column so the heading stays put and only the cards move. */
+#crafting .craft-recipes {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-/* `flow-root` makes the empty box its own formatting context, which is what
-   keeps it from running along underneath the floated grid - a plain block
-   box's border would pass behind it even though its text wraps clear. */
+#crafting .recipes {
+  font-size: 0;            /* no gaps between the inline-block cards */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  align-content: start;
+}
+
+#crafting .recipes::-webkit-scrollbar { width: 8px; }
+#crafting .recipes::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background: rgba(185, 140, 255, 0.4);
+}
+#crafting .recipes { scrollbar-width: thin; scrollbar-color: rgba(185, 140, 255, 0.4) transparent; }
+
 #crafting .recipes.is-empty {
-  display: flow-root;
+  flex: none;
+  overflow: visible;
   padding: 18px;
   border-radius: 14px;
   border: 1px dashed rgba(150, 180, 255, 0.16);
@@ -2058,10 +2088,11 @@ html, body {
 
 /* --- what is on the bench -------------------------------------------------- */
 
-/* Below both, whatever the recipe list did or did not flow under. */
+/* Across the foot of both columns, always in view. */
 #crafting .craft-stock {
-  clear: both;
-  padding-top: 22px;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  padding-top: 18px;
 }
 
 #crafting h3 {
@@ -2088,7 +2119,7 @@ html, body {
   grid-template-columns: repeat(auto-fill, 58px);
   justify-content: start;
   gap: 7px;
-  max-height: 208px;
+  max-height: 138px;
   overflow-y: auto;
   padding-right: 6px;
 }

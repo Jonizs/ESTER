@@ -225,37 +225,25 @@ export const MATERIAL_ART = {
     + '<path d="M4.4 17.5l7.2-3.3" fill="none" stroke="#c9a94e" stroke-width="3" stroke-linecap="round"/>'
     + '<path d="M5.2 16.6l5.6-2.6" fill="none" stroke="#e6cd84" stroke-width="0.95" stroke-linecap="round"/>',
 
-  // Fibre rope: a coil, flat on, the way rope is stowed - the turns running
-  // across the middle and doubling back at each end, with the free end
-  // hanging out from under it. The three stacked bars this replaced read as
-  // a ladder, or as the wood.
+  // Fibre rope: a hank - two loops of the same rope, bound in the middle by
+  // a few turns. That is how rope is actually stowed for carrying, and it
+  // is a far better silhouette than a coil: the figure of eight is unlike
+  // anything else in the set, where a coil kept closing up into a barrel.
   //
-  // The turns are drawn as alternating bands rather than as lines ruled over
-  // one flat shape: at tile size a ruled line closes up and the coil goes
-  // back to being a striped barrel, where bands of two tones stay reading as
-  // separate lengths of rope lying against each other.
+  // Each loop is one stroked ellipse over a darker, wider one, so the ring
+  // gets its own outline for free; the lay is short ticks laid across the
+  // band, worked out round the ellipse rather than placed by hand.
   rope:
-      // the coil
-      '<path d="M8.6 5.4h6.8a6.3 6.3 0 010 12.6H8.6a6.3 6.3 0 010-12.6z" fill="#c9a85c"/>'
-      // the turns across the middle, every other one caught by the light
-    + '<path d="M8.7 5.5h1.7v12.4H8.7zM12.1 5.5h1.7v12.4h-1.7zM15.5 5.5h1.7v12.4h-1.7z"'
-    + ' fill="#e0c27f"/>'
-    + '<path d="M8.7 5.5v12.4M10.4 5.5v12.4M12.1 5.5v12.4M13.8 5.5v12.4M15.5 5.5v12.4M17.2 5.5v12.4"'
-    + ' fill="none" stroke="#7d6329" stroke-width="0.8"/>'
-      // where the turns double back, nested at both ends
-    + '<path d="M8.6 5.5C4.4 5.5 4.4 17.9 8.6 17.9M8.6 8C6.5 8 6.5 15.4 8.6 15.4'
-    + 'M8.6 10.4C8.1 10.4 8.1 13 8.6 13'
-    + 'M15.4 5.5c4.2 0 4.2 12.4 0 12.4M15.4 8c2.1 0 2.1 7.4 0 7.4'
-    + 'M15.4 10.4c.5 0 .5 2.6 0 2.6"'
-    + ' fill="none" stroke="#3d2c10" stroke-width="1.15" stroke-linecap="round"/>'
-      // the outline, over all of it
-    + '<path d="M8.6 5.4h6.8a6.3 6.3 0 010 12.6H8.6a6.3 6.3 0 010-12.6z"'
-    + ' fill="none" stroke="#3d2c10" stroke-width="1.45" stroke-linejoin="round"/>'
-      // the free end, out from under the coil
-    + '<path d="M12 18c.3 2.5 1.5 3.9 3.5 4.4" fill="none" stroke="#3d2c10"'
-    + ' stroke-width="3.6" stroke-linecap="round"/>'
-    + '<path d="M12 18c.3 2.5 1.5 3.9 3.5 4.4" fill="none" stroke="#d3b167"'
-    + ' stroke-width="2.1" stroke-linecap="round"/>',
+      '<ellipse cx="6.5" cy="12" rx="4.5" ry="5" fill="none" stroke="#6b4320" stroke-width="4.6"/>'
+    + '<ellipse cx="17.5" cy="12" rx="4.5" ry="5" fill="none" stroke="#6b4320" stroke-width="4.6"/>'
+    + '<ellipse cx="6.5" cy="12" rx="4.5" ry="5" fill="none" stroke="#e0b87a" stroke-width="3"/>'
+    + '<ellipse cx="17.5" cy="12" rx="4.5" ry="5" fill="none" stroke="#e0b87a" stroke-width="3"/>'
+    + '<path d="M9.8 13.4L10.5 16.2 M8.2 15.5L7.1 18 M5.9 15.9L3.4 17 M3.8 14.6L1.2 13.6 M3 12L1.5 9.6 M3.8 9.4L4.1 6.6 M5.9 8.1L7.8 6.2 M8.2 8.5L11 8.5 M9.8 10.6L12 12.4" fill="none" stroke="#a06f36" stroke-width="0.85" stroke-linecap="round"/>'
+    + '<path d="M20.8 13.4L21.5 16.2 M19.2 15.5L18.1 18 M16.9 15.9L14.4 17 M14.8 14.6L12.2 13.6 M14 12L12.5 9.6 M14.8 9.4L15.1 6.6 M16.9 8.1L18.8 6.2 M19.2 8.5L22 8.5 M20.8 10.6L23 12.4" fill="none" stroke="#a06f36" stroke-width="0.85" stroke-linecap="round"/>'
+    + '<path d="M10.1 6.3v11.4M12 6.1v11.8M13.9 6.3v11.4" fill="none" stroke="#6b4320" stroke-width="3.9" stroke-linecap="round"/>'
+    + '<path d="M10.1 6.3v11.4M12 6.1v11.8M13.9 6.3v11.4" fill="none" stroke="#e0b87a" stroke-width="2.4" stroke-linecap="round"/>'
+    + '<path d="M9.2 9.3l1.8-1.7M9.2 12.3l1.8-1.7M9.2 15.3l1.8-1.7M11.1 9.5l1.8-1.7M11.1 12.5l1.8-1.7M11.1 15.5l1.8-1.7M13 9.3l1.8-1.7M13 12.3l1.8-1.7M13 15.3l1.8-1.7"'
+    + ' fill="none" stroke="#a06f36" stroke-width="0.85" stroke-linecap="round"/>',
 
   // A stick: one shaved length of wood with the stub of a side branch, laid
   // on the diagonal so it fills a square tile. Drawn as strokes rather than
@@ -309,19 +297,30 @@ export const MATERIAL_ART = {
       // the binding, over where head meets haft
     + '<path d="M11 12.6l4.3.4-.5 2.6-4.5-.5z" fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.2" stroke-linejoin="round"/>',
 
-  // Planks: three sawn boards stacked, seen end-on and a little from above,
-  // so the pale end grain shows against the barked faces. Flat boards with
-  // no end showing read as a stack of anything.
+  // Planks: sawn boards stacked in three-quarter view, so each one shows
+  // its lit top face with the grain running along it, its long side, and
+  // its sawn end. Drawn flat on, boards are three rectangles and read as a
+  // stack of anything; it is the top face that says wood.
+  //
+  // The geometry is one board swept three times - top, long side, end, then
+  // the grain, then one outline over all three faces - so the stack can be
+  // retuned by moving the three vectors rather than by nudging points.
   plank:
-      '<path d="M3.4 14.8l4.2-2.4 13 2.6-4.2 2.4z" fill="#e0b070" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
-    + '<path d="M3.4 14.8v2.6l13 2.6v-2.6z" fill="#a8763f" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
-    + '<path d="M16.4 17.4l4.2-2.4v2.6l-4.2 2.4z" fill="#8a5c30" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
-    + '<path d="M3.4 10.6l4.2-2.4 13 2.6-4.2 2.4z" fill="#e8bd80" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
-    + '<path d="M3.4 10.6v2.6l13 2.6v-2.6z" fill="#b8854c" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
-    + '<path d="M16.4 13.2l4.2-2.4v2.6l-4.2 2.4z" fill="#95653a" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
-    + '<path d="M3.4 6.4l4.2-2.4 13 2.6-4.2 2.4z" fill="#f0c88e" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
-    + '<path d="M3.4 6.4V9l13 2.6V9z" fill="#c28f54" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>'
-    + '<path d="M16.4 9l4.2-2.4V9.2L16.4 11.6z" fill="#9c6c3f" stroke="#3d2411" stroke-width="1.25" stroke-linejoin="round"/>',
+      '<path d="M8.8 17.5L20.2 11.8L20.2 14.5L8.8 20.2z" fill="#a8763f"/>'
+    + '<path d="M4.9 15.5L8.8 17.5L8.8 20.2L4.9 18.2z" fill="#8a5c30"/>'
+    + '<path d="M4.9 15.5L16.3 9.8L20.2 11.8L8.8 17.5z" fill="#e0b070"/>'
+    + '<path d="M6.7 15.6L16.5 10.7 M7.5 16L17.3 11.1 M8.2 16.4L18 11.5 M8.9 16.8L18.7 11.9" fill="none" stroke="#b8854c" stroke-width="0.75" stroke-linecap="round"/>'
+    + '<path d="M4.9 15.5L16.3 9.8L20.2 11.8L8.8 17.5zM8.8 17.5L20.2 11.8L20.2 14.5L8.8 20.2zM4.9 15.5L8.8 17.5L8.8 20.2L4.9 18.2z" fill="none" stroke="#3d2411" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M8.2 14.5L19.6 8.8L19.6 11.5L8.2 17.2z" fill="#a8763f"/>'
+    + '<path d="M4.4 12.5L8.2 14.5L8.2 17.2L4.4 15.2z" fill="#8a5c30"/>'
+    + '<path d="M4.4 12.5L15.8 6.8L19.6 8.8L8.2 14.5z" fill="#e0b070"/>'
+    + '<path d="M6.2 12.6L16 7.7 M6.9 13L16.7 8.1 M7.6 13.4L17.4 8.5 M8.4 13.8L18.2 8.9" fill="none" stroke="#b8854c" stroke-width="0.75" stroke-linecap="round"/>'
+    + '<path d="M4.4 12.5L15.8 6.8L19.6 8.8L8.2 14.5zM8.2 14.5L19.6 8.8L19.6 11.5L8.2 17.2zM4.4 12.5L8.2 14.5L8.2 17.2L4.4 15.2z" fill="none" stroke="#3d2411" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M7.7 11.5L19.1 5.8L19.1 8.5L7.7 14.2z" fill="#a8763f"/>'
+    + '<path d="M3.8 9.5L7.7 11.5L7.7 14.2L3.8 12.2z" fill="#8a5c30"/>'
+    + '<path d="M3.8 9.5L15.2 3.8L19.1 5.8L7.7 11.5z" fill="#e0b070"/>'
+    + '<path d="M5.6 9.6L15.4 4.7 M6.4 10L16.2 5.1 M7.1 10.4L16.9 5.5 M7.8 10.8L17.6 5.9" fill="none" stroke="#b8854c" stroke-width="0.75" stroke-linecap="round"/>'
+    + '<path d="M3.8 9.5L15.2 3.8L19.1 5.8L7.7 11.5zM7.7 11.5L19.1 5.8L19.1 8.5L7.7 14.2zM3.8 9.5L7.7 11.5L7.7 14.2L3.8 12.2z" fill="none" stroke="#3d2411" stroke-width="1.15" stroke-linejoin="round"/>',
 
   // Wheat: one ear on its stalk, the grains stepped up both sides in pairs
   // with an awn off each. A solid teardrop reads as a leaf, and it is the

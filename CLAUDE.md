@@ -448,22 +448,24 @@ with one inhabitant who walks around and works on what is there.
   (`src/crafting.js`, `#crafting`), and the only way in is to click the
   workbench standing in the middle of the isle. Opening it closes the panels,
   so the two are never up together.
-- **The crafting grid floats; the recipes flow around it.** The 4x4 grid, the
-  arrow and the output slot sit in the top right as one row and are
-  `float: right`, which is the whole reason
-  `.craft-body` is block flow rather than a grid - only normal flow lets the
-  craftable items run down the grid's left and then carry on *underneath* it
-  once there are more than fit beside. That is also why the recipe cards are
-  `display: inline-block`: a grid or flex container would be held in a narrow
-  column beside the float and never reach under it. `RECIPES` in
-  `crafting.js` is the list - pushing an entry onto it is all that is needed
-  to see it on screen, and a card is a picture and a name, because how it is
-  laid out is shown on the grid itself when the card is clicked. What is held is listed along the bottom
-  under the heading INVENTORY, on `clear: both`, and it *scrolls* rather than
-  growing - `max-height` on `#crafting .tiles` - so a full inventory never
-  pushes the grid off the top. The empty-recipes box is `display: flow-root`
-  on purpose: a plain block box's border runs along behind the floated grid
-  even though its text wraps clear of it, which reads as the two overlapping.
+- **The crafting screen is three regions that each hold their own ground**:
+  the recipe list down the left, the bench (grid, arrow, output) up the
+  right, and what is held along the bottom. `.craft-body` is a CSS grid with
+  `overflow: hidden`, which is what makes the *list* scroll rather than the
+  page - the bench and the inventory stay put however many recipes there are.
+  Both lists scroll inside themselves (`#craft-recipes` and
+  `#crafting .tiles`), so neither can push the other off the screen.
+
+  This replaced a floated bench with the recipes flowing around and under it.
+  The float kept a long list out of a narrow strip, but the price was having
+  to scroll the whole screen to reach the inventory, which is what a scroll
+  box fixes without moving anything else. The cards are still
+  `display: inline-block` - they wrap in the scroll box the same way, and
+  there is no longer anything to reach under.
+
+  `RECIPES` in `crafting.js` is the list - pushing an entry onto it is all
+  that is needed to see it on screen, and a card is a picture and a name,
+  because how it is laid out is shown on the grid itself when clicked.
 - **Wreckage cannot be moved; repair it first.** `canMove()` in `props.js`
   is the one test - a `placed` kind that also has a `cost` is not movable
   until `prop.repaired`, so the fallen bench stays where it fell. It still
