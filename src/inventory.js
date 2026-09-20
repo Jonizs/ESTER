@@ -15,7 +15,10 @@ export const ITEMS = {
   // Cut a tree down and some of it comes back as saplings. `plants` is the
   // prop kind the item puts on the ground, which is what gives the item its
   // PLANT button on the inventory tiles.
-  sapling: { label: 'Sapling', tint: '#7fd694', plants: 'sapling' }
+  sapling: { label: 'Sapling', tint: '#7fd694', plants: 'sapling' },
+  // Nothing on the isle drops these - they are knocked off stone at the
+  // workbench, and they are the first thing that is made rather than found.
+  pebble: { label: 'Pebble', tint: '#cbd6ef' }
 };
 
 export function createInventory() {

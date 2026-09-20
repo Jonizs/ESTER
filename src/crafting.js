@@ -1,4 +1,4 @@
-import { icon, itemIcon } from './icons.js';
+import { itemIcon } from './icons.js';
 import { ITEMS } from './inventory.js';
 
 /**
@@ -36,18 +36,90 @@ import { ITEMS } from './inventory.js';
  * is the point where `inventory.take` belongs, not here.
  */
 
-// The grid is 4x4. Nothing is dropped into it yet; the cells are here so the
-// bench looks like a bench and so the recipes have somewhere to lay out.
+// The grid is 4x4.
 export const GRID = { w: 4, h: 4 };
 
 /**
- * What can be made. Each entry is
- * `{ id, label, item, cost: [{ item, amount }] }`.
+ * Slots are numbered the way they are counted on screen: 1 is the top left,
+ * the first row runs 1 2 3 4, and the next row starts back on the left, so
+ * 5 is directly under 1. That is how a recipe is described ("slot 1 rock,
+ * slot 2 rock") and how it is written down below - `cells[]` is the same
+ * grid zero-indexed, and these two are the only places that convert.
  *
- * Empty for now, on purpose - recipes are coming. Everything below already
- * reads this list, so adding one is all that is needed to see it on screen.
+ *     1  2  3  4
+ *     5  6  7  8
+ *     9 10 11 12
+ *    13 14 15 16
  */
-export const RECIPES = [];
+const cellOfSlot = (slot) => slot - 1;
+const rowOf = (index) => Math.floor(index / GRID.w);
+const colOf = (index) => index % GRID.w;
+
+/**
+ * What can be made.
+ *
+ * `slots` is the shape, written in the numbering above. `yield` is how many
+ * come out, and one of each named slot is spent per craft - a slot holding a
+ * stack of twenty still only gives up one, which is why a full grid can be
+ * worked through a craft at a time.
+ *
+ * **The shape is what matters, not where it sits.** A recipe is matched
+ * against the grid trimmed to whatever is actually on it, so two rock side
+ * by side is the recipe whether they are in slots 1 and 2, 3 and 4, or 15
+ * and 16. What it will not do is wrap: slots 4 and 5 are the end of one row
+ * and the start of the next, which is not two side by side and does not
+ * match.
+ */
+export const RECIPES = [
+  {
+    id: 'pebble',
+    label: 'Pebble',
+    item: 'pebble',
+    yield: 8,
+    slots: { 1: 'stone', 2: 'stone' }
+  }
+];
+
+/**
+ * A recipe's shape, trimmed to its own bounding box:
+ * `{ w, h, rows: [[item | null, ...], ...] }`.
+ *
+ * Worked out once per recipe and kept, since `RECIPES` is written by hand
+ * and never changes while the game is running.
+ */
+const shapes = new Map();
+
+function shapeOf(recipe) {
+  if (shapes.has(recipe.id)) return shapes.get(recipe.id);
+
+  const indices = Object.keys(recipe.slots).map((slot) => cellOfSlot(Number(slot)));
+  const shape = shapeFrom(indices, (i) => recipe.slots[i + 1]);
+  shapes.set(recipe.id, shape);
+  return shape;
+}
+
+/** The bounding box of some filled cells, as a grid of item names. */
+function shapeFrom(indices, itemAt) {
+  if (indices.length === 0) return null;
+
+  const rows = indices.map(rowOf);
+  const cols = indices.map(colOf);
+  const top = Math.min(...rows);
+  const left = Math.min(...cols);
+  const h = Math.max(...rows) - top + 1;
+  const w = Math.max(...cols) - left + 1;
+
+  const out = Array.from({ length: h }, () => new Array(w).fill(null));
+  for (const i of indices) out[rowOf(i) - top][colOf(i) - left] = itemAt(i);
+  return { w, h, top, left, rows: out };
+}
+
+/** How many of each item a recipe spends, for the "can I afford it" check. */
+export function recipeCost(recipe) {
+  const cost = new Map();
+  for (const item of Object.values(recipe.slots)) cost.set(item, (cost.get(item) ?? 0) + 1);
+  return cost;
+}
 
 export function createCrafting({ inventory, blocked, onOpen }) {
   const root = document.getElementById('crafting');
@@ -56,6 +128,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   const grid = root.querySelector('#craft-grid');
   const recipeList = root.querySelector('#craft-recipes');
   const heldEl = root.querySelector('#craft-held');
+  const outputEl = root.querySelector('#craft-output');
 
   // --- what is on the bench, and what is on the cursor ---------------------
   // Both are stacks: `{ item, count }`, or null for an empty cell / an empty
@@ -249,6 +322,94 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     return new Map([[i, drag.button === 0 ? held.count : 1]]);
   }
 
+  // --- what the grid adds up to --------------------------------------------
+
+  /**
+   * The recipe the grid is currently laid out as, or null.
+   *
+   * Both sides are trimmed to their own bounding box before they are
+   * compared, which is the whole of "it can be placed anywhere": two rock in
+   * slots 15 and 16 trim to exactly what two rock in slots 1 and 2 trim to.
+   * A slot only has to *hold* the right item, not hold exactly one of it, so
+   * a grid loaded up with stacks still reads as the recipe and can be
+   * crafted over and over.
+   */
+  function match() {
+    const filled = cells.map((cell, i) => (cell ? i : -1)).filter((i) => i >= 0);
+    const laid = shapeFrom(filled, (i) => cells[i].item);
+    if (!laid) return null;
+
+    for (const recipe of RECIPES) {
+      const want = shapeOf(recipe);
+      if (!want || want.w !== laid.w || want.h !== laid.h) continue;
+
+      let same = true;
+      for (let r = 0; r < want.h && same; r++) {
+        for (let c = 0; c < want.w; c++) {
+          if (want.rows[r][c] !== laid.rows[r][c]) { same = false; break; }
+        }
+      }
+      // Every filled cell answered for one of the recipe's, so the filled
+      // cells are exactly what the craft spends.
+      if (same) return { recipe, used: filled };
+    }
+    return null;
+  }
+
+  /**
+   * Take what the bench is offering.
+   *
+   * This is the one place the ledger actually moves: everything else on this
+   * screen only rearranges a view of it. One of each laid-out slot is spent
+   * and the yield is added, so the craft is locked in by *taking* it - up to
+   * that moment the output slot is only showing what would happen, and
+   * clearing the grid costs nothing.
+   */
+  function takeOutput() {
+    const found = match();
+    if (!found) return;
+    const { recipe, used } = found;
+
+    // Onto the cursor, so it lands wherever the next click puts it - which
+    // is the same rule as everything else here. A hand already full of
+    // something else has nowhere to put it.
+    if (held && held.item !== recipe.item) return;
+
+    for (const i of used) {
+      const cell = cells[i];
+      inventory.take(cell.item, 1);
+      cell.count -= 1;
+      if (cell.count <= 0) cells[i] = null;
+    }
+
+    inventory.add(recipe.item, recipe.yield);
+    if (held) held.count += recipe.yield;
+    else held = { item: recipe.item, count: recipe.yield };
+  }
+
+  // --- showing a recipe on the grid ----------------------------------------
+  // Clicking a recipe card lays its shape over the grid in red so it can be
+  // copied. It is a drawing and nothing else: the cells are not filled, and
+  // anything actually on the grid is drawn over the top of it.
+  let showcase = null;
+
+  /** Where a shown recipe's items would go: `cell index -> item`. */
+  function demo() {
+    const recipe = RECIPES.find((r) => r.id === showcase);
+    const shape = recipe && shapeOf(recipe);
+    if (!shape) return null;
+
+    // Drawn in the corner it is written in, so a shape is always shown the
+    // same way up in the same place.
+    const out = new Map();
+    for (let r = 0; r < shape.h; r++) {
+      for (let c = 0; c < shape.w; c++) {
+        if (shape.rows[r][c]) out.set(r * GRID.w + c, shape.rows[r][c]);
+      }
+    }
+    return out;
+  }
+
   // --- the grid ------------------------------------------------------------
   // Built once: sixteen cells that never change shape, only what is in them.
   for (let i = 0; i < GRID.w * GRID.h; i++) {
@@ -270,10 +431,12 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   function updateGrid() {
     const aim = preview();
     const back = clearableCell();
+    const shown = showcase ? demo() : null;
     const key = [
       cells.map((c) => (c ? `${c.item}:${c.count}` : '-')).join(','),
       aim ? [...aim].map(([i, n]) => `${i}=${n}`).join(',') : '',
-      back
+      back,
+      showcase ?? ''
     ].join('|');
     if (key === gridKey) return;
     gridKey = key;
@@ -282,24 +445,51 @@ export function createCrafting({ inventory, blocked, onOpen }) {
       const el = cellEls[i];
       const aimed = aim?.has(i);
       const adding = aimed ? aim.get(i) : null;
-      // An empty cell a drag is about to fill shows what is coming, greyed
-      // back, so the shape of the drag is readable before it is let go.
-      const ghost = !cell && adding ? held.item : null;
-      const shown = cell?.item ?? ghost;
+      // What the cell draws, in the order the player needs it: what is
+      // actually in it first, then what a drag is about to put there, then
+      // what a shown recipe wants there. A real item always wins - the
+      // recipe is a drawing under the bench, not a claim on the cell.
+      const dragGhost = !cell && adding ? held.item : null;
+      const demoGhost = !cell && !dragGhost ? shown?.get(i) ?? null : null;
+      const art = cell?.item ?? dragGhost ?? demoGhost;
 
       el.classList.toggle('full', !!cell);
       el.classList.toggle('aim', !!aimed);
-      el.classList.toggle('ghost', !!ghost);
+      el.classList.toggle('ghost', !!dragGhost);
+      el.classList.toggle('demo', !!shown?.has(i));
       el.classList.toggle('back', i === back);
       el.dataset.label = cell ? ITEMS[cell.item]?.label ?? cell.item : '';
-      if (shown && ITEMS[shown]?.tint) el.style.setProperty('--tint', ITEMS[shown].tint);
+      if (art && ITEMS[art]?.tint) el.style.setProperty('--tint', ITEMS[art].tint);
       else el.style.removeProperty('--tint');
 
-      el.querySelector('.cell-icon').innerHTML = shown ? itemIcon(shown, 40) : '';
+      el.querySelector('.cell-icon').innerHTML = art ? itemIcon(art, 40) : '';
       el.querySelector('.cell-count').textContent = cell && cell.count > 1 ? cell.count : '';
       // A swap has no number to show, only the cell lit - see `preview`.
       el.querySelector('.cell-aim').textContent = adding ? `+${adding}` : '';
     });
+  }
+
+  // --- the output slot -----------------------------------------------------
+  // What the grid adds up to, shown rather than made: nothing is spent until
+  // it is taken out of here.
+  let outputKey = null;
+
+  function updateOutput() {
+    const found = match();
+    const recipe = found?.recipe ?? null;
+    const key = recipe ? `${recipe.item}:${recipe.yield}` : '-';
+    if (key === outputKey) return;
+    outputKey = key;
+
+    outputEl.classList.toggle('full', !!recipe);
+    outputEl.dataset.label = recipe ? ITEMS[recipe.item]?.label ?? recipe.item : '';
+    if (recipe && ITEMS[recipe.item]?.tint) {
+      outputEl.style.setProperty('--tint', ITEMS[recipe.item].tint);
+    } else {
+      outputEl.style.removeProperty('--tint');
+    }
+    outputEl.querySelector('.cell-icon').innerHTML = recipe ? itemIcon(recipe.item, 44) : '';
+    outputEl.querySelector('.cell-count').textContent = recipe ? recipe.yield : '';
   }
 
   // --- the stack on the cursor ---------------------------------------------
@@ -340,29 +530,38 @@ export function createCrafting({ inventory, blocked, onOpen }) {
       }
 
       for (const recipe of RECIPES) {
+        // A picture and a name, and that is all: how it is laid out is
+        // shown on the grid itself when the card is clicked, which says it
+        // better than a line of text ever did.
         const card = document.createElement('div');
         card.className = 'recipe';
         card.dataset.recipe = recipe.id;
         card.innerHTML = `
-          <div class="recipe-icon">${icon(recipe.item ?? recipe.id, 22)}</div>
-          <div class="recipe-name">${recipe.label}</div>
-          <div class="recipe-cost">${
-            (recipe.cost ?? [])
-              .map((c) => `<span><b>${c.amount}</b> ${ITEMS[c.item]?.label ?? c.item}</span>`)
-              .join('')
-          }</div>`;
+          <div class="recipe-icon">${itemIcon(recipe.item, 34)}<span>${recipe.yield}</span></div>
+          <div class="recipe-name">${recipe.label}</div>`;
         recipeList.append(card);
       }
     }
 
-    // Whether each one can be afforded right now, which is written onto the
-    // cards that are already there.
+    // Whether each one can be afforded right now, and which one is being
+    // shown on the grid - both written onto the cards already there.
     for (const recipe of RECIPES) {
       const card = recipeList.querySelector(`[data-recipe="${recipe.id}"]`);
-      const enough = (recipe.cost ?? []).every((c) => inventory.count(c.item) >= c.amount);
+      const enough = [...recipeCost(recipe)].every(([item, n]) => inventory.count(item) >= n);
       card.classList.toggle('short', !enough);
+      card.classList.toggle('showing', showcase === recipe.id);
     }
   }
+
+  // Clicking a card lays the recipe over the grid; clicking it again, or
+  // another one, puts it away. Delegated, because the cards are rebuilt.
+  recipeList.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-recipe]');
+    if (!card) return;
+    showcase = showcase === card.dataset.recipe ? null : card.dataset.recipe;
+    recipeKey = null;         // so the cards pick up `showing`
+    update();
+  });
 
   // --- what is on the bench ------------------------------------------------
   // Like the inventory page's tiles, only smaller: these are slots to take
@@ -422,6 +621,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   function slotAt(target) {
     const cellEl = target.closest?.('#craft-grid .cell');
     if (cellEl) return { type: 'grid', index: Number(cellEl.dataset.cell) };
+    if (target.closest?.('#craft-output')) return { type: 'output' };
     const tile = target.closest?.('#craft-stock .tile');
     if (tile) return { type: 'stock', item: tile.dataset.item };
     // Anywhere else in the stock section is still the inventory, so a stack
@@ -458,6 +658,14 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     const slot = slotAt(event.target);
     if (!slot) return;
     event.preventDefault();
+
+    // The output slot only ever gives: either button takes one craft's
+    // worth, and that is the moment it is actually made.
+    if (slot.type === 'output') {
+      takeOutput();
+      render();
+      return;
+    }
 
     // Shift with an empty hand sends a stack back where it came from, and
     // holds the sweep open so dragging on clears whatever else it crosses.
@@ -553,6 +761,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   function render() {
     reconcile();
     updateGrid();
+    updateOutput();
     updateStock();
     updateHeld();
   }
@@ -579,6 +788,8 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     cells.fill(null);
     drag = null;
     hoverIndex = null;
+    showcase = null;
+    recipeKey = null;
     root.hidden = true;
     updateHeld();
   }

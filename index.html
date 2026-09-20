@@ -180,7 +180,20 @@
         <div class="craft-body">
           <section class="craft-grid">
             <h3>Crafting grid</h3>
-            <div id="craft-grid" class="grid4"></div>
+            <!-- The grid, then the arrow, then what it adds up to. Nothing
+                 is spent until the output slot is clicked. -->
+            <div class="bench">
+              <div id="craft-grid" class="grid4"></div>
+              <svg class="bench-arrow" viewBox="0 0 24 24" width="26" height="26"
+                   fill="none" stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 12h15M13 6l6 6-6 6"/>
+              </svg>
+              <div id="craft-output" class="cell out" data-label="">
+                <div class="cell-icon"></div>
+                <div class="cell-count"></div>
+              </div>
+            </div>
           </section>
 
           <section class="craft-recipes">

@@ -64,7 +64,8 @@ with one inhabitant who walks around and works on what is there.
   - `src/menu.js` - the Esc pause menu and its keybind page.
   - `src/panels.js` - the Tab/Q/W/E panels: overview, inventory, quest book,
     stages.
-  - `src/crafting.js` - the crafting screen, opened from the workbench.
+  - `src/crafting.js` - the crafting screen, opened from the workbench:
+    the grid, the recipes and what the grid adds up to.
   - `src/icons.js` - the line-art glyphs the panels and crafting both draw,
     materials included.
   - `src/starfield.js` - the drifting motes behind every UI surface.
@@ -358,19 +359,54 @@ with one inhabitant who walks around and works on what is there.
   than hard-coding them. Adding a tab is a `TABS` entry in `panels.js`, an
   `ACTIONS` entry in `settings.js`, a glyph in `icons.js` and a
   `<section data-tab>` in `index.html` - nothing else.
+- **Slots are numbered the way they are counted on screen.** 1 is the top
+  left, the first row runs 1 2 3 4, and the next row starts back on the left,
+  so 5 is directly under 1, down to 16. That is how a recipe is described and
+  how `RECIPES` is written; `cellOfSlot` in `crafting.js` is the only place
+  it converts to the zero-indexed `cells[]`.
+- **A recipe is a shape, not a set of slots.** Both the recipe and what is on
+  the grid are trimmed to their own bounding box before they are compared
+  (`shapeFrom`), which is the whole of "it can be placed anywhere": two stone
+  in slots 15 and 16 trim to exactly what two stone in slots 1 and 2 trim to.
+  What it will not do is wrap - slots 4 and 5 are the end of one row and the
+  start of the next, so they are not two side by side and do not match. Check
+  that case after touching the matcher; it is the one an "is the next slot
+  along filled" shortcut gets wrong.
+- **A slot has to hold the right item, not exactly one of it.** One of each
+  laid-out slot is spent per craft, so a grid loaded with stacks is worked
+  through a craft at a time rather than refusing to match.
+- **The craft is locked in by taking it, not by laying it out.** The output
+  slot only *shows* what the grid adds up to; `takeOutput` is where the
+  ingredients are spent and the yield arrives. Up to that click the grid can
+  be cleared for nothing, which is the whole reason the output is a slot
+  rather than a button.
+- **Crafting is the one place on that screen where the ledger moves.**
+  Everything else - the grid, the cursor, the drags - is a *view* over
+  `inventory.js`: `reserved()` counts what the bench is showing and the stock
+  slots show the rest, so nothing is ever taken out and there is nothing to
+  give back when the screen closes or the game quits with it open. Only
+  `takeOutput` calls `take`/`add`. Anything new that moves items on that
+  screen has to decide which of the two it is, or a run quietly gains or
+  loses things.
+- **Clicking a recipe draws it on the grid in red, and that is all it is.**
+  The showcase fills no cells: a cell that actually holds something draws
+  that instead, over the top. It is put away by clicking the card again, by
+  clicking another, or by closing the screen.
 - **Crafting is not one of them and has no key.** It is its own overlay
   (`src/crafting.js`, `#crafting`), and the only way in is to click the
   workbench standing in the middle of the isle. Opening it closes the panels,
   so the two are never up together.
-- **The crafting grid floats; the recipes flow around it.** The 4x4 grid sits
-  in the top right and is `float: right`, which is the whole reason
+- **The crafting grid floats; the recipes flow around it.** The 4x4 grid, the
+  arrow and the output slot sit in the top right as one row and are
+  `float: right`, which is the whole reason
   `.craft-body` is block flow rather than a grid - only normal flow lets the
   craftable items run down the grid's left and then carry on *underneath* it
   once there are more than fit beside. That is also why the recipe cards are
   `display: inline-block`: a grid or flex container would be held in a narrow
   column beside the float and never reach under it. `RECIPES` in
-  `crafting.js` is the list, empty for now - pushing an entry onto it is all
-  that is needed to see it on screen. What is held is listed along the bottom
+  `crafting.js` is the list - pushing an entry onto it is all that is needed
+  to see it on screen, and a card is a picture and a name, because how it is
+  laid out is shown on the grid itself when the card is clicked. What is held is listed along the bottom
   under the heading INVENTORY, on `clear: both`, and it *scrolls* rather than
   growing - `max-height` on `#crafting .tiles` - so a full inventory never
   pushes the grid off the top. The empty-recipes box is `display: flow-root`

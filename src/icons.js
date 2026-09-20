@@ -136,7 +136,39 @@ export const MATERIAL_ART = {
     + '<path d="M12.4 11.7c.2-3.3 2.3-5.2 5.5-5-.2 3.1-2.4 5-5.5 5z"'
     + ' fill="#74c47c" stroke="#1f3f22" stroke-width="1.3" stroke-linejoin="round"/>'
     + '<path d="M5.7 19.9a6.3 6.3 0 0112.6 0z" fill="#7a5331" stroke="#2a1a0f" stroke-width="1.3" stroke-linejoin="round"/>'
-    + '<path d="M8.4 18.4c1-.7 2.1-1 3.3-1" fill="none" stroke="#9a6d43" stroke-width="1.05" stroke-linecap="round"/>'
+    + '<path d="M8.4 18.4c1-.7 2.1-1 3.3-1" fill="none" stroke="#9a6d43" stroke-width="1.05" stroke-linecap="round"/>',
+
+  // Three of them in a pile, faceted and lit the same way the boulder is -
+  // they are the same rock, so they are the same greys. What tells them
+  // apart at tile size is the count and the arrangement, not the colour: one
+  // big shape is stone, three small ones are pebbles. Drawn back to front,
+  // small one first, so the pile reads as a pile rather than as three
+  // shapes side by side.
+  pebble:
+      // the small one, resting on top
+      '<path d="M9.9 10.2L10.6 6.6 13.4 4.9 16.4 6.2 16.8 9.2 13.6 11z" fill="#b9c4d9"/>'
+    + '<path d="M10.6 6.6L13.4 4.9 16.4 6.2 13.3 7.9z" fill="#e1e8f6"/>'
+    + '<path d="M16.4 6.2L16.8 9.2 13.6 11 13.3 7.9z" fill="#95a3c0"/>'
+    + '<path d="M9.9 10.2L10.6 6.6 13.4 4.9 16.4 6.2 16.8 9.2 13.6 11z"'
+    + ' fill="none" stroke="#28304a" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M10.6 6.6L13.3 7.9 16.4 6.2M13.3 7.9L13.6 11"'
+    + ' fill="none" stroke="#28304a" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"/>'
+      // the middle one, to the right
+    + '<path d="M13.6 18.2L14.4 14.8 17.2 13.2 20.2 14.6 20.6 17.6 17.4 19.7z" fill="#b9c4d9"/>'
+    + '<path d="M14.4 14.8L17.2 13.2 20.2 14.6 17 16.1z" fill="#e1e8f6"/>'
+    + '<path d="M20.2 14.6L20.6 17.6 17.4 19.7 17 16.1z" fill="#95a3c0"/>'
+    + '<path d="M13.6 18.2L14.4 14.8 17.2 13.2 20.2 14.6 20.6 17.6 17.4 19.7z"'
+    + ' fill="none" stroke="#28304a" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M14.4 14.8L17 16.1 20.2 14.6M17 16.1L17.4 19.7"'
+    + ' fill="none" stroke="#28304a" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"/>'
+      // the big one, in front of both
+    + '<path d="M3.4 17.9L4.6 12.9 8.4 10.4 12.4 12.2 13.3 16.6 9 19.6z" fill="#b9c4d9"/>'
+    + '<path d="M4.6 12.9L8.4 10.4 12.4 12.2 8.3 14.6z" fill="#e1e8f6"/>'
+    + '<path d="M12.4 12.2L13.3 16.6 9 19.6 8.3 14.6z" fill="#95a3c0"/>'
+    + '<path d="M3.4 17.9L4.6 12.9 8.4 10.4 12.4 12.2 13.3 16.6 9 19.6z"'
+    + ' fill="none" stroke="#28304a" stroke-width="1.35" stroke-linejoin="round"/>'
+    + '<path d="M4.6 12.9L8.3 14.6 12.4 12.2M8.3 14.6L9 19.6"'
+    + ' fill="none" stroke="#28304a" stroke-width="1.15" stroke-linejoin="round" stroke-linecap="round"/>'
 };
 
 /** An `<svg>` holding one of the glyphs above. */
