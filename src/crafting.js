@@ -365,15 +365,17 @@ export function createCrafting({ inventory, blocked, onOpen }) {
    * that moment the output slot is only showing what would happen, and
    * clearing the grid costs nothing.
    */
-  function takeOutput() {
+  function takeOutput({ toInventory = false } = {}) {
     const found = match();
     if (!found) return;
     const { recipe, used } = found;
 
     // Onto the cursor, so it lands wherever the next click puts it - which
     // is the same rule as everything else here. A hand already full of
-    // something else has nowhere to put it.
-    if (held && held.item !== recipe.item) return;
+    // something else has nowhere to put it. Shift is the way past that: it
+    // sends the yield straight to the inventory instead, so a full hand is
+    // no reason to refuse.
+    if (!toInventory && held && held.item !== recipe.item) return;
 
     for (const i of used) {
       const cell = cells[i];
@@ -382,7 +384,12 @@ export function createCrafting({ inventory, blocked, onOpen }) {
       if (cell.count <= 0) cells[i] = null;
     }
 
+    // The yield lands in the ledger either way. What shift changes is only
+    // whether the cursor then lays claim to it: `held` is a view over the
+    // inventory, so leaving it alone *is* leaving the pebbles in the stock
+    // row, and they are in the slots below on the next frame.
     inventory.add(recipe.item, recipe.yield);
+    if (toInventory) return;
     if (held) held.count += recipe.yield;
     else held = { item: recipe.item, count: recipe.yield };
   }
@@ -660,9 +667,11 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     event.preventDefault();
 
     // The output slot only ever gives: either button takes one craft's
-    // worth, and that is the moment it is actually made.
+    // worth, and that is the moment it is actually made. Shift sends it to
+    // the inventory rather than onto the cursor - the same thing shift means
+    // on a grid cell, which is why it is the same key.
     if (slot.type === 'output') {
-      takeOutput();
+      takeOutput({ toInventory: event.shiftKey });
       render();
       return;
     }
