@@ -35,7 +35,7 @@ export const PROP_KINDS = {
     icon: 'sapling',
     grows: 'tree'
   },
-  rock: { label: 'rock', action: 'Picking up a rock', seconds: 7, icon: 'stone', yield: { item: 'stone', amount: 2 } },
+  rock: { label: 'rock', action: 'Picking up a rock', seconds: 7, icon: 'stone', yield: { item: 'stone', amount: 3 } },
   // Weeds. Small, quick, and the only thing on the isle that gives fibre -
   // there is no fixed `yield`, only the roll, so a clump is 1 or 2 and never
   // nothing. `gap` is its own: weeds come up in patches, and holding them to
@@ -329,7 +329,7 @@ export function syncBlocked(props, blocked) {
   return blocked;
 }
 
-const COUNTS = { tree: 9, rock: 6, weed: 14 };
+const COUNTS = { tree: 9, rock: 10, weed: 14 };
 
 /** How much room a kind keeps from whatever is already standing. */
 const DEFAULT_GAP = 2.2;

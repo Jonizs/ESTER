@@ -97,7 +97,13 @@ with one inhabitant who walks around and works on what is there.
   `props.js`; `y + 1` leaves everything hovering.
 - **The island is solid, not a shell.** Buried blocks are kept and layered
   like the rest, in separate `<layer>:core` instanced meshes that skip the
-  shadow pass - the surface already occludes the light. 4108 blocks total,
+  shadow pass - the surface already occludes the light. They do still
+  *receive*: once a shovel takes the block above one out, that buried block
+  is the floor of a pit and has to be shaded by the walls around it, or a dug
+  hole comes out as a bright square. Receiving is the cheap half and only
+  costs where a fragment is actually drawn, which for a buried block is
+  nowhere until it is dug out; casting, the expensive half, is unchanged.
+  4108 blocks total,
   1370 of them on the surface. 600 rays fired at the isle from all around
   never hit a core block first, so the fill stays invisible; it costs under
   1% of frame time.
@@ -318,10 +324,34 @@ with one inhabitant who walks around and works on what is there.
   it goes, if there is one), puts a bare plot back to grass, and reaps a ripe
   one; a crop still growing is left alone, because turning a field over by
   accident three minutes in is not something to make easy.
+- **The isle can be dug into, but never dug away.** `digBlock` in
+  `island.js` takes the top block off a column: the instance is scaled to
+  nothing rather than the mesh rebuilt (an `InstancedMesh` cannot lose a
+  member, and rebuilding one to drop a cube would be absurd), and `surface`
+  and `columns` both move down with it, which is what pathing, prop placement
+  and where an agent's feet go all read. A column keeps its last block
+  whatever is done to it. `blocks` is the map from a coordinate to the mesh
+  and instance holding it, built as the meshes are, and `layerAt` is what
+  says what a block is made of.
+- **`ITEMS[tool].digs` is which layers a tool takes out and what each
+  leaves.** A shovel has the soft ground (`grass`, `moss`, `dirt` -> dirt), a
+  pickaxe has the rock (`stone` -> stone), and neither touches bedrock, which
+  is what the isle is standing on. Adding a tool that digs is an entry here,
+  not a branch in `digGround`.
+- **Ask again when the agent gets there, not only when the order is given.**
+  A walk takes time and everything a job depends on can move in it: the tool
+  can be swapped out of their hand, a station can be put on the cell, another
+  agent can walk onto it. `canDig` is asked twice for exactly that, and
+  tilling and reaping re-check the hoe the same way. Getting this wrong is
+  quiet: swapping a shovel for a hoe mid-walk wore the *hoe* down for the
+  shovel's dig, because the job's `then` read whatever was in hand at the
+  end.
 - **Tilling is a SHIFT click on the ground; a plain click is still a walk.**
   `tilling(event)` in `main.js` is the one test, beside `queueing` - shift
   and shift alone, because ctrl is already the queue and means something
-  else. A shift click that cannot till, for want of a hoe or because
+  else. Shift means "work this ground with what is in hand": a hoe turns it
+  over, a shovel or a pickaxe takes a block out of it, and the tool is what
+  says which. A shift click that cannot till, for want of a hoe or because
   something is standing there, is *spent* rather than falling through to the
   walk: a modifier that sometimes does the very thing it was held to avoid is
   worse than one that occasionally does nothing. Clicks on a plot itself -

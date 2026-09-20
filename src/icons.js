@@ -322,6 +322,46 @@ export const MATERIAL_ART = {
     + '<path d="M5.6 9.6L15.4 4.7 M6.4 10L16.2 5.1 M7.1 10.4L16.9 5.5 M7.8 10.8L17.6 5.9" fill="none" stroke="#b8854c" stroke-width="0.75" stroke-linecap="round"/>'
     + '<path d="M3.8 9.5L15.2 3.8L19.1 5.8L7.7 11.5zM7.7 11.5L19.1 5.8L19.1 8.5L7.7 14.2zM3.8 9.5L7.7 11.5L7.7 14.2L3.8 12.2z" fill="none" stroke="#3d2411" stroke-width="1.15" stroke-linejoin="round"/>',
 
+  // Dirt: a turned clod with the grass still on its top face, seen the same
+  // three-quarter way the planks are. A plain brown lump is a rock in the
+  // wrong colour; the green cap is what says it came out of the ground.
+  dirt:
+      // the two faces of the clod
+      '<path d="M3.4 9.6L12 5.2 20.6 9.6 20.6 16.4 12 20.8 3.4 16.4z" fill="#8a6038"/>'
+    + '<path d="M12 9.9L20.6 9.6 20.6 16.4 12 20.8z" fill="#6b4728"/>'
+      // the sod on top
+    + '<path d="M3.4 9.6L12 5.2 20.6 9.6 12 13.4z" fill="#4fae78"/>'
+    + '<path d="M3.4 9.6L12 5.2 12 7.1 6.5 9.6z" fill="#67c48e"/>'
+      // crumbs falling off the near corners
+    + '<path d="M3.4 9.6L12 13.4 12 20.8 3.4 16.4z" fill="#a8763f"/>'
+    + '<path d="M3.4 9.6L12 5.2 20.6 9.6 20.6 16.4 12 20.8 3.4 16.4z'
+    + 'M3.4 9.6L12 13.4 20.6 9.6M12 13.4v7.4"'
+    + ' fill="none" stroke="#3a2412" stroke-width="1.3" stroke-linejoin="round"/>'
+      // the loose grain in the soil
+    + '<path d="M6.2 13.6l1.1.5M9.1 15.6l1 .5M6.4 16.6l1 .5M15.2 13.4l1.2-.5M17.6 14.6l1.2-.6"'
+    + ' fill="none" stroke="#5a3a1d" stroke-width="0.95" stroke-linecap="round"/>',
+
+  // Flint pickaxe: the head swept across the top of the haft with a point at
+  // each end, which is the one silhouette nothing else in the set has - the
+  // axe is a wedge on one side, the hoe a blade hung down.
+  flintPickaxe:
+      // the haft
+      '<path d="M9.4 21.6L11.3 7.8l2.8.4-1.9 13.8z"'
+    + ' fill="#a86f3d" stroke="#2c1a0e" stroke-width="1.3" stroke-linejoin="round"/>'
+    + '<path d="M10.8 20.8l1.6-12" fill="none" stroke="#c99359" stroke-width="0.9" stroke-linecap="round"/>'
+      // the head: a shallow arc with a point at both ends
+    + '<path d="M2.4 9.6C6.6 4.4 17.4 3.6 21.8 8.2l-1.9 2.6c-3.4-3.2-11.6-2.6-15.2 1.4z" fill="#5a6478"/>'
+    + '<path d="M2.4 9.6C6.6 4.4 17.4 3.6 21.8 8.2l-.9 1.2C16.9 5.6 6.9 6.4 3.3 10.6z" fill="#8794ad"/>'
+    + '<path d="M19.9 10.8c-1.3-1.2-3.2-2-5.3-2.4l.4-2.6c2.6.4 5 1.4 6.8 2.4z" fill="#3c4457"/>'
+    + '<path d="M2.4 9.6C6.6 4.4 17.4 3.6 21.8 8.2l-1.9 2.6c-3.4-3.2-11.6-2.6-15.2 1.4z"'
+    + ' fill="none" stroke="#151a27" stroke-width="1.4" stroke-linejoin="round"/>'
+    + '<path d="M15 6.1l-.4 2.3" fill="none" stroke="#151a27" stroke-width="1.1"/>'
+      // the two points, catching the light
+    + '<path d="M3.2 10.4L4.6 8.8M20.6 9.9l-1.3-1.4" fill="none" stroke="#c3ccdd"'
+    + ' stroke-width="1.05" stroke-linecap="round"/>'
+      // the binding at the joint
+    + '<path d="M9.9 8.4l4.3.6-.4 2.6-4.3-.6z" fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.2" stroke-linejoin="round"/>',
+
   // Wheat: one ear on its stalk, the grains stepped up both sides in pairs
   // with an awn off each. A solid teardrop reads as a leaf, and it is the
   // stepping that makes it a cereal.

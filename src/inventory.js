@@ -34,6 +34,8 @@ export const ITEMS = {
   stick:  { label: 'Stick',  tint: '#c99359' },
 
   plank:  { label: 'Plank',  tint: '#e0b070' },
+  // Turned out of the ground with a shovel.
+  dirt:   { label: 'Dirt',   tint: '#c08a5a' },
   seeds:  { label: 'Wheat Seeds', tint: '#cfe08a' },
   wheat:  { label: 'Wheat',  tint: '#f0d07a' },
 
@@ -55,8 +57,19 @@ export const ITEMS = {
     label: 'Flint Axe', tint: '#93b8f0', uses: 120, serves: ['flintKnife', 'flintAxe'], wields: true,
     work: { tree: { speed: 1.15, wear: 3, drops: [{ item: 'wood', min: 1, max: 1 }] } }
   },
+  /**
+   * `digs` is which layers of the isle a tool will take a block out of, and
+   * what each one leaves behind. A shovel is for the soft ground and a
+   * pickaxe is for the rock; neither touches bedrock, which is what the isle
+   * is standing on.
+   */
   flintShovel: {
-    label: 'Flint Shovel', tint: '#9ec0d8', uses: 120, serves: ['flintShovel'], wields: true
+    label: 'Flint Shovel', tint: '#9ec0d8', uses: 120, serves: ['flintShovel'], wields: true,
+    digs: { grass: 'dirt', moss: 'dirt', dirt: 'dirt' }
+  },
+  flintPickaxe: {
+    label: 'Flint Pickaxe', tint: '#aab6d8', uses: 120, serves: ['flintPickaxe'], wields: true,
+    digs: { stone: 'stone' }
   },
   // The hoe does no gathering of its own; what it is for is the ground.
   // `tills` is what lets a click on grass turn it over - see main.js.

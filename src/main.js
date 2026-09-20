@@ -274,6 +274,9 @@ function tillGround(agent, cell) {
     seconds: TILL_SECONDS,
     action: 'Turning the ground over',
     then: () => {
+      // Still a hoe in hand, and still bare ground - a walk takes time, and
+      // both can have changed by the time they get there.
+      if (!holding(agent, (t) => t.tills)) return;
       if (!canPlace(surface, 'farmland', cell, { props })) return;
       const plot = spawnProp('farmland', cell, { surface, group: propsGroup, props });
       plot.water = PROP_KINDS.farmland.water.start;
@@ -284,6 +287,69 @@ function tillGround(agent, cell) {
       castFromFront(plot.mesh);
       syncBlocked(props, blocked);
       wearTool(agent, 1);
+    }
+  });
+}
+
+const DIG_SECONDS = 5;
+
+/**
+ * A shift click on the ground with a digging tool: take the top block out.
+ *
+ * What a tool will dig, and what each layer leaves behind, is `ITEMS[t].digs`
+ * - a shovel takes the soft ground and a pickaxe takes the rock, and neither
+ * touches bedrock, which is what the isle is standing on.
+ */
+/**
+ * Whether this block can come out right now, and what it would leave.
+ *
+ * Asked twice - once when the order is given and again when the agent gets
+ * there - because a walk takes time and everything it depends on can move in
+ * the meantime: the tool can be swapped out of their hand, somebody can put
+ * a station on the cell, another agent can walk onto it, or the block can
+ * already be gone. Returns `{ tool, drop }` or null.
+ */
+function canDig(agent, cell) {
+  const tool = holding(agent, (t) => t.digs);
+  if (!tool) return null;
+
+  const y = surface.get(`${cell.x},${cell.z}`);
+  if (y === undefined) return null;
+
+  const drop = tool.digs[island.userData.layerAt(cell.x, y, cell.z)];
+  if (!drop) return null;
+
+  // Not out from under anything: a prop standing on it would be left in the
+  // air, and an agent standing on it would be too.
+  if (props.some((p) => !p.gone && footprintCells(p.kind, p)
+    .some((c) => c.x === cell.x && c.z === cell.z))) return null;
+  if (agents.some((a) => Math.round(a.x) === cell.x && Math.round(a.z) === cell.z)) return null;
+
+  return { tool, drop };
+}
+
+function digGround(agent, cell) {
+  if (!canDig(agent, cell)) return false;
+
+  return agent.doAt(cell, {
+    seconds: DIG_SECONDS,
+    action: 'Digging',
+    // Stood beside it, not on it - they are taking away the ground they
+    // would otherwise be standing on.
+    adjacent: true,
+    then: () => {
+      // Re-asked rather than remembered: the block comes out for the tool
+      // that is actually in hand when the work is done, so swapping a shovel
+      // for a hoe on the way over calls the dig off instead of wearing the
+      // wrong tool down for it.
+      const now = canDig(agent, cell);
+      if (!now) return;
+
+      if (!island.userData.digBlock(cell.x, cell.z)) return;
+      inventory.add(now.drop, 1);
+      wearTool(agent, 1);
+      // Everything that reads the heightmap has to be told it moved.
+      syncBlocked(props, blocked);
     }
   });
 }
@@ -305,7 +371,7 @@ function workFarmland(agent, plot) {
     seconds: reaping ? REAP_SECONDS : TILL_SECONDS,
     action: reaping ? 'Reaping the wheat' : 'Putting the ground back',
     then: () => {
-      if (plot.gone) return;
+      if (plot.gone || !holding(agent, (t) => t.tills)) return;
       wearTool(agent, 1);
 
       if (reaping) {
@@ -852,7 +918,13 @@ function handleClick(event) {
       // till - no hoe, or a cell something already stands on - is spent
       // rather than falling through to a walk, or the modifier would
       // sometimes do the very thing it was held to avoid.
-      if (tilling(event)) { tillGround(agent, { x, z }); return; }
+      // Shift is "work this ground with what is in hand": a hoe turns it
+      // over, a shovel or a pickaxe takes a block out of it. One modifier,
+      // and the tool says which of them it means.
+      if (tilling(event)) {
+        tillGround(agent, { x, z }) || digGround(agent, { x, z });
+        return;
+      }
       if (agent.walkTo({ x, z })) markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
       return;
     }
@@ -1431,7 +1503,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { ITEMS, lookAt, wield, tillGround, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
+window.ESTER = { ITEMS, lookAt, wield, tillGround, digGround, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 // One prop was the target when there was one agent and one job; a box can
 // light a whole stand at once, so `targets` is the list and `targeted` is

@@ -148,6 +148,9 @@ export function createIsland() {
   }
 
   // --- Pass 3: one InstancedMesh per layer -------------------------------
+  // Where every block ended up, so one can be dug out again later.
+  const blocks = new Map();
+
   const size = BLOCK + SEAM_OVERLAP;
   const geometry = new THREE.BoxGeometry(size, size, size);
   const matrix = new THREE.Matrix4();
@@ -168,12 +171,26 @@ export function createIsland() {
 
     const mesh = new THREE.InstancedMesh(geometry, material, list.length);
     mesh.name = `island-${name}`;
+    // Buried blocks skip the shadow *pass* - the surface occludes the light,
+    // so rendering them into the shadow map is work for nothing. They do
+    // still RECEIVE: once a shovel takes the block above one out, that
+    // buried block is the floor of a pit and has to be shaded by the walls
+    // around it, or a dug hole comes out as a bright square. Receiving is
+    // the cheap half of it and only costs where a fragment is actually
+    // drawn, which for a buried block is nowhere until it is dug out.
     mesh.castShadow = !hidden;
-    mesh.receiveShadow = !hidden;
+    mesh.receiveShadow = true;
 
     list.forEach((cell, i) => {
       matrix.makeTranslation(cell.x * BLOCK, cell.y * BLOCK, cell.z * BLOCK);
       mesh.setMatrixAt(i, matrix);
+      // Which instance of which mesh holds this block, and what it is made
+      // of - so a block can be found again and taken out.
+      blocks.set(key(cell.x, cell.y, cell.z), {
+        mesh,
+        index: i,
+        layer: hidden ? name.slice(0, -CORE_SUFFIX.length) : name
+      });
 
       // Per-block shade variation so flat faces do not read as one slab.
       // It only ever darkens: multiplying a layer colour above 1 pushed the
@@ -201,6 +218,47 @@ export function createIsland() {
   group.userData.isSolid = (x, y, z) => {
     const column = columns.get(`${x},${z}`);
     return !!column && y >= column.bottom && y <= column.top;
+  };
+
+  /** What a block is made of: 'grass', 'dirt', 'stone', 'bedrock'. */
+  group.userData.layerAt = (x, y, z) => blocks.get(key(x, y, z))?.layer ?? null;
+
+  /**
+   * Take the top block off a column.
+   *
+   * The instance is scaled to nothing rather than the mesh being rebuilt -
+   * an `InstancedMesh` cannot lose a member, and rebuilding one of these to
+   * drop a single cube would be absurd. The block stays in `blocks` so it
+   * can be found again if anything ever puts it back.
+   *
+   * `surface` and `columns` are both moved down with it, which is what
+   * everything else on the isle reads: pathing, prop placement, where an
+   * agent's feet go. Returns the layer that came out, or null if that block
+   * was not there to take.
+   */
+  group.userData.digBlock = (x, z) => {
+    const column = columns.get(`${x},${z}`);
+    if (!column) return null;
+    // Never punch through: a column keeps its last block whatever is done
+    // to it, so the isle can be dug into but not dug away.
+    if (column.top <= column.bottom) return null;
+
+    const y = column.top;
+    const found = blocks.get(key(x, y, z));
+    if (!found) return null;
+
+    const gone = new THREE.Matrix4().makeScale(0, 0, 0);
+    found.mesh.setMatrixAt(found.index, gone);
+    found.mesh.instanceMatrix.needsUpdate = true;
+    // The bounding sphere was measured with that block in it; leaving it
+    // stale only ever over-covers, but the raycast uses it, so it is kept
+    // honest.
+    found.mesh.computeBoundingSphere();
+
+    column.top = y - 1;
+    surface.set(`${x},${z}`, column.top);
+    group.userData.blockCount -= 1;
+    return found.layer;
   };
 
   return group;

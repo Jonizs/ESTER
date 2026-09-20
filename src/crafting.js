@@ -160,7 +160,19 @@ export const RECIPES = [
     yield: 1,
     slots: {
       1: 'flint', 2: 'flint', 3: 'stick',
-      5: 'flint', 6: 'stick',
+      5: 'flint', 6: 'stick', 7: 'stick',
+      10: 'stick', 11: 'stick',
+      14: 'stick', 15: 'stick'
+    }
+  },
+  {
+    id: 'flintPickaxe',
+    label: 'Flint Pickaxe',
+    item: 'flintPickaxe',
+    yield: 1,
+    slots: {
+      1: 'flint', 2: 'flint', 3: 'flint', 4: 'flint',
+      6: 'stick', 7: 'stick',
       10: 'stick', 11: 'stick',
       14: 'stick', 15: 'stick'
     }
