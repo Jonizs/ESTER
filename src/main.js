@@ -172,39 +172,15 @@ function finishProp(prop, agent = null) {
 }
 
 /**
- * How close someone has to be standing to use a station.
- *
- * Measured to the nearest cell of its footprint rather than to its middle:
- * the bench is two cells wide, so the far end of it is 1.5 cells from the
- * centre before anyone has walked anywhere. 1.8 takes in the ring of cells
- * around the footprint, diagonals included (SQRT2 is about 1.41), and
- * nothing past it.
- */
-const REACH = 1.8;
-
-/** Whether any agent is standing close enough to a prop to work it. */
-function someoneAt(prop) {
-  const cells = footprintCells(prop.kind, prop);
-  return agents.some((agent) => cells.some(
-    (c) => Math.hypot(agent.x - c.x, agent.z - c.z) <= REACH
-  ));
-}
-
-/**
- * A click on the workbench. Repaired, it opens crafting - but only with
- * someone standing at it; otherwise the click is an order to go there.
- * Broken, it is a job like any other, once there is the wood to pay for it,
- * and the wood is only spent when the work is finished.
+ * A click on the workbench. Repaired, it opens crafting; broken, it is a job
+ * like any other - but only once there is the wood to pay for it, and the
+ * wood is only spent when the work is finished.
  */
 function useWorkbench(prop) {
-  if (prop.repaired) {
-    // Opening a bench someone is already at is not an order, so it needs no
-    // selection - it is the same as pressing Tab. Sending someone to it is
-    // an order like any other, and needs one.
-    if (someoneAt(prop)) { crafting.open(); return; }
-    selectedAgent()?.walkToProp(prop);
-    return;
-  }
+  // Opening the repaired bench is not an order, so it needs no selection and
+  // nobody has to be standing at it - it is the same as pressing Tab.
+  // Repairing it is an order, and does.
+  if (prop.repaired) { crafting.open(); return; }
 
   const agent = selectedAgent();
   if (!agent) return;
@@ -790,6 +766,18 @@ function queueing(event) {
 }
 
 /**
+ * Whether a click is meant to work the ground rather than walk onto it.
+ *
+ * Shift, and shift alone - it is the same key that sends things back to the
+ * inventory on the crafting screen, which is the nearest thing this game has
+ * to a "do the other thing with this" modifier. Ctrl is already the queue
+ * and means something else entirely.
+ */
+function tilling(event) {
+  return !!event.shiftKey;
+}
+
+/**
  * Who an order is for, or null if nobody is selected.
  *
  * *Every* order needs a selected agent - walking somewhere as much as working
@@ -858,10 +846,13 @@ function handleClick(event) {
       if (queueing(event)) return;
       const agent = selectedAgent();
       if (!agent) return;
-      // A hoe turns bare ground over rather than walking onto it. Anything
-      // else - no hoe, a cell that cannot be tilled - falls through to the
-      // walk, so a click on the grass never simply does nothing.
-      if (tillGround(agent, { x, z })) return;
+      // Shift turns the ground over rather than walking onto it - a plain
+      // click on the grass is a walk, as it always was, and holding shift
+      // with a hoe in hand is what makes it a job. A shift click that cannot
+      // till - no hoe, or a cell something already stands on - is spent
+      // rather than falling through to a walk, or the modifier would
+      // sometimes do the very thing it was held to avoid.
+      if (tilling(event)) { tillGround(agent, { x, z }); return; }
       if (agent.walkTo({ x, z })) markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
       return;
     }
@@ -1423,11 +1414,6 @@ function frame() {
   updateBenchLabel();
   updatePanel();
   panels.update();
-  // The bench is only usable with someone standing at it, so it closes if
-  // whoever was there goes. Nothing the player does can move an agent while
-  // the screen is up - the overlay takes the clicks - but AGENT SWARM sends
-  // its two home on a timer, and one of those may be who opened it.
-  if (crafting.isOpen() && !someoneAt(workbench)) crafting.close();
   updateGround(delta);
   updateLookAt();
   crafting.update();

@@ -66,6 +66,8 @@ with one inhabitant who walks around and works on what is there.
     stages.
   - `src/crafting.js` - the crafting screen, opened from the workbench:
     the grid, the recipes and what the grid adds up to.
+  - `src/lookat.js` - the bar at the top naming whatever is under the cursor.
+  - `src/wield.js` - handing a tool to an agent, from either end.
   - `src/icons.js` - the line-art glyphs the panels and crafting both draw,
     materials included.
   - `src/starfield.js` - the drifting motes behind every UI surface.
@@ -266,6 +268,79 @@ with one inhabitant who walks around and works on what is there.
   project the prop's `Box3` to the screen at the default camera distance and
   fire a ray at the middle. Weeds are 21px across and 11 of 14 hit, which is
   the bar - rocks manage 3 of 6.
+- **The readout at the top of the screen is the one thing that tells the
+  player something, and that is allowed.** `src/lookat.js` names whatever is
+  under the cursor - agent, prop or ground - the way the WTHIT mod does. It
+  is not a toast: it says what is under the pointer *now* and goes when the
+  pointer does, rather than appearing to announce something. `describeProp`,
+  `describeAgent` and `describeGround` in `main.js` are what it says; the
+  module only draws.
+- **The readout runs off the frame loop, never off the pointer.** Naming the
+  ground needs a cast at the isle and the isle is thousands of instanced
+  blocks - 0.6ms a cast against 0.01ms for the props - so it is throttled to
+  every 80ms. Throttling it on the pointer move instead drops the move that
+  lands inside the window, and with nothing to retry it the readout never
+  catches up, which is exactly what it did. The frame loop always comes round
+  again. The prop *hover* keeps its own cheap path, and its rule stands: the
+  isle is only cast at once a prop has actually been hit.
+- **A tool is an instance in a hand, not a name.** `agent.tool` is
+  `{ item, left }` and it is *out* of the inventory while it is held - a tool
+  in someone's hand is not stock on the bench, and the crafting screen must
+  not be able to build with a knife that is out in the field.
+  `inventory.detach`/`attach` move it either way, so swapping a part-worn
+  knife for an axe puts that knife back at the wear it had rather than
+  averaging it into the pile. It is in `person.saveState`, and DEV RESET lets
+  every held tool go *before* the inventory is cleared, or it is the one
+  thing a reset misses. Two ways in, one picker: the EQUIP button on an
+  inventory tile asks who should carry it, the wield key asks what an agent
+  should wield, and `src/wield.js` answers both.
+- **The inventory keeps a tool and a bucket the same way.** Wear on a tool
+  and what is in a vessel are both per-instance numbers you cannot average
+  over a stack, so both live in the one-by-one list that `isSingular` covers.
+  A tool starts full and a vessel starts empty, which is the only difference
+  the ledger sees. The *most worn* is always used next, so a pile of knives
+  goes one at a time and the wear bar on the slot is telling the truth about
+  what the next craft costs.
+- **`ITEMS[tool].work[kind]` is what a tool does to a job**, and `main.js`
+  and `person.js` both read it rather than each knowing about knives. `speed`
+  is applied when the work is taken on rather than every frame, so swapping
+  tools halfway does not stretch what is already under way; `drops` are
+  appended to the prop's own list so one roll serves both; `wear` is what one
+  job costs. Anything new a tool should do goes here, not in a branch.
+- **A job is not always a prop.** `doAt` in `person.js` is go-somewhere,
+  spend-a-moment, then-do-this: tilling grass, filling a bucket and watering
+  a plot are all it, and `task.prop` is *null* for a job on a bare cell.
+  Anything walking the agents' tasks has to allow for that - `syncTargets`
+  crashed on it, because a cell has nothing to light yellow.
+- **Farmland is a prop, not a change to the isle.** Everything about it is
+  run state - what is sown, how far along, how much water is left - and props
+  are what the save already carries. A hoe turns grass over (sowing a seed as
+  it goes, if there is one), puts a bare plot back to grass, and reaps a ripe
+  one; a crop still growing is left alone, because turning a field over by
+  accident three minutes in is not something to make easy.
+- **Tilling is a SHIFT click on the ground; a plain click is still a walk.**
+  `tilling(event)` in `main.js` is the one test, beside `queueing` - shift
+  and shift alone, because ctrl is already the queue and means something
+  else. A shift click that cannot till, for want of a hoe or because
+  something is standing there, is *spent* rather than falling through to the
+  walk: a modifier that sometimes does the very thing it was held to avoid is
+  worse than one that occasionally does nothing. Clicks on a plot itself -
+  reaping it, watering it, putting it back to grass - are plain clicks, since
+  a prop under the cursor is not ambiguous the way bare ground is.
+- **A crop only grows while it has water, and that is the whole rule.** Five
+  minutes of *watered* growing at 20ml a minute, from the 50ml a fresh plot
+  starts with, so an unwatered one stops dead at 150 seconds and waits.
+  `updateGround` in `main.js` ticks that and the catchers filling, off the
+  frame delta, the same as a sapling coming up.
+- **A water catcher's level is a scaled mesh, not a rebuilt one.**
+  `setWaterLevel` in `props.js` moves the surface by scaling the block it is
+  drawn as - this runs every frame a catcher is filling, and rebuilding
+  geometry sixty times a second to raise a surface by a millimetre would be
+  absurd.
+- **What a freshly planted prop starts with belongs to its kind.** A sapling
+  starts a clock, a tub starts empty - `beginPlanting` reads `grows` and
+  `water` off `PROP_KINDS` rather than handing a sapling's `growSeconds` to
+  everything, which is what would sweep a water catcher into `updateGrowth`.
 - **A felled tree drops saplings, 0 to 2.** `PROP_KINDS.tree.drops` is the
   roll, beside the wood `yield`, and `finishProp` in `main.js` walks it - so
   anything else that should drop more than one thing needs no new code. The
@@ -472,17 +547,10 @@ with one inhabitant who walks around and works on what is there.
   outlines on hover, because it is still something to interact with; it just
   refuses the move key. `placement.begin` turns down anything `canMove` says
   no to, so callers do not have to check first.
-- **The repaired bench only opens with someone standing at it.** A click on
-  it with nobody there is an *order to go*, which needs an agent selected
-  like every other order - `walkToProp` in `person.js` is the walk with no
-  job hung off it, since `_begin` insists on an `action`. With someone there
-  the click opens the screen and needs no selection, which is the exemption
-  that was always there. `REACH` (1.8) in `main.js` is the distance, measured
-  to the nearest cell of the footprint rather than to the middle: the bench
-  is two cells wide, so its far end is 1.5 from the centre before anyone has
-  moved. The frame loop closes the screen if whoever was there goes - nothing
-  the player does can move an agent while it is up, but AGENT SWARM sends its
-  two home on a timer and one of those may be who opened it.
+- **The repaired bench opens from anywhere, and nobody has to walk to it.**
+  It was gated on an agent standing at it for a while and that was removed on
+  request: a click opens crafting wherever the camera is and whoever is
+  selected, the same as pressing Tab. Do not put the walk back.
 - **The workbench starts broken and costs 10 wood.** It is an ordinary prop as
   far as clicking, highlighting and pathing go - `props` carries it - but
   finishing the work repairs it instead of removing it, so it is never

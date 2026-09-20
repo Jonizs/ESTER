@@ -250,24 +250,6 @@ export class Person {
   }
 
   /**
-   * Walk up beside a prop, taking no work from it.
-   *
-   * This is what a click on the repaired workbench is: somewhere to go and
-   * stand, not a job. `_begin` cannot serve - it insists on an `action` and
-   * hangs a task off the agent, and there is no work here to do.
-   */
-  walkToProp(prop) {
-    if (prop.gone) return false;
-    if (!this.goTo(footprintCells(prop.kind, prop), { adjacent: true })) return false;
-    // Being sent somewhere calls off the batch as well as the current job,
-    // exactly as walking to a cell does.
-    this.queue = [];
-    this.task = null;
-    this.action = null;
-    return true;
-  }
-
-  /**
    * A one-off job with its own ending: go somewhere, spend a moment, then do
    * the thing. Tilling a patch of grass, filling a bucket and watering a
    * crop are all this - work that is not *harvesting a prop*, which is all
