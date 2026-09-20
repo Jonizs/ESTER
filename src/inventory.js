@@ -169,6 +169,30 @@ export function createInventory() {
       return true;
     },
 
+    /**
+     * Take one out and hand back what was on it: `{ item, left }`, or null.
+     *
+     * This is how a tool leaves the ledger to be carried by an agent. The
+     * most worn goes first, the same as everything else - and because the
+     * instance is handed over whole, what is left on it goes with it rather
+     * than being averaged back into the pile when it comes home.
+     */
+    detach(item) {
+      const at = worstOf(item);
+      if (at < 0) return null;
+      const [left] = kits.get(item).splice(at, 1);
+      return { item, left };
+    },
+
+    /** Put a carried one back, with whatever is left on it. */
+    attach(held) {
+      if (!held || !isSingular(held.item)) return false;
+      const list = kits.get(held.item) ?? [];
+      list.push(Math.max(0, Math.min(held.left, fullCharge(held.item))));
+      kits.set(held.item, list);
+      return true;
+    },
+
     /** How worn the next one to be used is: `{ left, max }`, or null. */
     wear(item) {
       const at = worstOf(item);

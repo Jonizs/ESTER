@@ -155,6 +155,20 @@
       </div>
     </div>
 
+    <!-- Handing a tool to an agent. Reached two ways - the EQUIP button on
+         an inventory tile, or the wield key with an agent selected - and
+         both land in src/wield.js. -->
+    <div id="wield" hidden>
+      <div class="scrim"></div>
+      <div class="shell starfield">
+        <header class="wield-head">
+          <h2 class="wield-title"></h2>
+          <button type="button" id="wield-close"><span>Close</span><kbd>Esc</kbd></button>
+        </header>
+        <div class="wield-list"></div>
+      </div>
+    </div>
+
     <!-- What the cursor is over, named at the top of the screen. Filled in
          by src/lookat.js off the hover ray. -->
     <div id="lookat" hidden>

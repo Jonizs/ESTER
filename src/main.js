@@ -16,6 +16,7 @@ import { createMenu } from './menu.js';
 import { createPanels } from './panels.js';
 import { createCrafting } from './crafting.js';
 import { createLookAt, propName } from './lookat.js';
+import { createWield } from './wield.js';
 import { createPlacement } from './placement.js';
 import { createSelectBox } from './selectbox.js';
 import { createInventory, ITEMS } from './inventory.js';
@@ -128,7 +129,7 @@ function castFromFront(object) {
   });
 }
 
-function finishProp(prop) {
+function finishProp(prop, agent = null) {
   if (targets.delete(prop)) setPropHighlight(prop, false);
 
   // The bench is repaired rather than carried off: it stays standing, gets
@@ -148,10 +149,19 @@ function finishProp(prop) {
   // Whatever else comes off it - a felled tree drops 0 to 2 saplings. The
   // roll is a plain `Math.random()`: this is what happens during a run, not
   // world generation, so it is not held to the seeded-noise rule.
-  for (const drop of kind.drops ?? []) {
+  //
+  // The tool in hand adds its own drops to the same list rather than being a
+  // special case after it, so an axe's extra log and a tree's saplings are
+  // rolled by one piece of code.
+  const work = agent?.toolWork(prop.kind) ?? null;
+  for (const drop of [...(kind.drops ?? []), ...(work?.drops ?? [])]) {
     const n = drop.min + Math.floor(Math.random() * (drop.max - drop.min + 1));
     if (n > 0) inventory.add(drop.item, n);
   }
+
+  // And the tool wears down by whatever that job costs it. It is held rather
+  // than in the ledger, so this is the one place its wear is counted.
+  if (work?.wear) wearTool(agent, work.wear);
 
   prop.gone = true;
   prop.mesh.visible = false;
@@ -221,6 +231,41 @@ castFromFront(scene);
 // what it says about each thing is decided in `describeProp` below.
 const lookAt = createLookAt();
 
+/**
+ * Putting a tool in an agent's hand, and taking it out again.
+ *
+ * The tool leaves the inventory while it is held - a tool in someone's hand
+ * is not stock on the bench, and the crafting screen should not be able to
+ * build with a knife that is out in the field. What the agent carries is the
+ * *instance*, wear and all, so the same one comes home rather than the pile
+ * being averaged out.
+ */
+function equipTool(agent, item) {
+  if (!agent) return false;
+  // Already holding that kind: asking again is a no-op rather than a swap
+  // for an identical one, which would only shuffle the wear about.
+  if (item && agent.tool?.item === item) return true;
+
+  const taken = item ? inventory.detach(item) : null;
+  if (item && !taken) return false;          // none left to pick up
+
+  if (agent.tool) inventory.attach(agent.tool);
+  agent.tool = taken;
+  return true;
+}
+
+/** Wear a held tool down, retiring it when it runs out. */
+function wearTool(agent, by = 1) {
+  if (!agent?.tool) return;
+  agent.tool.left -= by;
+  if (agent.tool.left <= 0) agent.tool = null;   // it broke in their hands
+}
+
+/** Every tool an agent could be handed right now, wielded ones included. */
+function wieldable() {
+  return Object.keys(ITEMS).filter((item) => ITEMS[item].wields && inventory.count(item) > 0);
+}
+
 // --- controls --------------------------------------------------------------
 
 const settings = createSettings();
@@ -245,9 +290,20 @@ const panels = createPanels({
   agents,
   inventory,
   progression,
-  blocked: () => menu.isOpen() || crafting.isOpen() || placement.isActive(),
+  blocked: () => menu.isOpen() || crafting.isOpen() || wield.isOpen() || placement.isActive(),
   onSelect: (agent) => selectOnly(agent),
-  onPlantItem: (item) => beginPlanting(item)
+  onPlantItem: (item) => beginPlanting(item),
+  onEquipItem: (item) => wield.chooseAgent(item)
+});
+
+// Handing a tool over. Built before the menu for the same reason the panels
+// are: its Esc handler has to run first.
+const wield = createWield({
+  agents,
+  inventory,
+  blocked: () => menu.isOpen() || placement.isActive(),
+  onOpen: () => { panels.close(); crafting.close(); },
+  onEquip: (agent, item) => equipTool(agent, item)
 });
 
 // Crafting is a screen of its own, reached by clicking the repaired bench
@@ -908,6 +964,20 @@ function describeProp(prop) {
   return what;
 }
 
+/** An agent: who they are, and what is in their hand. */
+function describeAgent(agent) {
+  const tool = agent.tool ? ITEMS[agent.tool.item] : null;
+  const what = { name: agent.name, item: agent.tool?.item ?? null };
+  if (tool) {
+    const max = tool.uses ?? tool.capacity;
+    what.note = `${tool.label} \u2014 ${Math.round(agent.tool.left)} / ${max}`;
+    what.bar = { value: agent.tool.left, max, colour: tool.tint };
+  } else {
+    what.note = 'empty handed';
+  }
+  return what;
+}
+
 /**
  * The ground itself: whichever layer of the isle the ray landed on.
  *
@@ -978,7 +1048,7 @@ let lookedAt = 0;
 
 function updateLookAt() {
   if (placement.isActive()) { lookAt.show(describeProp(placement.prop)); return; }
-  if (!pointerAt || menu.isOpen() || panels.isOpen() || crafting.isOpen()) {
+  if (!pointerAt || menu.isOpen() || panels.isOpen() || crafting.isOpen() || wield.isOpen()) {
     lookAt.hide();
     return;
   }
@@ -988,6 +1058,16 @@ function updateLookAt() {
   lookedAt = now;
 
   if (!aimRay()) { lookAt.hide(); return; }
+
+  // The agents stand in the scene rather than in the props group, so they
+  // are asked about on their own - and asked first, because someone standing
+  // at the bench should name themselves rather than it.
+  for (const agent of agents) {
+    if (raycaster.intersectObject(agent.mesh, true)[0]) {
+      lookAt.show(describeAgent(agent));
+      return;
+    }
+  }
 
   const prop = propUnderPointer();
   if (prop) { lookAt.show(describeProp(prop)); return; }
@@ -1004,6 +1084,17 @@ canvas.addEventListener('pointermove', (event) => {
 canvas.addEventListener('pointerleave', () => {
   pointerAt = null;
   refreshHover();
+});
+
+// The wield key: with an agent selected it asks what they should carry.
+// Like every other order it needs a selection first - it is a thing being
+// done to an agent, not a screen being opened.
+window.addEventListener('keydown', (event) => {
+  if (menu.isOpen() || placement.isActive() || panels.isOpen() || crafting.isOpen()) return;
+  if (settings.actionFor(event.key) !== 'wieldTool') return;
+  event.preventDefault();
+  const agent = selectedAgent();
+  if (agent) wield.chooseTool(agent);
 });
 
 // The number keys pick an agent by its slot, the way the overview lists them.
@@ -1127,7 +1218,7 @@ const clock = new THREE.Clock();
 function frame() {
   const delta = Math.min(clock.getDelta(), 0.1);
 
-  for (const agent of agents) agent.update(delta, props, finishProp);
+  for (const agent of agents) agent.update(delta, props, (prop) => finishProp(prop, agent));
   updateSwarm(delta);
   updateGrowth(delta);
   syncTargets();
@@ -1159,7 +1250,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { ITEMS, lookAt, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
+window.ESTER = { ITEMS, lookAt, wield, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 // One prop was the target when there was one agent and one job; a box can
 // light a whole stand at once, so `targets` is the list and `targeted` is

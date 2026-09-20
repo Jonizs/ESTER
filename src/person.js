@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { findPath } from './path.js';
 import { PROP_KINDS, GROUND_OFFSET, footprintCells } from './props.js';
+import { ITEMS } from './inventory.js';
 
 const WALK_SPEED = 2.2;        // cells per second on the level
 const HOP_SPEED = 1.5;         // slower while hopping up or down a block
@@ -81,6 +82,12 @@ export class Person {
     this.action = null;        // only set while actually working
     this.stats = { ...FRESH_STATS };
 
+    // What they are carrying and working with: `{ item, left }`, the whole
+    // instance rather than a name, so the wear on *this* one travels with
+    // it. It is out of the inventory while it is held - a tool in someone's
+    // hand is not stock on the bench. `main.js` owns putting it back.
+    this.tool = null;
+
     this.setSelected(false);
     this.mesh.rotation.y = 0;
     this.pos.set(this.x, this.groundAt(this.x, this.z), this.z);
@@ -95,7 +102,13 @@ export class Person {
    * they were.
    */
   saveState() {
-    return { x: this.x, z: this.z, stats: { ...this.stats } };
+    // The tool goes with them: it is out of the inventory while it is held,
+    // so a run that did not write it down would lose it on the next launch.
+    return {
+      x: this.x, z: this.z,
+      stats: { ...this.stats },
+      tool: this.tool ? { ...this.tool } : null
+    };
   }
 
   loadState(state) {
@@ -106,6 +119,7 @@ export class Person {
       this.z = state.z;
     }
     this.stats = { ...this.stats, ...(state.stats ?? {}) };
+    this.tool = state.tool && ITEMS[state.tool.item] ? { ...state.tool } : null;
 
     // Whatever they were doing does not survive the restart.
     this.path = [];
@@ -191,13 +205,25 @@ export class Person {
     return true;
   }
 
+  /**
+   * What the tool in hand does to a kind of job: `{ speed, wear, drops }`,
+   * or null when it is no help with this one. A knife is nothing to a tree.
+   */
+  toolWork(kind) {
+    return (this.tool && ITEMS[this.tool.item]?.work?.[kind]) || null;
+  }
+
   /** Walk over and work on a prop, leaving the queue alone. */
   _begin(prop) {
     if (prop.gone || !PROP_KINDS[prop.kind]?.action) return false;
     // Every cell the prop stands on is somewhere to walk up beside, so a
     // station two cells wide is reached from whichever side is nearest.
     if (!this.goTo(footprintCells(prop.kind, prop), { adjacent: true })) return false;
-    this.task = { prop, seconds: PROP_KINDS[prop.kind].seconds, elapsed: 0 };
+    // The right tool makes the job quicker. Measured when the work is taken
+    // on rather than every frame, so swapping tools halfway does not stretch
+    // or shorten what is already under way.
+    const speed = this.toolWork(prop.kind)?.speed ?? 1;
+    this.task = { prop, seconds: PROP_KINDS[prop.kind].seconds / speed, elapsed: 0 };
     // Nothing is shown while walking there; the label appears once the work
     // actually starts.
     this.action = null;

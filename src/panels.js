@@ -61,7 +61,7 @@ function meterColour(value) {
 
 const title = (word) => word[0].toUpperCase() + word.slice(1);
 
-export function createPanels({ settings, agents, inventory, progression, blocked, onSelect, onPlantItem }) {
+export function createPanels({ settings, agents, inventory, progression, blocked, onSelect, onPlantItem, onEquipItem }) {
   const root = document.getElementById('panels');
   const pages = new Map();
   const tabButtons = new Map();
@@ -163,6 +163,21 @@ export function createPanels({ settings, agents, inventory, progression, blocked
             onPlantItem?.(entry.item);
           });
           tile.append(plant);
+        }
+
+        // A tool is something somebody carries, so its button asks who. The
+        // picker is the same one the wield key opens, only entered from the
+        // other end - the item is known and the agent is the question.
+        if (ITEMS[entry.item].wields) {
+          const equip = document.createElement('button');
+          equip.type = 'button';
+          equip.className = 'tile-action';
+          equip.textContent = 'Equip';
+          equip.addEventListener('click', (event) => {
+            event.stopPropagation();
+            onEquipItem?.(entry.item);
+          });
+          tile.append(equip);
         }
         inventoryTiles.append(tile);
       }
