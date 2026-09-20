@@ -268,11 +268,18 @@ with one inhabitant who walks around and works on what is there.
   sapling is in the ground - one still being positioned is not growing. When
   its time is up it comes up *if* no tree is within `GROW_CLEARANCE` (2)
   cells; if one is, it stays a sapling and tries again every few seconds, so
-  two planted side by side give one tree and one sapling, and felling that
-  tree lets the other through. The clearance is measured to trees only, never
-  to other saplings, or a close pair would deadlock each other. **None of
-  this is told to the player** - no label, no tooltip, no line anywhere about
-  how long it takes or how far apart they go. Do not add one.
+  felling the tree beside it lets it through. **None of this is told to the
+  player** - no label, no tooltip, no line anywhere about how long it takes
+  or how far apart they go. Do not add one.
+- **A sapling cannot be planted where it would not grow.** `canPlace` runs
+  `hasPlantingRoom` for any kind with `grows`, so a spot within
+  `GROW_CLEARANCE` of a tree *or* another sapling is refused outright - the
+  mover flashes the footprint red, exactly as it does for a ledge or an
+  occupied cell, and `beginPlanting` stands the next one on the nearest cell
+  that is far enough, so planting a handful in a row spaces them two apart on
+  its own. That is why the placement check measures to saplings while
+  `hasRoomToGrow` does not: a deadlocked pair can no longer be made, and the
+  growth check stays forgiving for the pairs an older save already has.
 - **Growing is the prop changing kind, not a new prop.** `growProp` rebuilds
   the meshes under the same prop object and flips `kind` to `tree`, so the
   agent's task, the hover and anything else holding it keep working. Props

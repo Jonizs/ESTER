@@ -57,10 +57,14 @@ const ONE_CELL = { w: 1, d: 1 };
  * How long a sapling takes to come up, in seconds, and how much room a grown
  * tree needs around it.
  *
- * The clearance is measured to other *trees* only, so two saplings planted
- * close together are not both stuck: whichever comes up first takes the
- * space, and the other simply stays a sapling until there is room - if the
- * tree beside it is ever felled, it comes up then.
+ * `hasPlantingRoom` keeps the clearance at the moment a sapling is put down,
+ * measured to trees and saplings alike, so a sapling that cannot grow where
+ * it stands cannot be planted there in the first place.
+ *
+ * `hasRoomToGrow`, the check at the end of the timer, measures to other
+ * *trees* only. A sapling that has lost its room since - a neighbour grew,
+ * or an older save put two of them close together - is then not stuck for
+ * good: it stays a sapling and comes up once the tree beside it is felled.
  */
 export const GROW_SECONDS = { min: 180, max: 240 };
 export const GROW_CLEARANCE = 2;
@@ -78,6 +82,26 @@ export function hasRoomToGrow(prop, props) {
   return !props.some((other) => (
     other !== prop && !other.gone && other.kind === 'tree' &&
     Math.hypot(other.x - prop.x, other.z - prop.z) < GROW_CLEARANCE
+  ));
+}
+
+/**
+ * Whether a cell is far enough from everything that grows for a sapling to
+ * be put there at all.
+ *
+ * This is the same `GROW_CLEARANCE`, measured to saplings as well as trees:
+ * a spot where the sapling would come up and immediately be stuck is not a
+ * spot it may be planted in, so a refused place is the answer rather than a
+ * sapling that quietly never grows. Once nothing may be planted within two
+ * cells of another sapling, a pair that would deadlock each other cannot be
+ * made in the first place - which is why measuring to saplings here does not
+ * bring back the deadlock `hasRoomToGrow` avoids by ignoring them.
+ */
+export function hasPlantingRoom(cell, props, ignore = null) {
+  return !props.some((other) => (
+    other !== ignore && !other.gone &&
+    (other.kind === 'tree' || other.kind === 'sapling') &&
+    Math.hypot(other.x - cell.x, other.z - cell.z) < GROW_CLEARANCE
   ));
 }
 
@@ -112,11 +136,16 @@ export function footprintCentre(kind, cell) {
  *
  * Every cell it covers has to be solid ground, all of it at the same height -
  * a bench half on a ledge would hang in the air - and nothing else may be
- * standing there. Returns `{ height }` so a ground of 0 is still an answer,
- * or null when it cannot go there.
+ * standing there. A kind that `grows` also has to keep `GROW_CLEARANCE` from
+ * the trees and saplings already on the isle. Returns `{ height }` so a
+ * ground of 0 is still an answer, or null when it cannot go there.
  */
 export function canPlace(surface, kind, cell, { props = [], ignore = null, keepClear = [] } = {}) {
   let height = null;
+
+  // Anything that grows keeps its distance from the rest: a sapling may not
+  // be planted where it would have no room to come up.
+  if (PROP_KINDS[kind]?.grows && !hasPlantingRoom(cell, props, ignore)) return null;
 
   for (const c of footprintCells(kind, cell)) {
     const y = surface.get(`${c.x},${c.z}`);
