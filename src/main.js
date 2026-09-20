@@ -157,14 +157,40 @@ function finishProp(prop) {
 }
 
 /**
- * A click on the workbench. Repaired, it opens crafting; broken, it is a job
- * like any other - but only once there is the wood to pay for it, and the
- * wood is only spent when the work is finished.
+ * How close someone has to be standing to use a station.
+ *
+ * Measured to the nearest cell of its footprint rather than to its middle:
+ * the bench is two cells wide, so the far end of it is 1.5 cells from the
+ * centre before anyone has walked anywhere. 1.8 takes in the ring of cells
+ * around the footprint, diagonals included (SQRT2 is about 1.41), and
+ * nothing past it.
+ */
+const REACH = 1.8;
+
+/** Whether any agent is standing close enough to a prop to work it. */
+function someoneAt(prop) {
+  const cells = footprintCells(prop.kind, prop);
+  return agents.some((agent) => cells.some(
+    (c) => Math.hypot(agent.x - c.x, agent.z - c.z) <= REACH
+  ));
+}
+
+/**
+ * A click on the workbench. Repaired, it opens crafting - but only with
+ * someone standing at it; otherwise the click is an order to go there.
+ * Broken, it is a job like any other, once there is the wood to pay for it,
+ * and the wood is only spent when the work is finished.
  */
 function useWorkbench(prop) {
-  // Opening the repaired bench is not an order, so it needs no selection -
-  // it is the same as pressing Tab. Repairing it is an order, and does.
-  if (prop.repaired) { crafting.open(); return; }
+  if (prop.repaired) {
+    // Opening a bench someone is already at is not an order, so it needs no
+    // selection - it is the same as pressing Tab. Sending someone to it is
+    // an order like any other, and needs one.
+    if (someoneAt(prop)) { crafting.open(); return; }
+    selectedAgent()?.walkToProp(prop);
+    return;
+  }
+
   const agent = selectedAgent();
   if (!agent) return;
   if (agent.task?.prop === prop) return;   // already on its way
@@ -461,7 +487,20 @@ controls.keyboardBlocked = () => menu.isOpen();
 // A box already being dragged out keeps the camera still even if the right
 // button is pressed as well: a mouse is one pointer, so both gestures would
 // otherwise run off the same drag.
-controls.pointerBlocked = () => placement.isActive() || selectBox.isDragging();
+/**
+ * Who owns a press on the canvas: the camera, or something already running.
+ *
+ * A box being dragged owns the whole mouse until it is let go. A move owns
+ * the LEFT button only - that is how a station is dragged - and the RIGHT
+ * button stays the camera's the whole time, because lining something up is
+ * exactly when the isle most needs turning. `placement.js` already ignores
+ * anything that is not button 0, so the two never fight over one press.
+ */
+controls.pointerBlocked = (event) => {
+  if (selectBox.isDragging()) return true;
+  if (!placement.isActive()) return false;
+  return !(event?.pointerType === 'mouse' && event.button === 2);
+};
 
 // Dragging the left button out on the isle draws a box rather than turning
 // the camera - the orbit is on the right button now. A station being moved
@@ -1010,6 +1049,11 @@ function frame() {
   updateBenchLabel();
   updatePanel();
   panels.update();
+  // The bench is only usable with someone standing at it, so it closes if
+  // whoever was there goes. Nothing the player does can move an agent while
+  // the screen is up - the overlay takes the clicks - but AGENT SWARM sends
+  // its two home on a timer, and one of those may be who opened it.
+  if (crafting.isOpen() && !someoneAt(workbench)) crafting.close();
   crafting.update();
 
   renderer.render(scene, camera);

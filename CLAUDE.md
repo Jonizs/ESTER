@@ -421,7 +421,17 @@ with one inhabitant who walks around and works on what is there.
   slot only *shows* what the grid adds up to; `takeOutput` is where the
   ingredients are spent and the yield arrives. Up to that click the grid can
   be cleared for nothing, which is the whole reason the output is a slot
-  rather than a button.
+  rather than a button. A plain click makes one and puts it on the cursor;
+  shift makes *everything* and sends it all to the inventory, running crafts
+  until the grid stops adding up to anything.
+- **Square the grid with the ledger before reading it, every craft.**
+  `craftOne` calls `reconcile()` first, and crafting everything is why.
+  Materials are taken from the cell and the ledger in the same breath, but a
+  tool is *worn*: when it breaks, its cell still claims to hold it until
+  `reconcile` takes it away, and that only ran when something was drawn. A
+  run of crafts happens entirely between two frames, so a knife with ten uses
+  left went on making sticks until the wood ran out. Anything that reads the
+  grid in a loop has the same trap.
 - **Crafting is the one place on that screen where the ledger moves.**
   Everything else - the grid, the cursor, the drags - is a *view* over
   `inventory.js`: `reserved()` counts what the bench is showing and the stock
@@ -460,6 +470,17 @@ with one inhabitant who walks around and works on what is there.
   outlines on hover, because it is still something to interact with; it just
   refuses the move key. `placement.begin` turns down anything `canMove` says
   no to, so callers do not have to check first.
+- **The repaired bench only opens with someone standing at it.** A click on
+  it with nobody there is an *order to go*, which needs an agent selected
+  like every other order - `walkToProp` in `person.js` is the walk with no
+  job hung off it, since `_begin` insists on an `action`. With someone there
+  the click opens the screen and needs no selection, which is the exemption
+  that was always there. `REACH` (1.8) in `main.js` is the distance, measured
+  to the nearest cell of the footprint rather than to the middle: the bench
+  is two cells wide, so its far end is 1.5 from the centre before anyone has
+  moved. The frame loop closes the screen if whoever was there goes - nothing
+  the player does can move an agent while it is up, but AGENT SWARM sends its
+  two home on a timer and one of those may be who opened it.
 - **The workbench starts broken and costs 10 wood.** It is an ordinary prop as
   far as clicking, highlighting and pathing go - `props` carries it - but
   finishing the work repairs it instead of removing it, so it is never
@@ -522,12 +543,21 @@ with one inhabitant who walks around and works on what is there.
   keying off position put two of the four arrows in the wrong cells.
 - **A station is dragged on the isle, not by a handle.** With a move on,
   left-press on the canvas and move: the station follows the cell under the
-  cursor. That is the same gesture that orbits the camera, so
-  `controls.pointerBlocked` hands it to `placement.js` for as long as the
-  move lasts - which is also why the orbit camera grew that hook beside
+  cursor. `controls.pointerBlocked` is what hands that press to
+  `placement.js` - which is also why the orbit camera grew that hook beside
   `keyboardBlocked`. The station only moves once the cursor actually travels,
   so a plain click never teleports it, and `setPointerCapture` is wrapped in
   a try/catch because a refused capture must not swallow the drag.
+- **`pointerBlocked` is asked about a press, not about a state.** It takes
+  the event, because a move owns the LEFT button only - the RIGHT button
+  stays the camera's the whole time it is running, since lining something up
+  is exactly when the isle most needs turning. It used to answer for the
+  whole move and the camera was frozen until the station was placed. A box
+  being dragged still owns the whole mouse. `placement.js` ignores anything
+  that is not button 0 on its own account, so the two never fight over one
+  press. Testing this needs a *dead still* camera first: the orbit coasts on
+  `velocity` after a drag, so a left-drag that follows a right-drag looks
+  like it turned the camera when it is only the spin running down.
 - **DEV RESET puts stations back.** A placed prop carries `prop.home`, the
   anchor it started the run at, and `devReset` walks them back to it - a
   bench left at the far end of the isle otherwise survives the reset.

@@ -138,7 +138,7 @@ export const RECIPES = [
       1: 'flint', 2: 'flint', 3: 'stick',
       5: 'flint', 6: 'flint', 7: 'stick',
       10: 'stick', 11: 'stick',
-      13: 'stick', 14: 'stick'
+      14: 'stick', 15: 'stick'
     }
   }
 ];
@@ -442,9 +442,32 @@ export function createCrafting({ inventory, blocked, onOpen }) {
    * that moment the output slot is only showing what would happen, and
    * clearing the grid costs nothing.
    */
+  /**
+   * Take what the bench is offering.
+   *
+   * Shift takes *everything*: it crafts over and over until the grid no
+   * longer adds up to anything, which is what shift clicking an output does
+   * in the game these gestures come from. Every craft spends at least one
+   * item off the grid, so it always runs down to nothing - the cap is only
+   * there so a future recipe that somehow feeds itself cannot hang the
+   * frame.
+   */
   function takeOutput({ toInventory = false } = {}) {
+    if (!toInventory) { craftOne({ toInventory }); return; }
+    for (let n = 0; n < 4096 && craftOne({ toInventory }); n++) { /* until it runs out */ }
+  }
+
+  /** One craft, or false when the grid is not a recipe. */
+  function craftOne({ toInventory = false } = {}) {
+    // Square the grid with the ledger before reading it. A tool is worn
+    // rather than spent, so when one breaks its cell still *claims* to hold
+    // it until `reconcile` takes it away - and crafting everything runs
+    // several crafts before anything is drawn, so without this a knife with
+    // ten uses left went on making sticks until the wood ran out.
+    reconcile();
+
     const found = match();
-    if (!found) return;
+    if (!found) return false;
     const { recipe, used, toolAt } = found;
 
     // Onto the cursor, so it lands wherever the next click puts it - which
@@ -452,7 +475,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     // something else has nowhere to put it. Shift is the way past that: it
     // sends the yield straight to the inventory instead, so a full hand is
     // no reason to refuse.
-    if (!toInventory && held && held.item !== recipe.item) return;
+    if (!toInventory && held && held.item !== recipe.item) return false;
 
     for (const i of used) {
       const cell = cells[i];
@@ -471,9 +494,10 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     // inventory, so leaving it alone *is* leaving the pebbles in the stock
     // row, and they are in the slots below on the next frame.
     inventory.add(recipe.item, recipe.yield);
-    if (toInventory) return;
+    if (toInventory) return true;
     if (held) held.count += recipe.yield;
     else held = { item: recipe.item, count: recipe.yield };
+    return true;
   }
 
   // --- showing a recipe on the grid ----------------------------------------

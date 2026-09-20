@@ -168,7 +168,7 @@ export class OrbitCamera {
     dom.addEventListener('pointerdown', (e) => {
       // Something else may own the drag - moving a station uses the same
       // press-and-move on the same canvas, and it takes precedence.
-      if (this.pointerBlocked?.()) return;
+      if (this.pointerBlocked?.(e)) return;
       // The camera is turned with the RIGHT button. Left-drag belongs to the
       // selection box out on the isle, so it must never reach the orbit.
       // A touch or a pen has no buttons to choose between, so it still
