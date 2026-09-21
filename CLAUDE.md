@@ -74,7 +74,8 @@ with one inhabitant who walks around and works on what is there.
   - `src/starfield.js` - the drifting motes behind every UI surface.
   - `src/fullscreen.js` - full screen on launch, in a browser.
   - `src/inventory.js` - what has been gathered, and the item list (an item
-    with `plants` gets a PLANT button on its tile).
+    with `plants` gets a PLANT button on its tile and opens the mover; one
+    with `sows` or `fills` gets one that arms the cursor instead).
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/save.js` - the run, written down and read back on launch.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
@@ -321,6 +322,20 @@ with one inhabitant who walks around and works on what is there.
   thing a reset misses. Two ways in, one picker: the EQUIP button on an
   inventory tile asks who should carry it, the wield key asks what an agent
   should wield, and `src/wield.js` answers both.
+- **What is in an agent's hand is on both panels, and it is the instance.**
+  `describeHand` in `main.js` writes the same row into the stats panel on
+  the isle and into every overview card: the picture, the label, and a bar
+  of the wear on *that* tool rather than on the pile it came from. EQUIP
+  opens the wield picker (it reads SWAP when something is already held, and
+  is disabled when there is nothing to hand over) and UNEQUIP is
+  `equipTool(agent, null)` - until it existed a tool could only be swapped
+  for another and never simply handed back. The panels know nothing about
+  wear or capacities; they hand `main.js` the row and it fills it. What this
+  replaced was a "Tool" *trait* sitting beside Education and Mastery that
+  was never written to - it read None whatever the agent was carrying, which
+  is exactly the kind of placeholder to delete rather than to keep feeding.
+  `#agent-panel` is `pointer-events: none` so a click on the isle behind it
+  is never swallowed; only those two buttons take the pointer back.
 - **The inventory keeps a tool and a bucket the same way.** Wear on a tool
   and what is in a vessel are both per-instance numbers you cannot average
   over a stack, so both live in the one-by-one list that `isSingular` covers.
@@ -346,13 +361,19 @@ with one inhabitant who walks around and works on what is there.
   because turning a field over by accident three minutes in is not something
   to make easy. It does **not** sow: a plot comes up bare and dry, and the
   seed is a gesture of its own.
-- **A plot is a DENT, and that needs the block itself moved.** Soil drawn on
-  top of the grass reads as a tray standing on it, and soil drawn below the
-  grass is simply invisible - the block's own top face is opaque and in
-  front of it. So `island.sinkBlock` presses the top block down (the
-  instance matrix is scaled and shifted; its bottom stays put) and the
-  neighbours' side faces, coincident until then, become the turf rim of the
-  dent. `raiseBlock` puts it back, and everything that takes a plot away has
+- **A plot is a DENT, and the isle's own block is the floor of it.** Soil
+  drawn on top of the grass reads as a tray standing on it, and soil drawn
+  below the grass is simply invisible - the block's own top face is opaque
+  and in front of it. So `island.sinkBlock` presses the top block down (the
+  instance matrix is scaled and shifted; its bottom stays put) *and repaints
+  it* `FARMLAND_SOIL`, and the neighbours' side faces, coincident until
+  then, become the turf rim of the dent. The repaint is what matters:
+  drawing a slab of soil instead needs it as wide as the cell to leave no
+  gap at the rim, which puts it and the neighbouring cubes in the same
+  space, and the two flicker against each other the moment the camera moves.
+  Nothing can z-fight with a block that is simply painted another colour.
+  The only thing the prop draws is its furrows, well inside the cell and
+  sunk into that floor, touching nothing. `raiseBlock` puts it back, and everything that takes a plot away has
   to call it - reaping does not, since the plot stays and is only bare;
   putting the ground back does, and so does DEV RESET. Digging the column
   out drops the record of it, so there is nothing left to put back. The
@@ -365,18 +386,34 @@ with one inhabitant who walks around and works on what is there.
   `hitPad` in `props.js` is an invisible mesh, and an invisible mesh is
   still raycast - three.js stopped skipping them. A plot needs one because a
   dent is *below* the grass: at anything but a steep angle the rim is in the
-  way and the plot could not be hovered at all. It is marked `isHitPad`, and
-  `buildOutline` and `propBox` both skip it - tracing the edges of a box
-  nobody can see draws a cage around thin air.
-- **Seeds are sown from the inventory, and that is not the mover.** A
+  way and the plot could not be hovered at all. It also has to *grow with
+  the crop* (`padUpTo`, called from `setCropStage`): wheat is a handful of
+  thin blades with air between them, and without the pad reaching over them
+  the cursor falls straight through the gaps and the plot cannot be picked
+  up once anything is on it. It is marked `isHitPad`, and `buildOutline` and
+  `propBox` both skip it - tracing the edges of a box nobody can see draws a
+  cage around thin air.
+- **Some things are carried on the CURSOR, and that is not the mover.** A
   sapling has to be *positioned* - it needs room, and where exactly it goes
   matters - so it earns arrows and a PLACE button. A seed only ever goes
-  into ground already turned over, so the plot is the position and all that
-  is left is which plot: `sows` in `ITEMS` puts a PLANT button on the tile,
-  the screen closes, and the next click on a plot sows it. No agent, no
-  walk - the ground is already open. The cursor keeps its seeds so a row
-  goes in one after another, and puts them away on its own when they run
-  out, on a click that is not a plot, or on a right click.
+  into ground already turned over and a spadeful of earth only ever goes
+  back into a hole, so in both cases the target *is* the position and all
+  that is left is which one. `sows` in `ITEMS` says it goes into a plot and
+  `fills` says it goes into a hole (naming the layer it comes back as);
+  either puts a button on the tile that closes the screen and arms the
+  cursor, and the next click puts one down. No agent and no walk - the
+  ground is already open and the hole is already dug. The cursor keeps the
+  rest so a row goes in one after another, and puts itself away when they
+  run out, on a click that is not a target, or on a right click. Anything
+  else that should be put down this way is one of those two flags rather
+  than a branch in `handleClick`.
+- **A plot with a crop coming up is scenery, not a station.** `busyPlot` in
+  `main.js` is the test - sown and not yet ripe - and such a plot takes no
+  hover outline and does not swallow a click: the click falls through to the
+  isle below it, so a field can still be walked across and dug beside. There
+  is nothing to do to one anyway: it cannot be sown again, and a hoe will
+  not turn a field over three minutes in. Watering it still works, because
+  that is a click that actually does something, and it is tried first.
 - **A crop is a stage, not a stretched mesh.** `setCropStage` in `props.js`
   rebuilds the blades every 20% of the way to ripe - five times over five
   minutes, so it costs nothing per frame - and the sixth stage, gold with
@@ -394,6 +431,15 @@ with one inhabitant who walks around and works on what is there.
   whatever is done to it. `blocks` is the map from a coordinate to the mesh
   and instance holding it, built as the meshes are, and `layerAt` is what
   says what a block is made of.
+- **A hole can be filled in, and the isle still cannot be built up.**
+  `fillBlock` in `island.js` is `digBlock` in reverse: the instance that was
+  scaled to nothing is scaled back, repainted as the layer going in, and its
+  record updated so a shovel reads it as the earth it is now rather than the
+  turf it was. `canFill` is what says whether there is anything to put back,
+  and there is one only where something came out - no instance was ever made
+  above the isle's original surface, so a column can be restored and never
+  raised. Nothing may be standing on the cell: a block appearing under a
+  prop leaves it buried and under an agent leaves them in the floor.
 - **`ITEMS[tool].digs` is which layers a tool takes out and what each
   leaves.** A shovel has the soft ground (`grass`, `moss`, `dirt` -> dirt), a
   pickaxe has the rock (`stone` -> stone), and neither touches bedrock, which

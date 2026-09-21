@@ -29,9 +29,26 @@
         <div class="meter" data-stat="happiness"><label>Happiness</label><div class="bar"><span class="fill"></span></div><span class="value"></span></div>
       </div>
 
+      <!-- What is in their hand. It is a real instance with wear on it, not
+           the placeholder trait it used to sit beside - and the two buttons
+           are the only way to take a tool back off an agent. -->
+      <div class="agent-tool">
+        <div class="tool-slot">
+          <div class="tool-icon"></div>
+          <div class="tool-id">
+            <span class="tool-name">Empty handed</span>
+            <div class="bar"><span class="fill"></span></div>
+            <span class="tool-wear"></span>
+          </div>
+        </div>
+        <div class="tool-buttons">
+          <button type="button" class="tool-equip">Equip</button>
+          <button type="button" class="tool-unequip">Unequip</button>
+        </div>
+      </div>
+
       <div class="traits">
         <div><label>Education</label><span data-trait="education"></span></div>
-        <div><label>Tool</label><span data-trait="tool"></span></div>
         <div><label>Mastery</label><span data-trait="mastery"></span></div>
       </div>
     </div>

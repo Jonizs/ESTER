@@ -7,7 +7,7 @@ import {
   canMove, canPlace, placeProp, footprintCells, syncBlocked,
   spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds, setWaterLevel,
   setCropStage, cropStageOf, buildOutline, tagProp,
-  GROUND_OFFSET, FARMLAND_SINK, PROP_KINDS
+  GROUND_OFFSET, FARMLAND_SINK, FARMLAND_SOIL, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
 import { findPath } from './path.js';
@@ -22,6 +22,7 @@ import { createWield } from './wield.js';
 import { createPlacement } from './placement.js';
 import { createSelectBox } from './selectbox.js';
 import { createInventory, ITEMS } from './inventory.js';
+import { itemIcon } from './icons.js';
 import { createProgression } from './progression.js';
 import { createDebug } from './debug.js';
 import { createSaves } from './save.js';
@@ -323,7 +324,7 @@ function tillGround(agent, cell) {
  * block - so nothing about pathing or placement changes.
  */
 function openPlot(plot) {
-  island.userData.sinkBlock(plot.x, plot.z, FARMLAND_SINK);
+  island.userData.sinkBlock(plot.x, plot.z, FARMLAND_SINK, FARMLAND_SOIL);
 }
 
 /** And closing it again: the block comes back up when the plot goes. */
@@ -396,6 +397,19 @@ function digGround(agent, cell) {
 
 /** Is this plot's crop ready to come up? */
 const ripe = (plot) => plot.sown && plot.growth >= PROP_KINDS.farmland.growSeconds;
+
+/**
+ * A plot with a crop still coming up on it.
+ *
+ * There is nothing to do to one - it cannot be sown again, and a hoe will
+ * not turn a field over three minutes in - so it stops behaving like a
+ * station: no outline under the cursor, and a click on it is not swallowed
+ * but falls through to the ground it is standing on. A patch of wheat that
+ * the player cannot walk across or dig beside would be worse than one they
+ * cannot click. Watering it still works, because that is a click that
+ * actually does something.
+ */
+const busyPlot = (prop) => prop.kind === 'farmland' && !!prop.sown && !ripe(prop);
 
 /**
  * A click on a plot with a hoe: reap it if it is ready, and otherwise put it
@@ -559,7 +573,13 @@ const panels = createPanels({
   blocked: () => menu.isOpen() || crafting.isOpen() || wield.isOpen() || placement.isActive(),
   onSelect: (agent) => selectOnly(agent),
   onPlantItem: (item) => beginPlanting(item),
-  onSowItem: (item) => beginSowing(item),
+  onCarryItem: (item) => beginCarrying(item),
+  // The overview's cards carry the same hand row as the panel on the isle,
+  // and both ends of it come back here rather than the panel reaching into
+  // the inventory itself.
+  onHand: (agent, row) => describeHand(agent, row),
+  onWieldAgent: (agent) => wield.chooseTool(agent),
+  onUnequip: (agent) => equipTool(agent, null),
   onEquipItem: (item) => wield.chooseAgent(item)
 });
 
@@ -759,7 +779,7 @@ function devReset() {
 
   syncBlocked(props, blocked);
   setHovered(null);
-  cancelSowing();
+  stopCarrying();
   plantedAt = null;
 
   person.reset();
@@ -892,7 +912,7 @@ canvas.addEventListener('pointerup', (e) => {
 
   // Right click clears the selection, wherever it lands - and puts the
   // seeds away, since it is already the "never mind" button.
-  if (started.button === 2) { cancelSowing(); selectOnly(null); return; }
+  if (started.button === 2) { stopCarrying(); selectOnly(null); return; }
   if (started.button === 0) handleClick(e);
 });
 
@@ -946,15 +966,18 @@ function handleClick(event) {
   pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
 
-  // Seeds on the cursor take the click before anything else does: on a plot
-  // they go in, and anywhere else they go back in the pack. A click that
-  // sometimes sowed and sometimes marched an agent across the isle would be
-  // the worst of both.
-  if (sowing) {
+  // Whatever is on the cursor takes the click before anything else does: on
+  // the thing it goes into it goes in, and anywhere else it goes back in the
+  // pack. A click that sometimes sowed and sometimes marched an agent across
+  // the isle would be the worst of both.
+  if (carrying) {
     const plot = propUnderPointer();
-    if (!canSow(plot)) { cancelSowing(); return; }
-    sowPlot(plot);
-    lookedAt = 0;
+    if (canSow(plot)) { sowPlot(plot); lookedAt = 0; return; }
+    if (!plot) {
+      const ground = raycaster.intersectObject(island, true)[0];
+      if (ground && fillGround(blockAt(ground))) { lookedAt = 0; return; }
+    }
+    stopCarrying();
     return;
   }
 
@@ -974,8 +997,13 @@ function handleClick(event) {
         // is a hoe's job or a bucket's depending on who is standing there.
         if (prop && !prop.gone && prop.kind === 'farmland') {
           const agent = selectedAgent();
-          if (agent) { waterFarmland(agent, prop) || workFarmland(agent, prop); }
-          return;
+          // Sowing has already had its go above. What is left is watering it
+          // and working it with a hoe - and when neither is on, the click is
+          // NOT spent: a crop coming up is scenery, and standing between the
+          // player and the ground it grows on would mean a field they cannot
+          // walk across or dig beside. It falls through to the isle below.
+          if (agent && (waterFarmland(agent, prop) || workFarmland(agent, prop))) return;
+          break;
         }
         if (prop && !prop.gone && prop.kind === 'waterCatcher') {
           const agent = selectedAgent();
@@ -1329,45 +1357,89 @@ function blockAt(hit) {
 }
 
 /**
- * Sowing: the seeds are on the cursor, and the next click on a plot puts
- * them in.
+ * Something held on the CURSOR, put down by clicking where it goes.
  *
  * It is deliberately not the mover. A sapling has to be *positioned* - it
  * needs room, and where exactly it goes matters - so it earns arrows. A
- * seed only ever goes into ground that has already been turned over, and
- * the plot is the position, so all that is left is which plot. Nobody has
- * to walk over: the ground is already open.
+ * seed only ever goes into ground already turned over and a spadeful of
+ * earth only ever goes back into a hole, so in both cases the target *is*
+ * the position and all that is left is which one. Nobody has to walk over
+ * either: the ground is already open, and the hole is already dug.
+ *
+ * `sows` in `ITEMS` says it goes into a plot, `fills` says it goes into a
+ * hole. Anything else that should be put down this way is one of those two
+ * rather than a branch here.
  */
-let sowing = false;
+let carrying = null;
 
-function beginSowing(item) {
-  if (!ITEMS[item]?.sows || inventory.count(item) < 1) return false;
-  sowing = true;
+function beginCarrying(item) {
+  const spec = ITEMS[item];
+  if (!spec || !(spec.sows || spec.fills)) return false;
+  if (inventory.count(item) < 1) return false;
+  carrying = item;
   panels.close();
   lookedAt = 0;
   return true;
 }
 
-function cancelSowing() {
-  sowing = false;
+function stopCarrying() {
+  if (carrying === null) return;
+  carrying = null;
+  lookedAt = 0;
+}
+
+/** Whatever is on the cursor runs out, so it puts itself away. */
+function spendCarried() {
+  if (carrying && inventory.count(carrying) < 1) stopCarrying();
 }
 
 /** Whether the seeds on the cursor could go into this plot. */
 function canSow(plot) {
-  return sowing && !!plot && !plot.gone && plot.kind === 'farmland'
-    && !plot.sown && inventory.count('seeds') > 0;
+  if (!carrying || ITEMS[carrying].sows !== 'farmland') return false;
+  return !!plot && !plot.gone && plot.kind === 'farmland' && !plot.sown;
 }
 
 function sowPlot(plot) {
   if (!canSow(plot)) return false;
-  if (!inventory.take('seeds', 1)) return false;
+  if (!inventory.take(carrying, 1)) return false;
   plot.sown = true;
   plot.growth = 0;
   showCrop(plot, 0);
-  // The cursor keeps its seeds so a row of plots goes in one after another,
-  // and puts them away on its own once there are none left.
-  if (inventory.count('seeds') < 1) cancelSowing();
+  // The cursor keeps the rest so a row of plots goes in one after another.
+  spendCarried();
   return true;
+}
+
+/**
+ * Whether the earth on the cursor could go back into this cell.
+ *
+ * Only into a hole: a column can be built back up to where it started and
+ * no further, because there is no instance above the isle's own surface to
+ * put back. Nothing may be standing on it either - a block appearing under
+ * a prop leaves it buried and under an agent leaves them in the floor.
+ */
+function canFill(cell) {
+  if (!carrying || !ITEMS[carrying].fills) return false;
+  if (!island.userData.canFill(cell.x, cell.z)) return false;
+  if (props.some((p) => !p.gone && footprintCells(p.kind, p)
+    .some((c) => c.x === cell.x && c.z === cell.z))) return false;
+  return !agents.some((a) => Math.round(a.x) === cell.x && Math.round(a.z) === cell.z);
+}
+
+function fillGround(cell) {
+  if (!canFill(cell)) return false;
+  const layer = ITEMS[carrying].fills;
+  if (!inventory.take(carrying, 1)) return false;
+  island.userData.fillBlock(cell.x, cell.z, layer);
+  syncBlocked(props, blocked);
+  spendCarried();
+  return true;
+}
+
+/** The cell whatever is on the cursor would go into, or null. */
+function carryTargetAt(block) {
+  if (!carrying || !ITEMS[carrying].fills) return null;
+  return canFill(block) ? { x: block.x, y: block.y + 1, z: block.z } : null;
 }
 
 function setHovered(prop) {
@@ -1484,9 +1556,10 @@ function refreshHover() {
   }
   if (!aimRay()) { setHovered(null); return; }
 
-  // Only a station the player put down takes the outline.
+  // Only a station the player put down takes the outline, and only while
+  // there is something to do to it.
   const prop = propUnderPointer();
-  setHovered(prop && PROP_KINDS[prop.kind]?.placed ? prop : null);
+  setHovered(prop && PROP_KINDS[prop.kind]?.placed && !busyPlot(prop) ? prop : null);
 }
 
 /**
@@ -1550,6 +1623,13 @@ function updateLookAt() {
   // only when the click would actually do something. An armed gesture that
   // lights ground it cannot work would be worse than no mark at all.
   const block = blockAt(ground);
+
+  // Earth on the cursor points at the cell it would fill, which is the one
+  // ABOVE the block under the pointer - the brackets have to show where the
+  // block is going, not what it is going on top of.
+  const fill = carryTargetAt(block);
+  if (fill) { highlight.showCell(fill.x, fill.y, fill.z, HIGHLIGHT_WORK); return; }
+
   highlight.showCell(block.x, block.y, block.z, armedOn(block) ? HIGHLIGHT_WORK : HIGHLIGHT_PLAIN);
 }
 
@@ -1683,6 +1763,53 @@ const meters = [...panel.querySelectorAll('.meter')].map((el) => ({
 }));
 const traits = [...panel.querySelectorAll('[data-trait]')];
 
+// What is in the selected agent's hand. The panel used to have a "Tool"
+// trait beside Education and Mastery, and it was a placeholder that was
+// never written to - it said None whatever anybody was carrying. This is
+// the real one, and the two buttons are how a tool comes back off an agent
+// at all: until now it could only be swapped for another.
+const toolIcon = panel.querySelector('.agent-tool .tool-icon');
+const toolName = panel.querySelector('.agent-tool .tool-name');
+const toolWear = panel.querySelector('.agent-tool .tool-wear');
+const toolFill = panel.querySelector('.agent-tool .fill');
+const toolEquip = panel.querySelector('.tool-equip');
+const toolUnequip = panel.querySelector('.tool-unequip');
+
+toolEquip.addEventListener('click', () => {
+  const agent = selectedAgent();
+  if (agent) wield.chooseTool(agent);
+});
+
+toolUnequip.addEventListener('click', () => {
+  const agent = selectedAgent();
+  if (agent?.tool) equipTool(agent, null);
+});
+
+/**
+ * What an agent is carrying, written into whichever of these rows is asking.
+ *
+ * The bar is the instance's own wear, so it is telling the truth about the
+ * one in their hand rather than about the pile it came out of - a tool is an
+ * instance, not a name.
+ */
+function describeHand(agent, row) {
+  const held = agent?.tool ?? null;
+  const spec = held ? ITEMS[held.item] : null;
+  const max = spec ? (spec.uses ?? spec.capacity ?? 1) : 1;
+
+  row.icon.innerHTML = held ? itemIcon(held.item, 24) : '';
+  // An empty box reads as a hole; a dashed one reads as an empty slot.
+  row.icon.classList.toggle('empty', !held);
+  row.name.textContent = spec ? spec.label : 'Empty handed';
+  row.wear.textContent = spec ? `${Math.round(held.left)} / ${max}` : '';
+  row.fill.style.width = held ? `${(held.left / max) * 100}%` : '0%';
+  row.fill.style.background = spec?.tint ?? 'var(--accent)';
+  row.unequip.disabled = !held;
+  // Nothing to hand over is not a button worth offering.
+  row.equip.disabled = wieldable().length === 0;
+  row.equip.textContent = held ? 'Swap' : 'Equip';
+}
+
 function meterColour(value) {
   if (value > 60) return '#7ad7ff';
   if (value > 25) return '#f0c04a';
@@ -1711,6 +1838,11 @@ function updatePanel() {
   for (const trait of traits) {
     trait.textContent = agent.stats[trait.dataset.trait] ?? 'None';
   }
+
+  describeHand(agent, {
+    icon: toolIcon, name: toolName, wear: toolWear, fill: toolFill,
+    equip: toolEquip, unequip: toolUnequip
+  });
 }
 
 // --- loop ------------------------------------------------------------------
@@ -1755,7 +1887,8 @@ console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props
 
 // Handle for the devtools console (F12) and for automated testing.
 window.ESTER = { ITEMS, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
-  beginSowing, sowPlot, canSow, showCrop, blockAt, propBox, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
+  beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
+  busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 // One prop was the target when there was one agent and one job; a box can
 // light a whole stand at once, so `targets` is the list and `targeted` is

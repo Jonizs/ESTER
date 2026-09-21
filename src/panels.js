@@ -52,7 +52,11 @@ const TABS = [
 ];
 
 const STATS = ['health', 'food', 'water', 'happiness'];
-const TRAITS = ['education', 'tool', 'mastery'];
+// `tool` used to be one of these and it was a placeholder that was never
+// written to - it read None whatever the agent was carrying. What is
+// actually in their hand is its own row now, with the wear on that instance
+// and the buttons that change it.
+const TRAITS = ['education', 'mastery'];
 
 function meterColour(value) {
   if (value > 60) return '#7ad7ff';
@@ -62,7 +66,7 @@ function meterColour(value) {
 
 const title = (word) => word[0].toUpperCase() + word.slice(1);
 
-export function createPanels({ settings, agents, inventory, progression, blocked, onSelect, onPlantItem, onSowItem, onEquipItem }) {
+export function createPanels({ settings, agents, inventory, progression, blocked, onSelect, onPlantItem, onCarryItem, onEquipItem, onHand, onWieldAgent, onUnequip }) {
   const root = document.getElementById('panels');
   const pages = new Map();
   const tabButtons = new Map();
@@ -168,19 +172,19 @@ export function createPanels({ settings, agents, inventory, progression, blocked
           tile.append(plant);
         }
 
-        // Seeds go into ground that has already been turned over, so their
-        // button arms the cursor rather than opening the mover: the screen
-        // closes and the next click on a plot sows it.
-        if (ITEMS[entry.item].sows) {
-          const sow = document.createElement('button');
-          sow.type = 'button';
-          sow.className = 'tile-action';
-          sow.textContent = 'Plant';
-          sow.addEventListener('click', (event) => {
+        // Seeds go into ground already turned over and earth goes back into
+        // a hole, so their button arms the cursor rather than opening the
+        // mover: the screen closes and the next click puts one down.
+        if (ITEMS[entry.item].sows || ITEMS[entry.item].fills) {
+          const carry = document.createElement('button');
+          carry.type = 'button';
+          carry.className = 'tile-action';
+          carry.textContent = ITEMS[entry.item].sows ? 'Plant' : 'Place';
+          carry.addEventListener('click', (event) => {
             event.stopPropagation();
-            onSowItem?.(entry.item);
+            onCarryItem?.(entry.item);
           });
-          tile.append(sow);
+          tile.append(carry);
         }
 
         // A tool is something somebody carries, so its button asks who. The
@@ -226,6 +230,18 @@ export function createPanels({ settings, agents, inventory, progression, blocked
         <span class="agent-time"></span>
       </div>
       <div class="agent-meters"></div>
+      <div class="agent-tool">
+        <div class="tool-icon"></div>
+        <div class="tool-id">
+          <span class="tool-name">Empty handed</span>
+          <span class="tool-wear"></span>
+          <div class="bar"><span class="fill"></span></div>
+        </div>
+        <div class="tool-buttons">
+          <button type="button" class="tool-equip">Equip</button>
+          <button type="button" class="tool-unequip">Unequip</button>
+        </div>
+      </div>
       <div class="agent-traits"></div>`;
 
     card.querySelector('.agent-name').textContent = agent.name;
@@ -251,11 +267,34 @@ export function createPanels({ settings, agents, inventory, progression, blocked
       traits[trait] = cell.querySelector('.value');
     }
 
-    // Clicking a card selects that agent, the same as clicking them on the isle.
+    // Clicking a card selects that agent, the same as clicking them on the
+    // isle - but not when the click was one of the hand buttons, which do
+    // their own thing to that agent and should not also reselect.
     card.addEventListener('click', () => onSelect?.(agent));
+
+    const hand = {
+      icon: card.querySelector('.tool-icon'),
+      name: card.querySelector('.tool-name'),
+      wear: card.querySelector('.tool-wear'),
+      fill: card.querySelector('.agent-tool .fill'),
+      equip: card.querySelector('.tool-equip'),
+      unequip: card.querySelector('.tool-unequip')
+    };
+
+    hand.equip.addEventListener('click', (event) => {
+      event.stopPropagation();
+      onSelect?.(agent);          // the picker asks about whoever is selected
+      onWieldAgent?.(agent);
+    });
+
+    hand.unequip.addEventListener('click', (event) => {
+      event.stopPropagation();
+      onUnequip?.(agent);
+    });
 
     return {
       card,
+      hand,
       pill: card.querySelector('.pill'),
       doing: card.querySelector('.agent-doing'),
       fill: card.querySelector('.agent-work .fill'),
@@ -309,6 +348,10 @@ export function createPanels({ settings, agents, inventory, progression, blocked
       for (const trait of TRAITS) {
         card.traits[trait].textContent = agent.stats[trait] ?? 'None';
       }
+
+      // What is in their hand is `main.js`'s to describe: the panel knows
+      // nothing about wear, capacities or who may be handed what.
+      onHand?.(agent, card.hand);
     }
   }
 

@@ -645,6 +645,9 @@ function mat(color, opts = {}) {
 /** How far the block under a plot is pressed down to make the dent. */
 export const FARMLAND_SINK = 0.16;
 
+/** And what that block is repainted, so the floor of the dent is soil. */
+export const FARMLAND_SOIL = 0x6b4a2c;
+
 /**
  * A block of nothing, there to be hit by a ray and by nothing else.
  *
@@ -658,10 +661,26 @@ function hitPad(w, h, d, y) {
     new THREE.BoxGeometry(w, h, d),
     new THREE.MeshBasicMaterial({ visible: false })
   );
+  pad.name = 'hit';
   pad.position.y = y;
   pad.visible = false;
   pad.userData.isHitPad = true;
   return pad;
+}
+
+/**
+ * Reach the hitbox from the floor of the dent up to `top`.
+ *
+ * A crop is a handful of thin blades with air between them, so without this
+ * the cursor falls straight through the gaps and the plot cannot be picked
+ * up at all once anything is growing on it.
+ */
+function padUpTo(prop, top) {
+  const pad = prop.mesh.getObjectByName('hit');
+  if (!pad) return;
+  const bottom = -FARMLAND_SINK - 0.05;
+  pad.scale.y = Math.max(0.1, top - bottom);
+  pad.position.y = bottom + pad.scale.y / 2;
 }
 
 /**
@@ -684,7 +703,12 @@ export function setCropStage(prop, stage) {
 
   const old = prop.mesh.getObjectByName('crop');
   if (old) prop.mesh.remove(old);
-  if (stage === null || stage === undefined) return true;
+  if (stage === null || stage === undefined) {
+    // Bare: the hitbox is the dent and a hair over the rim, which is what
+    // lets a plot below the grass be hovered at a low angle at all.
+    padUpTo(prop, 0.18);
+    return true;
+  }
 
   const crop = new THREE.Group();
   crop.name = 'crop';
@@ -704,8 +728,8 @@ export function setCropStage(prop, stage) {
     const geo = new THREE.BoxGeometry(0.09, tall, 0.09);
     geo.translate(0, tall / 2, 0);
     const blade = new THREE.Mesh(geo, mat(tint.getHex()));
-    // Out of the soil at the bottom of the dent, not off the grass.
-    blade.position.set(x, -0.08, z);
+    // Out of the floor of the dent, not off the grass.
+    blade.position.set(x, -FARMLAND_SINK, z);
     blade.castShadow = true;
     crop.add(blade);
 
@@ -713,13 +737,15 @@ export function setCropStage(prop, stage) {
     // having to read the number at the top of the screen.
     if (stage === CROP_STAGES - 1) {
       const head = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.17, 0.15), mat(0xe8cc63));
-      head.position.set(x, -0.08 + tall + 0.06, z);
+      head.position.set(x, -FARMLAND_SINK + tall + 0.06, z);
       head.castShadow = true;
       crop.add(head);
     }
   });
 
   prop.mesh.add(crop);
+  // Over the tallest a blade can have rolled, plus its head.
+  padUpTo(prop, -FARMLAND_SINK + h * 1.18 + (stage === CROP_STAGES - 1 ? 0.25 : 0.06));
   return true;
 }
 
@@ -768,21 +794,20 @@ function buildProp(kind, salt) {
   }
 
   if (kind === 'farmland') {
-    // A dent, not a tray. The soil fills the whole cell and its surface sits
-    // below the grass around it - `island.sinkBlock` presses the block down
-    // to make the room, and the neighbours' sides become the turf rim. It is
-    // drawn the same hair oversized the isle's own cubes are, so there is no
-    // seam at the edge of the cell for the grass to show through.
-    const soil = new THREE.Mesh(new THREE.BoxGeometry(1.004, 0.16, 1.004), mat(0x6b4a2c));
-    soil.position.y = -FARMLAND_SINK;
-    soil.receiveShadow = true;
-    g.add(soil);
-
-    // The furrows are what say it has been hoed. They sit a hair proud of
-    // the soil and still well under the rim.
+    // A dent, not a tray - and the floor of it is the isle's own block,
+    // pressed down by `island.sinkBlock` and repainted `FARMLAND_SOIL`.
+    // There is deliberately no slab of soil here: a slab has to be as wide
+    // as the cell to leave no gap at the rim, which puts it and the
+    // neighbouring cubes in the same space, and the two flicker against each
+    // other the moment the camera moves. A block that is simply painted
+    // another colour cannot z-fight with anything.
+    //
+    // The furrows are all that is drawn, and they are what say it has been
+    // hoed. They are well inside the cell and sunk into the floor, so they
+    // touch nothing either.
     for (let i = -1; i <= 1; i++) {
-      const furrow = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.04, 0.13), mat(0x553a21));
-      furrow.position.set(0, -0.06, i * 0.29);
+      const furrow = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.05, 0.12), mat(0x553a21));
+      furrow.position.set(0, -FARMLAND_SINK + 0.01, i * 0.28);
       furrow.receiveShadow = true;
       g.add(furrow);
     }
@@ -790,9 +815,10 @@ function buildProp(kind, salt) {
     // And a block of nothing over the top of it, purely to be hit by the
     // cursor. A dent is *below* the grass, so a ray coming in at anything
     // but a steep angle meets the rim first and the plot could not be
-    // hovered at all - which is exactly what a sunken plot would feel like
-    // without this. It is never drawn and never casts.
-    g.add(hitPad(1, 0.36, 1, 0));
+    // hovered at all. `setCropStage` stretches it up over whatever is
+    // growing, or the gaps between the blades are see-through. It is never
+    // drawn and never casts.
+    g.add(hitPad(1, 1, 1, 0));
     return g;
   }
 

@@ -35,7 +35,11 @@ export const ITEMS = {
 
   plank:  { label: 'Plank',  tint: '#e0b070' },
   // Turned out of the ground with a shovel.
-  dirt:   { label: 'Dirt',   tint: '#c08a5a' },
+  // A spadeful of earth goes back into a hole - `fills` names the layer the
+  // block comes back as, so a dug and refilled cell reads as the earth it is
+  // now rather than the turf it was. It cannot build the isle up: there is
+  // no block above the original surface to put back.
+  dirt:   { label: 'Dirt',   tint: '#c08a5a', fills: 'dirt' },
   // Seeds are sown rather than planted: they go into ground that has
   // already been turned over, so `sows` names the kind of prop they may go
   // into rather than a prop of their own to stand on the isle.

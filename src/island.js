@@ -250,21 +250,40 @@ export function createIsland() {
    * as far as pathing, prop placement and where an agent's feet go are
    * concerned. It is a dent of a few centimetres, not a dug block - that is
    * `digBlock`.
+   *
+   * It is also *recoloured*, and that is what makes the dent's floor the
+   * block itself rather than a slab drawn over it. A slab has to be as wide
+   * as the cell to leave no gap at the rim, which means it and the
+   * neighbouring cubes claim the same space and the two flicker against each
+   * other the moment the camera moves. Nothing can z-fight with a block that
+   * is simply painted a different colour.
    */
   const sunk = new Map();
+  const wasColour = new THREE.Color();
 
-  group.userData.sinkBlock = (x, z, depth) => {
+  group.userData.sinkBlock = (x, z, depth, colour) => {
     const column = columns.get(`${x},${z}`);
     if (!column) return false;
     const found = blocks.get(key(x, column.top, z));
     if (!found) return false;
 
-    sunk.set(`${x},${z}`, { y: column.top, mesh: found.mesh, index: found.index });
+    const held = { y: column.top, mesh: found.mesh, index: found.index, colour: null };
+    if (found.mesh.instanceColor) {
+      found.mesh.getColorAt(found.index, wasColour);
+      held.colour = wasColour.getHex();
+    }
+    sunk.set(`${x},${z}`, held);
+
     const m = new THREE.Matrix4()
       .makeTranslation(x * BLOCK, column.top * BLOCK - depth / 2, z * BLOCK)
       .multiply(new THREE.Matrix4().makeScale(1, 1 - depth, 1));
     found.mesh.setMatrixAt(found.index, m);
     found.mesh.instanceMatrix.needsUpdate = true;
+
+    if (colour !== undefined && found.mesh.instanceColor) {
+      found.mesh.setColorAt(found.index, wasColour.setHex(colour));
+      found.mesh.instanceColor.needsUpdate = true;
+    }
     return true;
   };
 
@@ -279,6 +298,10 @@ export function createIsland() {
     found.mesh.setMatrixAt(found.index, new THREE.Matrix4()
       .makeTranslation(x * BLOCK, was.y * BLOCK, z * BLOCK));
     found.mesh.instanceMatrix.needsUpdate = true;
+    if (was.colour !== null && found.mesh.instanceColor) {
+      found.mesh.setColorAt(found.index, wasColour.setHex(was.colour));
+      found.mesh.instanceColor.needsUpdate = true;
+    }
     return true;
   };
 
@@ -301,6 +324,10 @@ export function createIsland() {
     // honest.
     found.mesh.computeBoundingSphere();
 
+    // What came out is what can go back in, and only that: the block is
+    // still in `blocks`, scaled to nothing, so `fillBlock` has something to
+    // put back. There is no instance above the isle's original surface, so
+    // a hole can be filled and the isle cannot be built up.
     column.top = y - 1;
     // Whatever was pressed down here is gone with it, so there is nothing
     // left to let back up.
@@ -308,6 +335,51 @@ export function createIsland() {
     surface.set(`${x},${z}`, column.top);
     group.userData.blockCount -= 1;
     return found.layer;
+  };
+
+  /**
+   * Is there a hole here to fill? A column can only be built back up to
+   * where it started - the instances above that were never made.
+   */
+  group.userData.canFill = (x, z) => {
+    const column = columns.get(`${x},${z}`);
+    if (!column) return false;
+    return blocks.has(key(x, column.top + 1, z));
+  };
+
+  /**
+   * Put a block back on top of a column that has been dug into.
+   *
+   * The instance is scaled back to full rather than a new one being made,
+   * which is the same reasoning as `digBlock` in reverse. It is repainted
+   * as `layer` and its record updated to match, so a shovel dug out and put
+   * back reads as the earth it is now rather than the turf it was.
+   */
+  group.userData.fillBlock = (x, z, layer = 'dirt') => {
+    const column = columns.get(`${x},${z}`);
+    if (!column) return false;
+
+    const y = column.top + 1;
+    const found = blocks.get(key(x, y, z));
+    if (!found) return false;
+
+    found.mesh.setMatrixAt(found.index, new THREE.Matrix4()
+      .makeTranslation(x * BLOCK, y * BLOCK, z * BLOCK));
+    found.mesh.instanceMatrix.needsUpdate = true;
+    found.mesh.computeBoundingSphere();
+
+    const spec = LAYERS[layer] ?? LAYERS.dirt;
+    if (found.mesh.instanceColor) {
+      const shade = 0.90 + 0.10 * rand(Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791), SEED);
+      found.mesh.setColorAt(found.index, new THREE.Color().setHex(spec.color).multiplyScalar(shade));
+      found.mesh.instanceColor.needsUpdate = true;
+    }
+    found.layer = layer;
+
+    column.top = y;
+    surface.set(`${x},${z}`, y);
+    group.userData.blockCount += 1;
+    return true;
   };
 
   return group;
