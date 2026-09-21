@@ -556,13 +556,14 @@ const controls = new OrbitCamera(camera, canvas, {
   minDistance: ISLAND_RADIUS * 0.5,
   maxDistance: ISLAND_RADIUS * 14,
   pitch: 0.5,
-  // How far the free camera may fly from where it started: past the far shore,
-  // and no further. Measured rather than guessed - the isle is 15 across and
-  // the camera looks down at it, so at 2.5 radii it has slid off the bottom of
-  // the screen entirely and there is nothing left to steer back by. At 1.4 it
-  // still fills the lower half. The reset-view key is the way home from
-  // anywhere inside that.
-  panRadius: ISLAND_RADIUS * 1.4,
+  // The free camera's leash: how far the EYE may get from the middle of the
+  // isle, in any direction. It is measured to the eye rather than to what the
+  // eye is looking at, because with nothing locked in the middle the eye is
+  // the only thing that is really moving. The view starts 31.5 out, so this
+  // has to clear that and then leave some room past it - it can fly right
+  // down among the trees, and a good way out into the void, and no further.
+  // Reset view is the way home from anywhere inside it.
+  panRadius: ISLAND_RADIUS * 3,
   isSolid: island.userData.isSolid,
   onFreeCamera: (on) => document.body.classList.toggle('free-camera', on),
   settings
