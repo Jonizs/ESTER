@@ -170,15 +170,29 @@ export class OrbitCamera {
     this.targetDistance = THREE.MathUtils.clamp(next, this.minDistance, this.maxDistance);
   }
 
-  /** Turn the free camera on or off. */
+  /**
+   * Turn the free camera on or off.
+   *
+   * Locking back on puts the view home. Free, the target is left wherever the
+   * eye happened to be looking - out in the void, or under the isle - and an
+   * orbit about a point like that is not a view anyone asked for: the isle
+   * would swing around something off in the dark. Going the other way resets
+   * nothing, because the eye carries on from exactly where the orbit had it.
+   */
   setFreeCamera(on) {
     if (this.freeCamera === on) return;
     this.freeCamera = on;
-    // A zoom still easing towards its target would carry the eye along on its
-    // own for a few frames, and free the eye moves only when it is flown.
-    if (on) this.distance = this.targetDistance;
-    // Whatever is held belongs to the mode it was pressed in.
-    this._held.clear();
+
+    if (on) {
+      // A zoom still easing towards its target would carry the eye along on
+      // its own for a few frames, and free the eye moves only when it is
+      // flown. Whatever is held belongs to the mode it was pressed in.
+      this.distance = this.targetDistance;
+      this._held.clear();
+    } else {
+      this.reset();   // which lets the held keys go as well
+    }
+
     this.onFreeCamera?.(on);
   }
 

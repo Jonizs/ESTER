@@ -174,6 +174,12 @@ with one inhabitant who walks around and works on what is there.
   menu alone: the mover steps a station with the same four arrows, and flying
   the camera out from under it at the same time is one gesture doing two
   things.
+- **Locking back on resets the view; turning free ON does not.** Free, the
+  target is left wherever the eye happened to be looking - out in the void, or
+  under the isle - so an orbit picked straight back up would swing the isle
+  around a point off in the dark. `setFreeCamera(false)` calls `reset()` for
+  exactly that, which lets the held keys go as well. The other way needs
+  nothing: the eye simply carries on from where the orbit had it.
 - **Free is on a leash, and reset view is the way home.** `panRadius` holds
   the EYE within 3 island radii of the middle of the isle, in any direction,
   and `reset()` puts the target back as well as the orientation. It is
