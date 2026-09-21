@@ -54,7 +54,7 @@ with one inhabitant who walks around and works on what is there.
   - `src/island.js` - voxel island, and the surface heightmap everything
     standing on it uses (`group.userData.surface`, keyed `"x,z"`).
   - `src/space.js` - nebula shell, stars and lighting.
-  - `src/orbitCamera.js` - quaternion orbit camera.
+  - `src/orbitCamera.js` - quaternion orbit camera, and the free camera on F.
   - `src/noise.js` - deterministic value noise.
   - `src/props.js` - the few trees and rocks, the broken workbench in the
     middle, and the yellow target tint.
@@ -114,6 +114,86 @@ with one inhabitant who walks around and works on what is there.
   so keying bedrock off `bottom` painted the whole island body bedrock and
   produced zero stone. Bedrock is now limited to the deepest few blocks of
   the whole isle; everything under the soil is stone.
+- **F is the free camera, and NOTHING is locked in the middle of it.** That
+  is the whole point of it: a right-drag turns the eye about ITSELF, the way
+  it does in Minecraft or CS, rather than swinging it around a point. It is
+  still the same rig - the eye is target + offset - so `rotate` notes where
+  the eye is, turns, and puts it back, which leaves the TARGET to swing out
+  from under the eye instead. The same maths read the other way up, and every
+  other part of the camera carries on as it was. An orbit was the first
+  version of this and it was wrong: being pinned to the middle of the isle is
+  exactly what a free camera is not. It took the `f` key off the auto-spin,
+  which was already passed `autoSpin: false` and could only ever have put back
+  the idle drift the rule below forbids.
+- **Forward is the middle of the SCREEN, not a compass heading.** Up is
+  forward and down is back, along the full view direction - so looking up and
+  holding forward climbs, and looking down dives. That is the whole of the
+  vertical movement and it needs no keys of its own. Flattening forward onto
+  the ground was the first version and it fights the free look: you aim at the
+  sky and then skim along the floor. Left and right strafe and stay level
+  whatever the pitch, because the camera's own right axis is horizontal by
+  construction - yaw is applied about the world's up and pitch about that same
+  right axis, so pitching never tilts it, which is why `_fly` reads the axis
+  straight off the orientation rather than crossing anything.
+- **Free, the eye is the player's and nothing else may move it.**
+  `_clearOfBlocks` is skipped in free mode: it exists to shove an ORBIT camera
+  out of terrain it was swung into, and a shove fights the hand on the keys.
+  The eye is kept out of the isle by refusing the step instead
+  (`_stepEye`), which is also what keeps the wheel honest - free, it dollies
+  the eye along its own view line through that same step rather than changing
+  `distance` behind everyone's back, since with nothing in the middle there is
+  no subject left to zoom towards.
+- **A step is taken one axis at a time, and it stops SHORT of the block.**
+  Axis at a time is what makes it slide: a step that would end inside the isle
+  gives up only the axis that did it, so flying into a wall runs along it
+  rather than sticking dead. And the test probes `EYE_MARGIN` past where the
+  step lands, because the near plane is only 0.1 - an eye allowed to come to
+  rest flush against a face sees straight past it into the unlit inside of the
+  isle, and the screen fills with black. Checking only the cell the eye is in
+  lets it get exactly that close.
+- **Both step tests ask whether a step makes things WORSE**, never whether it
+  ends somewhere bad. An eye already inside a block - free camera toggled on
+  while zoomed into the terrain - or somehow already past the leash would
+  otherwise have every step out of it refused as well, and be stuck for good.
+- **The movement keys are HELD, not tapped, or there are no diagonals.**
+  `_held` in `orbitCamera.js` is a Set of the movement actions that are down
+  and the step is taken in the frame loop, which is the whole of "press two
+  and go diagonally" - a keydown that moves the camera once can only ever go
+  one way at a time. The combined direction is normalised, so a diagonal is
+  the same speed as a straight line rather than 1.41 times faster.
+- **The arrows are one pair of actions, and the mode decides what they do.**
+  `orbitLeft`/`orbitRight`/`orbitUp`/`orbitDown` orbit until F is pressed and
+  fly the eye after it, so rebinding them in the pause menu rebinds both -
+  two sets of bindings for one pair of keys would be worse than one that
+  reads a little oddly in the list.
+- **Let the held keys go whenever the camera is stood down.** A key still
+  down when a panel opens sends its keyup to whatever took the keyboard, so
+  the eye would fly on behind it forever; `update` clears `_held` while
+  `keyboardBlocked` is true, and `blur` clears it when the window goes. That
+  is also why `keyboardBlocked` is the whole list of screens rather than the
+  menu alone: the mover steps a station with the same four arrows, and flying
+  the camera out from under it at the same time is one gesture doing two
+  things.
+- **Locking back on resets the view; turning free ON does not.** Free, the
+  target is left wherever the eye happened to be looking - out in the void, or
+  under the isle - so an orbit picked straight back up would swing the isle
+  around a point off in the dark. `setFreeCamera(false)` calls `reset()` for
+  exactly that, which lets the held keys go as well. The other way needs
+  nothing: the eye simply carries on from where the orbit had it.
+- **Free is on a leash, and reset view is the way home.** `panRadius` holds
+  the EYE within 3 island radii of the middle of the isle, in any direction,
+  and `reset()` puts the target back as well as the orientation. It is
+  measured to the eye rather than to what the eye is looking at, because with
+  nothing locked in the middle the eye is the only thing really moving - and
+  it has to clear the 31.5 the view starts at and leave room past it. Both
+  halves are needed: look up, hold forward, and the isle is out of frame in
+  seconds with nothing on screen to steer back by, so there has to be a key
+  that brings it home.
+- **Which mode the camera is in is the one thing the arrows cannot say for
+  themselves**, so `body.free-camera` lights the `#help` line that names the
+  key while it is on (`onFreeCamera` in `main.js` is the hook). That is not a
+  toast: it is a line already on screen for as long as the mode lasts, not a
+  notice that appears and goes.
 - **The camera keeps itself out of the ground.** The orbit target sits inside
   the isle, so this cannot be a ray cast outward from it - that hits terrain
   immediately. `_clearOfBlocks` in `orbitCamera.js` samples the camera's own
