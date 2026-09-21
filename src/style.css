@@ -142,6 +142,13 @@ html, body {
 
 #help b { color: var(--ink); font-weight: 600; }
 
+/* Which mode the camera is in is the one thing the arrows do not say for
+   themselves, so the hint that names the key lights up while it is on. It is a
+   line already on screen rather than a notice that appears - there are no
+   toasts, and a mode has to be readable for as long as it lasts. */
+body.free-camera .hint-free,
+body.free-camera .hint-free b { color: var(--accent); }
+
 #loading {
   inset: 0;
   display: grid;

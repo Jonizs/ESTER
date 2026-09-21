@@ -541,9 +541,16 @@ const controls = new OrbitCamera(camera, canvas, {
   distance: ISLAND_RADIUS * 2.1,
   minDistance: ISLAND_RADIUS * 0.5,
   maxDistance: ISLAND_RADIUS * 14,
-  autoSpin: false,
   pitch: 0.5,
+  // How far the free camera may fly from where it started: past the far shore,
+  // and no further. Measured rather than guessed - the isle is 15 across and
+  // the camera looks down at it, so at 2.5 radii it has slid off the bottom of
+  // the screen entirely and there is nothing left to steer back by. At 1.4 it
+  // still fills the lower half. The reset-view key is the way home from
+  // anywhere inside that.
+  panRadius: ISLAND_RADIUS * 1.4,
   isSolid: island.userData.isSolid,
+  onFreeCamera: (on) => document.body.classList.toggle('free-camera', on),
   settings
 });
 
@@ -829,7 +836,16 @@ autoFullscreen();
 
 // The menu owns the keyboard while it is open, and a station being moved
 // owns the drag on the canvas.
-controls.keyboardBlocked = () => menu.isOpen();
+//
+// The free camera is why this is the whole list rather than the menu alone: a
+// screen that is up has the arrows - the mover steps the station with them -
+// and flying the camera out from under it at the same time is one gesture
+// doing two things. The camera lets go of whatever is held while it is stood
+// down, so a key still down when a panel opened does not fly on behind it.
+controls.keyboardBlocked = () => (
+  menu.isOpen() || panels.isOpen() || crafting.isOpen() ||
+  wield.isOpen() || placement.isActive()
+);
 // A box already being dragged out keeps the camera still even if the right
 // button is pressed as well: a mouse is one pointer, so both gestures would
 // otherwise run off the same drag.
