@@ -57,7 +57,7 @@ function store() {
 
 export function createSaves({
   surface, propsGroup, props, blocked, person, inventory, progression,
-  setWorkbenchRepaired, onSpawn
+  setWorkbenchRepaired, onSpawn, onDrop
 }) {
 
   /** Everything worth keeping, as a plain object. */
@@ -133,7 +133,13 @@ export function createSaves({
     // is the whole list, so growing it rather than replacing it would double
     // every sapling on every launch.
     for (const prop of [...props]) {
-      if (prop.spawned) removeProp(prop, propsGroup, props);
+      // Through the caller, not `removeProp` directly: some props are more
+      // than their mesh. A plot is a dent pressed into the isle too, and
+      // dropping it without letting that block back up leaves a brown
+      // hollow behind that nothing can ever turn into farmland again.
+      if (!prop.spawned) continue;
+      if (onDrop) onDrop(prop);
+      else removeProp(prop, propsGroup, props);
     }
 
     for (const entry of data.props ?? []) {

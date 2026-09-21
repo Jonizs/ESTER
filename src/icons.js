@@ -341,6 +341,24 @@ export const MATERIAL_ART = {
     + '<path d="M6.2 13.6l1.1.5M9.1 15.6l1 .5M6.4 16.6l1 .5M15.2 13.4l1.2-.5M17.6 14.6l1.2-.6"'
     + ' fill="none" stroke="#5a3a1d" stroke-width="0.95" stroke-linecap="round"/>',
 
+  // A lump knocked out of a rock: the same isometric block the clod is drawn
+  // as, so the two read as the same *kind* of thing - something to stand on
+  // the isle - but in the stone's greys with the corners chipped off rather
+  // than a green sod on top.
+  brokenStone:
+      '<path d="M3.4 9.6L12 5.2 20.6 9.6 20.6 16.4 12 20.8 3.4 16.4z" fill="#8b929c"/>'
+    + '<path d="M12 13.4L20.6 9.6 20.6 16.4 12 20.8z" fill="#6f767f"/>'
+    + '<path d="M3.4 9.6L12 5.2 20.6 9.6 12 13.4z" fill="#aab1bd"/>'
+      // chips off the top corners, drawn as lighter facets
+    + '<path d="M6.9 8.1L12 5.2 14.6 6.5 9.2 9.2z" fill="#c3c9d4"/>'
+    + '<path d="M16.4 11.2L20.6 9.6 20.6 12.6 16.9 14.2z" fill="#828992"/>'
+    + '<path d="M3.4 9.6L12 5.2 20.6 9.6 20.6 16.4 12 20.8 3.4 16.4z'
+    + 'M3.4 9.6L12 13.4 20.6 9.6M12 13.4v7.4"'
+    + ' fill="none" stroke="#2b313c" stroke-width="1.3" stroke-linejoin="round"/>'
+      // the grain of the break
+    + '<path d="M6.3 12.2l1.4 1M6.6 15.4l1.5 1M14.8 15.9l1.6-.8M15.4 18.4l1.7-.8"'
+    + ' fill="none" stroke="#4a515c" stroke-width="0.95" stroke-linecap="round"/>',
+
   // Flint pickaxe: the head swept across the top of the haft with a point at
   // each end, which is the one silhouette nothing else in the set has - the
   // axe is a wedge on one side, the hoe a blade hung down.

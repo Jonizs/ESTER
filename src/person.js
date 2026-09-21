@@ -53,6 +53,38 @@ const FRESH_STATS = {
   mastery: null              // none to start with
 };
 
+/**
+ * One thing to do, whichever kind it is.
+ *
+ * The queue used to be a list of props, which is why ctrl could only ever
+ * add a tree or a rock: everything else - tilling, digging, reaping,
+ * filling a bucket - went through `doAt`, which cleared the queue and
+ * replaced whatever was on. A job is now either a prop to harvest or a
+ * `doAt` with its target and options kept beside it, and `_startNextJob`
+ * runs whichever it finds.
+ *
+ * `at` is on both of them because that is what "nearest first" measures.
+ */
+const propJob = (prop) => ({ prop, target: null, opts: null, at: { x: prop.x, z: prop.z } });
+const cellJob = (target, opts) => ({ prop: null, target, opts, at: { x: target.x, z: target.z } });
+
+/** Where a job is and what it is called - a running task answers too. */
+function spotOf(job) {
+  const at = job.at ?? (job.prop ? { x: job.prop.x, z: job.prop.z } : null);
+  if (!at) return null;
+  // A queued job keeps its request in `opts`; a running one has it written
+  // onto the task itself. `person.action` is the *displayed* line and is
+  // null while they are still walking, so it is deliberately not this.
+  return { x: at.x, z: at.z, action: (job.opts ? job.opts.action : job.action) ?? null };
+}
+
+/** The same work in the same place: asking twice should do nothing. */
+function sameSpot(a, b) {
+  const p = spotOf(a);
+  const q = spotOf(b);
+  return !!p && !!q && p.x === q.x && p.z === q.z && p.action === q.action;
+}
+
 export class Person {
   constructor(surface, startCell, { name = 'Ester', blocked } = {}) {
     this.surface = surface;
@@ -78,7 +110,7 @@ export class Person {
     this.path = [];
     this.segment = null;       // the step being walked, for the hop arc
     this.task = null;          // { prop, seconds, elapsed }
-    this.queue = [];           // the rest of a batch of work, nearest first
+    this.queue = [];           // the rest of the work, nearest first
     this.action = null;        // only set while actually working
     this.stats = { ...FRESH_STATS };
 
@@ -180,7 +212,9 @@ export class Person {
    * is skipped rather than stalling the batch.
    */
   workOnAll(list) {
-    this.queue = list.filter((prop) => !prop.gone && PROP_KINDS[prop.kind]?.action);
+    this.queue = list
+      .filter((prop) => !prop.gone && PROP_KINDS[prop.kind]?.action)
+      .map(propJob);
     return this._startNextJob();
   }
 
@@ -198,10 +232,29 @@ export class Person {
    */
   queueUp(prop, limit = Infinity) {
     if (prop.gone || !PROP_KINDS[prop.kind]?.action) return false;
-    if (this.task?.prop === prop || this.queue.includes(prop)) return false;
+    if (this.task?.prop === prop || this.queue.some((job) => job.prop === prop)) return false;
     if (!this.task) return this._begin(prop);
     if (this.jobCount() >= limit) return false;
-    this.queue.push(prop);
+    this.queue.push(propJob(prop));
+    return true;
+  }
+
+  /**
+   * The same, for a job with its own ending rather than a prop to harvest.
+   *
+   * Tilling, digging, reaping, filling a bucket and watering a plot all go
+   * through this, so ctrl means the same thing whatever is being asked for
+   * - which it did not, for a long time: the queue could only ever hold
+   * things to *cut down or pick up*, and every other order went in
+   * instead of what was already on.
+   */
+  queueAt(target, opts = {}, limit = Infinity) {
+    const job = cellJob(target, opts);
+    if (this.task && sameSpot(this.task, job)) return false;
+    if (this.queue.some((other) => sameSpot(other, job))) return false;
+    if (!this.task) return this._doAt(target, opts);
+    if (this.jobCount() >= limit) return false;
+    this.queue.push(job);
     return true;
   }
 
@@ -239,12 +292,20 @@ export class Person {
       let pick = 0;
       let best = Infinity;
       for (let i = 0; i < this.queue.length; i++) {
-        const prop = this.queue[i];
-        const d = Math.hypot(prop.x - this.x, prop.z - this.z);
+        const { at } = this.queue[i];
+        const d = Math.hypot(at.x - this.x, at.z - this.z);
         if (d < best) { best = d; pick = i; }
       }
-      const [prop] = this.queue.splice(pick, 1);
-      if (this._begin(prop)) return true;
+      const [job] = this.queue.splice(pick, 1);
+
+      if (job.prop) {
+        if (this._begin(job.prop)) return true;
+        continue;
+      }
+      // A job on a prop that has since gone - a plot somebody else put back
+      // to grass - is dropped rather than stalling the rest.
+      if (job.target.kind && job.target.gone) continue;
+      if (this._doAt(job.target, job.opts)) return true;
     }
     return false;
   }
@@ -258,13 +319,18 @@ export class Person {
    * `target` is a prop to stand beside or a cell to stand on. It replaces
    * whatever was in hand and clears the queue, like any other single order.
    */
-  doAt(target, { seconds = 1, action = null, then = null, adjacent = false } = {}) {
+  doAt(target, opts = {}) {
+    this.queue = [];
+    return this._doAt(target, opts);
+  }
+
+  /** The same, leaving the queue alone - what the queue itself runs. */
+  _doAt(target, { seconds = 1, action = null, then = null, adjacent = false } = {}) {
     const cells = target.kind
       ? footprintCells(target.kind, target)
       : [{ x: target.x, z: target.z }];
     if (!this.goTo(cells, { adjacent })) return false;
 
-    this.queue = [];
     this.task = {
       prop: target.kind ? target : null,
       at: { x: target.x, z: target.z },

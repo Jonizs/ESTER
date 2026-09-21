@@ -40,6 +40,10 @@ export const ITEMS = {
   // now rather than the turf it was. It cannot build the isle up: there is
   // no block above the original surface to put back.
   dirt:   { label: 'Dirt',   tint: '#c08a5a', fills: 'dirt' },
+  // A lump knocked out of a rock. It is worth nothing in a recipe and gives
+  // nothing back but itself when it is dug up again - it is a block to
+  // stand somewhere, and that is all it is for.
+  brokenStone: { label: 'Broken Stone', tint: '#9aa0ad', fills: 'brokenStone' },
   // Seeds are sown rather than planted: they go into ground that has
   // already been turned over, so `sows` names the kind of prop they may go
   // into rather than a prop of their own to stand on the isle.
@@ -76,7 +80,10 @@ export const ITEMS = {
   },
   flintPickaxe: {
     label: 'Flint Pickaxe', tint: '#aab6d8', uses: 120, serves: ['flintPickaxe'], wields: true,
-    digs: { stone: 'stone' }
+    // A block of broken stone stood back on the isle gives only itself
+    // back, never the stone it was knocked out of - so a wall is something
+    // to build with rather than somewhere to store rock.
+    digs: { stone: 'stone', brokenStone: 'brokenStone' }
   },
   // The hoe does no gathering of its own; what it is for is the ground.
   // `tills` is what lets a click on grass turn it over - see main.js.

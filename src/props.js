@@ -35,7 +35,17 @@ export const PROP_KINDS = {
     icon: 'sapling',
     grows: 'tree'
   },
-  rock: { label: 'rock', action: 'Picking up a rock', seconds: 7, icon: 'stone', yield: { item: 'stone', amount: 3 } },
+  // A rock is broken up rather than carried off: four stone out of it, and
+  // one lump too knocked about to be worth anything but standing back on
+  // the isle.
+  rock: {
+    label: 'rock',
+    action: 'Picking up a rock',
+    seconds: 7,
+    icon: 'stone',
+    yield: { item: 'stone', amount: 4 },
+    drops: [{ item: 'brokenStone', min: 1, max: 1 }]
+  },
   // Weeds. Small, quick, and the only thing on the isle that gives fibre -
   // there is no fixed `yield`, only the roll, so a clump is 1 or 2 and never
   // nothing. `gap` is its own: weeds come up in patches, and holding them to
@@ -63,6 +73,11 @@ export const PROP_KINDS = {
   farmland: {
     label: 'farmland',
     placed: true,          // outlines on hover, like a station
+    // ...but it does not go anywhere. It is a hole in the isle as much as a
+    // prop - the block under it is pressed down and repainted - so carrying
+    // it off would leave the dent behind and take the soil somewhere there
+    // is none. Put it back to grass with a hoe instead.
+    fixed: true,
     icon: 'seeds',
     // What it holds: 200ml is a bucketful, and a fresh plot is dry - turned
     // ground holds no water of its own, and nothing drinks until something
@@ -360,6 +375,7 @@ const OUTLINE_COLOUR = 0x8ad8ff;
 export function canMove(prop) {
   const kind = prop && !prop.gone && PROP_KINDS[prop.kind];
   if (!kind?.placed) return false;
+  if (kind.fixed) return false;
   if (kind.cost && !prop.repaired) return false;
   return true;
 }

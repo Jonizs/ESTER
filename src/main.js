@@ -103,7 +103,12 @@ function syncTargets() {
     if (agent.task?.prop && agent.path.length > 0 && !agent.task.prop.gone) {
       wanted.add(agent.task.prop);
     }
-    for (const prop of agent.queue) if (!prop.gone) wanted.add(prop);
+    // A queued job is either a prop to harvest or a job with its own
+    // ending, and only the ones standing on a prop have anything to light.
+    for (const job of agent.queue) {
+      const prop = job.prop ?? (job.target?.kind ? job.target : null);
+      if (prop && !prop.gone) wanted.add(prop);
+    }
   }
 
   for (const prop of targets) {
@@ -268,6 +273,19 @@ const TILL_SECONDS = 4;
 const REAP_SECONDS = 5;
 const FILL_SECONDS = 2;
 
+/**
+ * Give an agent a job, either instead of or behind what they are doing.
+ *
+ * Every order that is not "harvest this prop" goes through here, which is
+ * what makes ctrl mean the same thing whatever is being asked for. It did
+ * not for a long time: the queue could only hold things to cut down or pick
+ * up, so ctrl-clicking a patch of grass to till threw away the batch that
+ * was already running.
+ */
+function order(agent, target, opts, queue = false) {
+  return queue ? agent.queueAt(target, opts, JOB_LIMIT) : agent.doAt(target, opts);
+}
+
 /** The tool an agent is holding, if it is one that does this job. */
 function holding(agent, test) {
   const item = agent?.tool && ITEMS[agent.tool.item];
@@ -288,10 +306,10 @@ function canTill(agent, cell) {
 }
 
 /** A click on bare ground with a hoe in hand: turn it over. */
-function tillGround(agent, cell) {
+function tillGround(agent, cell, queue = false) {
   if (!canTill(agent, cell)) return false;
 
-  return agent.doAt(cell, {
+  return order(agent, cell, {
     seconds: TILL_SECONDS,
     // Beside the cell, not on it. Standing on the plot they have just made
     // puts an agent between the cursor and it, and a plot that cannot be
@@ -314,7 +332,7 @@ function tillGround(agent, cell) {
       syncBlocked(props, blocked);
       wearTool(agent, 1);
     }
-  });
+  }, queue);
 }
 
 /**
@@ -327,9 +345,21 @@ function openPlot(plot) {
   island.userData.sinkBlock(plot.x, plot.z, FARMLAND_SINK, FARMLAND_SOIL);
 }
 
-/** And closing it again: the block comes back up when the plot goes. */
-function closePlot(plot) {
+/**
+ * Taking a plot away again, dent and all.
+ *
+ * This is the ONLY way a plot leaves the isle, because a plot is two
+ * things: a prop, and a block of the isle pressed down and repainted.
+ * Removing the prop on its own leaves the dent behind for good - a brown
+ * hollow that is not farmland and cannot be made into any - and that is
+ * exactly what a restore over a live plot used to do.
+ */
+function dropPlot(plot) {
   island.userData.raiseBlock(plot.x, plot.z);
+  // A gone prop must not stay the hovered one, or its outline burns on
+  // something that is no longer in the scene.
+  if (hovered === plot) setHovered(null);
+  removeProp(plot, propsGroup, props);
 }
 
 const DIG_SECONDS = 5;
@@ -369,10 +399,10 @@ function canDig(agent, cell) {
   return { tool, drop };
 }
 
-function digGround(agent, cell) {
+function digGround(agent, cell, queue = false) {
   if (!canDig(agent, cell)) return false;
 
-  return agent.doAt(cell, {
+  return order(agent, cell, {
     seconds: DIG_SECONDS,
     action: 'Digging',
     // Stood beside it, not on it - they are taking away the ground they
@@ -392,7 +422,7 @@ function digGround(agent, cell) {
       // Everything that reads the heightmap has to be told it moved.
       syncBlocked(props, blocked);
     }
-  });
+  }, queue);
 }
 
 /** Is this plot's crop ready to come up? */
@@ -416,12 +446,12 @@ const busyPlot = (prop) => prop.kind === 'farmland' && !!prop.sown && !ripe(prop
  * back to grass. A crop still growing is left alone - turning a field over
  * by accident three minutes in is not something to make easy.
  */
-function workFarmland(agent, plot) {
+function workFarmland(agent, plot, queue = false) {
   if (!holding(agent, (t) => t.tills)) return false;
   if (plot.sown && !ripe(plot)) return false;
 
   const reaping = ripe(plot);
-  return agent.doAt(plot, {
+  return order(agent, plot, {
     seconds: reaping ? REAP_SECONDS : TILL_SECONDS,
     adjacent: true,
     action: reaping ? 'Reaping the wheat' : 'Putting the ground back',
@@ -444,20 +474,19 @@ function workFarmland(agent, plot) {
         return;
       }
 
-      closePlot(plot);
-      removeProp(plot, propsGroup, props);
+      dropPlot(plot);
       syncBlocked(props, blocked);
     }
-  });
+  }, queue);
 }
 
 /** A click on a water source with a bucket in hand: fill it up. */
-function fillBucket(agent, source) {
+function fillBucket(agent, source, queue = false) {
   const bucket = holding(agent, (t) => t.holds === 'water');
   if (!bucket || agent.tool.left >= bucket.capacity) return false;
   if ((source.water ?? 0) <= 0) return false;
 
-  return agent.doAt(source, {
+  return order(agent, source, {
     seconds: FILL_SECONDS,
     action: 'Filling the bucket',
     adjacent: true,
@@ -468,16 +497,16 @@ function fillBucket(agent, source) {
       source.water -= drawn;
       agent.tool.left += drawn;
     }
-  });
+  }, queue);
 }
 
 /** A click on a plot with water in the bucket: pour it in. */
-function waterFarmland(agent, plot) {
+function waterFarmland(agent, plot, queue = false) {
   const bucket = holding(agent, (t) => t.holds === 'water');
   if (!bucket || agent.tool.left <= 0) return false;
   if (plot.water >= PROP_KINDS.farmland.water.max) return false;
 
-  return agent.doAt(plot, {
+  return order(agent, plot, {
     seconds: FILL_SECONDS,
     adjacent: true,
     action: 'Watering the ground',
@@ -488,7 +517,7 @@ function waterFarmland(agent, plot) {
       plot.water += poured;
       agent.tool.left -= poured;
     }
-  });
+  }, queue);
 }
 
 /**
@@ -763,8 +792,8 @@ function devReset() {
     // tree one grew into - goes away rather than being reset in place. A
     // plot takes its dent with it.
     if (prop.spawned) {
-      if (prop.kind === 'farmland') closePlot(prop);
-      removeProp(prop, propsGroup, props);
+      if (prop.kind === 'farmland') dropPlot(prop);
+      else removeProp(prop, propsGroup, props);
       continue;
     }
     if (prop.home) placeProp(prop, prop.home, surface);
@@ -821,6 +850,9 @@ const saves = createSaves({
     setWorkbenchState(prop, repaired);
     castFromFront(prop.mesh);
   },
+  // A plot is a dent in the isle as well as a prop, so the restore cannot
+  // simply drop the props it is replacing - the dent would stay behind.
+  onDrop: (prop) => { if (prop.kind === 'farmland') dropPlot(prop); else removeProp(prop, propsGroup, props); },
   onSpawn: (prop) => {
     castFromFront(prop.mesh);
     // A plot is a dent in the isle and a crop at some stage of coming up,
@@ -997,17 +1029,18 @@ function handleClick(event) {
         // is a hoe's job or a bucket's depending on who is standing there.
         if (prop && !prop.gone && prop.kind === 'farmland') {
           const agent = selectedAgent();
+          const q = queueing(event);
           // Sowing has already had its go above. What is left is watering it
           // and working it with a hoe - and when neither is on, the click is
           // NOT spent: a crop coming up is scenery, and standing between the
           // player and the ground it grows on would mean a field they cannot
           // walk across or dig beside. It falls through to the isle below.
-          if (agent && (waterFarmland(agent, prop) || workFarmland(agent, prop))) return;
+          if (agent && (waterFarmland(agent, prop, q) || workFarmland(agent, prop, q))) return;
           break;
         }
         if (prop && !prop.gone && prop.kind === 'waterCatcher') {
           const agent = selectedAgent();
-          if (agent) fillBucket(agent, prop);
+          if (agent) fillBucket(agent, prop, queueing(event));
           return;
         }
 
@@ -1035,9 +1068,6 @@ function handleClick(event) {
     // the same answer the cursor's own brackets are drawn around.
     const { x, z } = blockAt(hit);
     if (surface.has(`${x},${z}`)) {
-      // Ctrl is the queue gesture, so a miss with it held leaves the queue
-      // alone rather than calling the whole thing off and walking there.
-      if (queueing(event)) return;
       const agent = selectedAgent();
       if (!agent) return;
       // Shift turns the ground over rather than walking onto it - a plain
@@ -1049,10 +1079,19 @@ function handleClick(event) {
       // Shift is "work this ground with what is in hand": a hoe turns it
       // over, a shovel or a pickaxe takes a block out of it. One modifier,
       // and the tool says which of them it means.
+      //
+      // Ctrl works on it as it does on everything else: the job goes behind
+      // whatever is already on rather than instead of it. Shift and ctrl
+      // together is a whole field tilled in one pass.
       if (tilling(event)) {
-        tillGround(agent, { x, z }) || digGround(agent, { x, z });
+        const q = queueing(event);
+        tillGround(agent, { x, z }, q) || digGround(agent, { x, z }, q);
         return;
       }
+      // Ctrl on its own is the queue gesture, so a miss with it held leaves
+      // the queue alone rather than calling the whole thing off and walking
+      // there. Walking is never queued: it is what CALLS a queue off.
+      if (queueing(event)) return;
       if (agent.walkTo({ x, z })) markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
       return;
     }

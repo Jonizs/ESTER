@@ -22,7 +22,11 @@ const LAYERS = {
   moss: { color: 0x3a8a5e, roughness: 0.9, metalness: 0.0 },
   dirt: { color: 0x6d503c, roughness: 0.95, metalness: 0.0 },
   stone: { color: 0x8b8d92, roughness: 0.82, metalness: 0.03 },
-  bedrock: { color: 0x5a6173, roughness: 0.8, metalness: 0.06, emissive: 0x16283c, emissiveIntensity: 0.12 }
+  bedrock: { color: 0x5a6173, roughness: 0.8, metalness: 0.06, emissive: 0x16283c, emissiveIntensity: 0.12 },
+  // Never generated - only ever put back in by hand. A lump knocked out of
+  // a rock and stood back on the isle, duller and rougher than the stone
+  // the isle is made of so a wall of it reads as built rather than dug.
+  brokenStone: { color: 0x6e737c, roughness: 0.95, metalness: 0.02 }
 };
 
 // Buried blocks are drawn from the same palette, so the isle is layered all
@@ -267,8 +271,13 @@ export function createIsland() {
     const found = blocks.get(key(x, column.top, z));
     if (!found) return false;
 
-    const held = { y: column.top, mesh: found.mesh, index: found.index, colour: null };
-    if (found.mesh.instanceColor) {
+    // What it looked like before ANY of this, not before this call: sinking
+    // a block that is already sunk (a restore over a live plot does exactly
+    // that) would otherwise record the soil brown as the grass to put back,
+    // and the cell would stay brown for the rest of the run.
+    const held = sunk.get(`${x},${z}`)
+      ?? { y: column.top, mesh: found.mesh, index: found.index, colour: null };
+    if (held.colour === null && found.mesh.instanceColor) {
       found.mesh.getColorAt(found.index, wasColour);
       held.colour = wasColour.getHex();
     }

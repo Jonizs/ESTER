@@ -198,11 +198,19 @@ with one inhabitant who walks around and works on what is there.
   Anything unreachable or already felled is skipped rather than stalling the
   batch, and `walkTo` calls the whole thing off. The bench is left out of a
   box on purpose: it is a station with a cost, repaired by clicking it.
-- **Ctrl adds, and never takes anything away.** Holding it turns a click on
-  a tree or a rock into `queueUp` (`person.js`) - behind whatever the agent
-  is already doing rather than instead of it, up to `JOB_LIMIT` in all, and
-  asking twice for the same thing does nothing rather than queueing it
-  twice. A box drawn with it held adds as well, taking however many of the
+- **Ctrl adds, and never takes anything away - on EVERY order.** Holding it
+  turns a click into a job queued behind whatever the agent is already doing
+  rather than instead of it, up to `JOB_LIMIT` in all, and asking twice for
+  the same thing does nothing rather than queueing it twice. That is
+  `queueUp` for a prop to harvest and `queueAt` for everything else -
+  tilling, digging, reaping, putting ground back, filling a bucket,
+  watering. It was only ever the first of those for a long time, because the
+  queue was a list of *props*: `doAt` cleared it, so ctrl-clicking a patch
+  of grass threw away the batch that was already running. The queue holds
+  jobs now (`propJob`/`cellJob` in `person.js`), `_startNextJob` runs
+  whichever kind it finds, and `order()` in `main.js` is the one door every
+  ground job goes through. Walking is the exception and always will be: it
+  is what CALLS a queue off. A box drawn with it held adds as well, taking however many of the
   three are still going spare. Because it only ever adds, a queue click that
   misses is silent: on bare ground it does not send them walking, and on the
   void it does not drop the selection. `queueing(event)` in `main.js` is the
@@ -440,9 +448,16 @@ with one inhabitant who walks around and works on what is there.
   above the isle's original surface, so a column can be restored and never
   raised. Nothing may be standing on the cell: a block appearing under a
   prop leaves it buried and under an agent leaves them in the floor.
+- **A rock gives four stone and one lump too broken to be worth any.**
+  `brokenStone` is in no recipe and gives nothing back but itself when it is
+  dug up again - it is a block to stand somewhere and that is all it is for,
+  so a wall of it is something to build and never somewhere to store rock.
+  Its layer is in `LAYERS` but nothing generates it; the only way one gets
+  into the isle is `fillBlock` putting one there.
 - **`ITEMS[tool].digs` is which layers a tool takes out and what each
   leaves.** A shovel has the soft ground (`grass`, `moss`, `dirt` -> dirt), a
-  pickaxe has the rock (`stone` -> stone), and neither touches bedrock, which
+  pickaxe has the rock (`stone` -> stone) and the broken stone somebody put
+  back (`brokenStone` -> brokenStone), and neither touches bedrock, which
   is what the isle is standing on. Adding a tool that digs is an entry here,
   not a branch in `digGround`.
 - **Ask again when the agent gets there, not only when the order is given.**
@@ -687,6 +702,21 @@ with one inhabitant who walks around and works on what is there.
   `RECIPES` in `crafting.js` is the list - pushing an entry onto it is all
   that is needed to see it on screen, and a card is a picture and a name,
   because how it is laid out is shown on the grid itself when clicked.
+- **A plot does not move, and `fixed` is what says so.** `PROP_KINDS[kind]
+  .fixed` is refused by `canMove`, which is how a kind can be `placed` -
+  outlined under the cursor, something to interact with - without being
+  something to carry off. Farmland is the one: it is a hole in the isle as
+  much as a prop, so moving it would leave the dent behind and take the soil
+  somewhere there is none. A hoe puts it back to grass instead.
+- **Only `dropPlot` takes a plot away.** A plot is two things - a prop and a
+  block of the isle pressed down and repainted - so `removeProp` on its own
+  leaves the dent behind for good: a brown hollow that is not farmland and
+  that tilling only sinks further. That is what `saves.restore()` used to
+  do to every live plot before it put the saved ones back, which is why
+  `createSaves` takes an `onDrop` rather than calling `removeProp` itself.
+  `sinkBlock` guards the other half of it: sinking a block that is already
+  sunk keeps the colour recorded the FIRST time, or the soil brown gets
+  written down as the grass to put back and the cell never goes green again.
 - **Wreckage cannot be moved; repair it first.** `canMove()` in `props.js`
   is the one test - a `placed` kind that also has a `cost` is not movable
   until `prop.repaired`, so the fallen bench stays where it fell. It still
