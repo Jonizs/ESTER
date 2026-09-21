@@ -8,14 +8,16 @@
 
 // The order is the order the keybind list shows them in.
 export const ACTIONS = [
-  { id: 'orbitLeft', label: 'Orbit left', key: 'ArrowLeft' },
-  { id: 'orbitRight', label: 'Orbit right', key: 'ArrowRight' },
-  { id: 'orbitUp', label: 'Orbit up', key: 'ArrowUp' },
-  { id: 'orbitDown', label: 'Orbit down', key: 'ArrowDown' },
+  // One action each, whichever mode the camera is in: they orbit the isle
+  // normally and fly the free camera when it is on.
+  { id: 'orbitLeft', label: 'Orbit / move left', key: 'ArrowLeft' },
+  { id: 'orbitRight', label: 'Orbit / move right', key: 'ArrowRight' },
+  { id: 'orbitUp', label: 'Orbit up / move forward', key: 'ArrowUp' },
+  { id: 'orbitDown', label: 'Orbit down / move back', key: 'ArrowDown' },
   { id: 'zoomIn', label: 'Zoom in', key: '+' },
   { id: 'zoomOut', label: 'Zoom out', key: '-' },
   { id: 'resetView', label: 'Reset view', key: 'r' },
-  { id: 'autoSpin', label: 'Toggle auto-spin', key: 'f' },
+  { id: 'freeCamera', label: 'Toggle free camera', key: 'f' },
   { id: 'moveStation', label: 'Move station', key: 'a' },
   { id: 'wieldTool', label: 'Wield a tool', key: 's' },
   // One slot per agent, in the order the overview lists them. There is only

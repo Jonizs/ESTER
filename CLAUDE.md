@@ -54,7 +54,7 @@ with one inhabitant who walks around and works on what is there.
   - `src/island.js` - voxel island, and the surface heightmap everything
     standing on it uses (`group.userData.surface`, keyed `"x,z"`).
   - `src/space.js` - nebula shell, stars and lighting.
-  - `src/orbitCamera.js` - quaternion orbit camera.
+  - `src/orbitCamera.js` - quaternion orbit camera, and the free camera on F.
   - `src/noise.js` - deterministic value noise.
   - `src/props.js` - the few trees and rocks, the broken workbench in the
     middle, and the yellow target tint.
@@ -114,6 +114,47 @@ with one inhabitant who walks around and works on what is there.
   so keying bedrock off `bottom` painted the whole island body bedrock and
   produced zero stone. Bedrock is now limited to the deepest few blocks of
   the whole isle; everything under the soil is stone.
+- **F is the free camera, and it flies the same rig rather than a second
+  one.** `freeCamera` in `orbitCamera.js` is a mode, not another camera: the
+  four arrows push the orbit TARGET along the ground instead of turning about
+  it, and because the camera sits at target + offset the whole rig goes with
+  it - a right-drag still orbits whatever it has been flown to, the wheel
+  still zooms, and `_clearOfBlocks` still keeps it out of the isle. It took
+  the `f` key off the auto-spin, which was already passed `autoSpin: false`
+  and could only ever have put back the idle drift the rule below forbids.
+- **The movement keys are HELD, not tapped, or there are no diagonals.**
+  `_held` in `orbitCamera.js` is a Set of the movement actions that are down
+  and the step is taken in the frame loop, which is the whole of "press two
+  and go diagonally" - a keydown that moves the camera once can only ever go
+  one way at a time. The combined direction is divided by its own length, so
+  a diagonal is the same speed as a straight line rather than 1.41 times
+  faster; it measures at exactly 45 degrees and exactly the same distance a
+  second.
+- **The arrows are one pair of actions, and the mode decides what they do.**
+  `orbitLeft`/`orbitRight`/`orbitUp`/`orbitDown` orbit until F is pressed and
+  fly the camera after it, so rebinding them in the pause menu rebinds both -
+  two sets of bindings for one pair of keys would be worse than one that
+  reads a little oddly in the list.
+- **Let the held keys go whenever the camera is stood down.** A key still
+  down when a panel opens sends its keyup to whatever took the keyboard, so
+  the camera would fly on behind it forever; `update` clears `_held` while
+  `keyboardBlocked` is true, and `blur` clears it when the window goes. That
+  is also why `keyboardBlocked` is the whole list of screens rather than the
+  menu alone: the mover steps a station with the same four arrows, and flying
+  the camera out from under it at the same time is one gesture doing two
+  things.
+- **Free is bounded, and reset view is the way home.** `panRadius` holds the
+  camera within 1.4 island radii of where it started, and `reset()` puts the
+  target back as well as the orientation. Both are needed and the number was
+  measured, not guessed: the isle is only 15 across and the camera looks down
+  at it, so at 2.5 radii out it has slid off the bottom of the screen
+  entirely and there is nothing left on screen to steer back by. At 1.4 it
+  still fills the lower half of the frame.
+- **Which mode the camera is in is the one thing the arrows cannot say for
+  themselves**, so `body.free-camera` lights the `#help` line that names the
+  key while it is on (`onFreeCamera` in `main.js` is the hook). That is not a
+  toast: it is a line already on screen for as long as the mode lasts, not a
+  notice that appears and goes.
 - **The camera keeps itself out of the ground.** The orbit target sits inside
   the isle, so this cannot be a ray cast outward from it - that hits terrain
   immediately. `_clearOfBlocks` in `orbitCamera.js` samples the camera's own
