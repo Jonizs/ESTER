@@ -1092,6 +1092,13 @@ function handleClick(event) {
       object = object.parent;
     }
 
+    // Only a block of the isle is somewhere to walk. Anything else the ray
+    // met that is neither an agent nor a prop - a marker, a line, the sky -
+    // is passed over rather than read as ground: reading a click-wave ring
+    // lying on the grass as the ground is exactly what sent the agent off
+    // somewhere the brackets were not.
+    if (!hit.object.isInstancedMesh || hit.object.parent !== island) continue;
+
     // Otherwise walk to whatever patch of island was clicked. The block is
     // read off the face rather than the point, so clicking the side of a
     // ledge means that block and not the column standing in front of it -

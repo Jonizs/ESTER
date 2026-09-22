@@ -420,6 +420,15 @@ with one inhabitant who walks around and works on what is there.
   than no mark. It rides the same throttled pass as the readout, and
   pressing or releasing shift clears the throttle so the mark appears with
   the key rather than waiting for the mouse to move.
+- **A click only walks to a block of the ISLE.** `handleClick` casts at the
+  whole scene, and anything there that is neither an agent, a prop nor one
+  of the isle's own meshes is passed over. The click-wave rings are pooled
+  and only HIDDEN when spent, and three.js still raycasts hidden meshes - so
+  a ring left lying where an earlier click landed caught the next click that
+  passed through it, and the agent walked to the cell under the old ring
+  while the brackets (cast at the isle alone) sat on the block under the
+  cursor. The rings now refuse rays outright as well. Anything else added to
+  the scene that is only dressing wants `raycast = () => {}` the same way.
 - **Which block a ray hit is read off the FACE, not the point.** The hit
   point is on the surface, so rounding it is a coin toss at every face.
   `blockAt` in `main.js` steps a hair back along the face's own normal

@@ -39,6 +39,12 @@ export function createMarkers(scene, { color = 0x7df5a5 } = {}) {
     mesh.rotation.x = -Math.PI / 2;   // flat on the ground
     mesh.renderOrder = 2;
     mesh.visible = false;
+    // Never a click target. A spent ring is only hidden, and three.js still
+    // raycasts hidden meshes - so a ring left lying where an earlier click
+    // landed caught the next click that passed through it, and the agent
+    // walked to the cell under the old ring instead of the one under the
+    // cursor.
+    mesh.raycast = () => {};
     group.add(mesh);
     rings.push({ mesh, active: false, age: 0, delay: 0 });
   }
