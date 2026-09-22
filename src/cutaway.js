@@ -39,7 +39,7 @@ import * as THREE from 'three';
  */
 
 const RADIUS = 3.3;          // how far a block's centre may be from the line - wide, so the gap is a proper view and not a slot
-const SHORT_OF = 0.9;        // where it stops, before the agent's chest
+const SHORT_OF = 0;          // right up to the agent: the one block they stand on is kept on its own (uCutKeep), and stopping short left the blocks beside them covering them
 const CHEST = 0.9;           // the height on the agent the tube is aimed at
 const OPEN_RATE = 16;        // blocks of radius a second, growing or shrinking
 const LINGER = 0.35;         // seconds it stays open once they are back in view

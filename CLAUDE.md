@@ -212,7 +212,10 @@ with one inhabitant who walks around and works on what is there.
     blocks taken out of the way. Being a shader it follows the camera round
     as it orbits, and the instance matrices are never touched.
   - The tube is wide - `RADIUS` 3.3 blocks - so the gap is a real view onto
-    the agent rather than a slot through the hill.
+    the agent rather than a slot through the hill - and it runs right up to
+    them (`SHORT_OF` 0). It used to stop almost a block short to spare their
+    ground, which left the blocks right in front of them standing and
+    covering them; the one block they stand on is spared on its own now.
   - Only the ONE block the agent stands on is kept (`uCutKeep`, read off the
     heightmap, not their height, which bobs mid-hop). An earlier rule kept
     everything at or below their feet and was taken out on request: it left
