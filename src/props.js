@@ -752,8 +752,11 @@ export function setCropStage(prop, stage) {
     // Ripe: a head on every stalk, which is what says it is ready without
     // having to read the number at the top of the screen.
     if (stage === CROP_STAGES - 1) {
+      // Sunk well down over the top of its stalk rather than balanced on it:
+      // an overlap of a hair left a thin seam under each head, and from low
+      // down they read as floating over the crop.
       const head = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.17, 0.15), mat(0xe8cc63));
-      head.position.set(x, -FARMLAND_SINK + tall + 0.06, z);
+      head.position.set(x, -FARMLAND_SINK + tall + 0.01, z);
       head.castShadow = true;
       crop.add(head);
     }

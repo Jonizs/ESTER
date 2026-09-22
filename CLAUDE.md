@@ -756,10 +756,22 @@ with one inhabitant who walks around and works on what is there.
   `takeOutput` calls `take`/`add`. Anything new that moves items on that
   screen has to decide which of the two it is, or a run quietly gains or
   loses things.
-- **Clicking a recipe draws it on the grid in red, and that is all it is.**
-  The showcase fills no cells: a cell that actually holds something draws
-  that instead, over the top. It is put away by clicking the card again, by
-  clicking another, or by closing the screen.
+- **Clicking a recipe lays it out from stock, and red is what is MISSING.**
+  `fillFrom` in `crafting.js` clears the bench (a view, so that costs
+  nothing) and puts one of each item into every cell of the shape, in the
+  same corner the drawing is in, plus the tool - the one the recipe names,
+  or anything that `serves` for it. Whatever could not be found is left
+  empty, and only an EMPTY cell of a shown recipe is drawn red: now that the
+  drawing is filled in, red has to mean "this one is missing", and tinting
+  the filled cells the same made the missing ones impossible to pick out.
+  `#craft-missing` under the bench says how many of each, counted against
+  the whole ledger rather than cell by cell - a shape can sit anywhere on the
+  grid, so comparing against the drawing's corner would call a recipe short
+  the moment it was moved along one. Shift lays out as many sets as there is
+  stock for, the way shift takes everything out of the output. Nothing is
+  spent by any of it; the output slot is still where a craft is locked in.
+  Clicking the card again puts the drawing away and leaves the grid alone -
+  by then it is the player's.
 - **Crafting is not one of them and has no key.** It is its own overlay
   (`src/crafting.js`, `#crafting`), and the only way in is to click the
   workbench standing in the middle of the isle. Opening it closes the panels,
@@ -942,6 +954,29 @@ with one inhabitant who walks around and works on what is there.
   over one flat shape closes up into a striped barrel at tile size; drawing
   the turns as alternating bands of two tones keeps them reading as separate
   lengths lying against each other.
+  Rope has been redrawn three times, which is its own lesson. The ruled
+  coil became a barrel; the figure-of-eight hank drawn after it read as a
+  pretzel - two stiff rings with dark eyes, and ticks across them that looked
+  like scratches. What finally made it rope is the TWIST: a light dash laid
+  along every strand, offset ring to ring so the bands do not line up into
+  stripes, and the loose end hanging down the front with its whipping.
+  `ropeCoil` in `icons.js` computes it from a few numbers, because each ring
+  is dozens of points.
+- **Draw a thin part in its light tones, or it is all outline.** The flint
+  knife's blade was a sliver of the flint's own dark grey inside a 1.35
+  outline, and at tile size the middle of the knife came out as a black
+  slot - it read as a hole. Two facets either side of a spine, in the pale
+  greys of a fresh-struck face, fixed it. The same goes for anything narrow.
+- **A thing hanging off a thing must reach it.** The bucket's rope handle
+  stopped short of the far rim in mid-air, and the wheat's leaves and awns
+  began a few pixels out from the stalk - both read as parts floating beside
+  the object rather than of it. Root every leaf on its stem, start every awn
+  at the tip of its grain, and tie a handle on at BOTH ends.
+- **A material is drawn the size it is, relative to the others.** Flint is
+  at four fifths of the tile, inside a scaled group, because at full size a
+  knapped flake stood as big as the whole rock it came out of. Scaling
+  thins the lines, so the outline widths inside the group are raised to
+  match the rest of the set.
 - **An inventory slot is a picture, a count and nothing else.** The tile is
   square, the art is drawn to 62% of it, the count sits in a badge in the top
   right corner, and what the material is *called* is on the tile as

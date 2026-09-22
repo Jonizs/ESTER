@@ -1890,6 +1890,50 @@ body.free-camera .hint-free b { color: var(--accent); }
 
 #crafting .bench .grid4 { flex: 1; }
 
+/* What a shown recipe is short of. In the rose of the red drawing on the
+   grid, so the two read as the same message: the cells say where, this says
+   how many. */
+#craft-missing {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 12px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent-3) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-3) 10%, rgba(4, 3, 14, 0.5));
+  font-size: 12px;
+}
+
+#craft-missing[hidden] { display: none; }
+
+#craft-missing .missing-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-3);
+  margin-right: 2px;
+}
+
+#craft-missing .missing-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 7px;
+  background: rgba(4, 3, 14, 0.45);
+  color: var(--ink);
+}
+
+#craft-missing .missing-item b {
+  color: var(--accent-3);
+  font-variant-numeric: tabular-nums;
+}
+
 #crafting .bench-arrow {
   flex: none;
   color: rgba(150, 180, 255, 0.5);

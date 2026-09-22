@@ -267,6 +267,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   const recipeList = root.querySelector('#craft-recipes');
   const heldEl = root.querySelector('#craft-held');
   const outputEl = root.querySelector('#craft-output');
+  const missingEl = root.querySelector('#craft-missing');
 
   // --- what is on the bench, and what is on the cursor ---------------------
   // Both are stacks: `{ item, count }`, or null for an empty cell / an empty
@@ -613,6 +614,101 @@ export function createCrafting({ inventory, blocked, onOpen }) {
   }
 
   /**
+   * The tool a recipe would be made with, out of what is still in stock:
+   * the one it names if there is one, and anything that serves for it if
+   * not - an axe will cut sticks when there is no knife to hand.
+   */
+  function toolFor(recipe) {
+    if (!recipe.tool) return null;
+    if (available(recipe.tool) > 0) return recipe.tool;
+    return Object.keys(ITEMS).find((item) => servesAs(item, recipe.tool) && available(item) > 0) ?? null;
+  }
+
+  /**
+   * Clicking a recipe lays it out on the grid from what is in stock.
+   *
+   * The whole bench is cleared first - it is a view over the ledger, so
+   * nothing is lost by it - and then every cell of the shape takes one of
+   * its item, in the same corner the red drawing is in, so whatever could
+   * not be found is left showing red exactly where it goes. Nothing is
+   * spent: this only arranges, and the output slot is still where a craft
+   * is locked in.
+   *
+   * Shift lays out as many sets as there is stock for, the way shift takes
+   * everything out of the output slot - so a stack of wood goes down ready
+   * to be made into planks in one go.
+   */
+  function fillFrom(recipe, { most = false } = {}) {
+    cells.fill(null);
+    held = null;
+
+    const layout = demo();
+    if (!layout) return;
+
+    const perSet = new Map();
+    for (const [i, item] of layout) {
+      if (i === toolDemoAt) continue;
+      perSet.set(item, (perSet.get(item) ?? 0) + 1);
+    }
+
+    let sets = 1;
+    if (most) {
+      sets = Math.min(...[...perSet].map(([item, n]) => Math.floor(available(item) / n)));
+      sets = Math.max(1, Number.isFinite(sets) ? sets : 1);
+    }
+
+    // `available` goes down as cells are filled, so a short item fills the
+    // cells it can and leaves the rest empty rather than overdrawing.
+    for (const [i, item] of layout) {
+      if (i === toolDemoAt) continue;
+      const give = Math.min(sets, available(item));
+      if (give > 0) cells[i] = { item, count: give };
+    }
+
+    const tool = toolFor(recipe);
+    if (tool && toolDemoAt >= 0) cells[toolDemoAt] = { item: tool, count: 1 };
+  }
+
+  /**
+   * What a shown recipe is short of, for one craft: `[{ item, count }]`.
+   *
+   * Counted against everything held rather than cell by cell, because a
+   * shape can be laid out anywhere on the grid - comparing against the
+   * corner the drawing is in would call a recipe short the moment it was
+   * moved one cell along. The grid, the cursor and the stock row are all
+   * the one ledger, so the ledger is the whole answer.
+   */
+  function shortOf(recipe) {
+    const short = [];
+    for (const [item, need] of recipeCost(recipe)) {
+      const have = inventory.count(item);
+      if (have < need) short.push({ item, count: need - have });
+    }
+    if (recipe.tool) {
+      const any = Object.keys(ITEMS).some((item) => servesAs(item, recipe.tool) && inventory.count(item) > 0);
+      if (!any) short.push({ item: recipe.tool, count: 1 });
+    }
+    return short;
+  }
+
+  let missingKey = null;
+
+  function updateMissing() {
+    const recipe = showcase ? RECIPES.find((r) => r.id === showcase) : null;
+    const short = recipe ? shortOf(recipe) : [];
+    const key = short.map((s) => `${s.item}:${s.count}`).join(',');
+    if (key === missingKey) return;
+    missingKey = key;
+
+    missingEl.hidden = short.length === 0;
+    missingEl.innerHTML = short.length === 0 ? '' : '<span class="missing-label">Missing</span>'
+      + short.map(({ item, count }) => `
+        <span class="missing-item" style="--tint:${ITEMS[item]?.tint ?? '#e8646a'}">
+          ${itemIcon(item, 20)}<b>${count}</b>${ITEMS[item]?.label ?? item}
+        </span>`).join('');
+  }
+
+  /**
    * Draw a wear bar: how much of the tool is left, and green through to red
    * as it goes. The colour is written here rather than in the stylesheet
    * because it has to follow the same number the width does.
@@ -672,8 +768,13 @@ export function createCrafting({ inventory, blocked, onOpen }) {
       el.classList.toggle('full', !!cell);
       el.classList.toggle('aim', !!aimed);
       el.classList.toggle('ghost', !!dragGhost);
-      el.classList.toggle('demo', !!shown?.has(i));
-      el.classList.toggle('loose', shown?.has(i) && i === toolDemoAt);
+      // Only an EMPTY cell of a shown recipe is drawn red. Now that showing
+      // a recipe fills it from stock, red is what says "this one is
+      // missing" - a filled cell tinted the same would make the missing ones
+      // impossible to pick out, which is what it did.
+      const wanted = !!shown?.has(i) && !cell;
+      el.classList.toggle('demo', wanted);
+      el.classList.toggle('loose', wanted && i === toolDemoAt);
       el.classList.toggle('back', i === back);
       el.dataset.label = cell ? ITEMS[cell.item]?.label ?? cell.item : '';
       if (art && ITEMS[art]?.tint) el.style.setProperty('--tint', ITEMS[art].tint);
@@ -785,10 +886,18 @@ export function createCrafting({ inventory, blocked, onOpen }) {
 
   // Clicking a card lays the recipe over the grid; clicking it again, or
   // another one, puts it away. Delegated, because the cards are rebuilt.
+  //
+  // Showing one also lays it out: whatever is in stock goes into the cells
+  // it belongs in, and whatever is not stays drawn in red there, with a line
+  // under the bench saying how many are missing. Putting a recipe away
+  // leaves the grid alone - by then it is the player's to do with as they
+  // like.
   recipeList.addEventListener('click', (event) => {
     const card = event.target.closest('[data-recipe]');
     if (!card) return;
-    showcase = showcase === card.dataset.recipe ? null : card.dataset.recipe;
+    const again = showcase === card.dataset.recipe && !event.shiftKey;
+    showcase = again ? null : card.dataset.recipe;
+    if (!again) fillFrom(RECIPES.find((r) => r.id === showcase), { most: event.shiftKey });
     recipeKey = null;         // so the cards pick up `showing`
     update();
   });
@@ -1000,6 +1109,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     reconcile();
     updateGrid();
     updateOutput();
+    updateMissing();
     updateStock();
     updateHeld();
   }

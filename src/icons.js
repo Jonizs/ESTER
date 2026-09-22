@@ -94,6 +94,57 @@ export const ICONS = {
  * everything: the wrapper for these must not force `fill: none` and
  * `stroke: currentColor` over the top.
  */
+// --- rope, worked out rather than placed by hand ----------------------------
+// A coil of rope is three rings stacked one over another with the free end
+// hanging down the front, and every ring is the same strand: a dark rim, a
+// mid tone, and a light dash laid along it so the lay reads as the twisted
+// bands a rope actually has. Drawing that by hand is dozens of points per
+// ring, so it is computed once, here, from a handful of numbers.
+
+const r2 = (n) => +n.toFixed(2);
+
+/** An ellipse as a closed polyline, so it can be dashed like any strand. */
+function ringPath(cx, cy, rx, ry, steps = 48) {
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    pts.push(`${r2(cx + Math.cos(a) * rx)} ${r2(cy + Math.sin(a) * ry)}`);
+  }
+  return `M${pts.join('L')}Z`;
+}
+
+/** One length of twisted rope along `d`: rim, body, and the lay over it. */
+function ropeStrand(d, { w = 2.6, mid = '#b98347', light = '#ecc98c', offset = 0 } = {}) {
+  return `<path d="${d}" fill="none" stroke="#4a2c12" stroke-width="${r2(w + 1.4)}" stroke-linecap="round" stroke-linejoin="round"/>`
+    + `<path d="${d}" fill="none" stroke="${mid}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`
+    + `<path d="${d}" fill="none" stroke="${light}" stroke-width="${w}" stroke-dasharray="1.1 1" stroke-dashoffset="${offset}"/>`;
+}
+
+function ropeCoil({ rings = 3, cx = 11.4, top = 7.6, rx = 7.8, ry = 4.1, step = 2.3 } = {}) {
+  let s = '';
+  // The bottom ring first, so each ring above lies over the one below - and
+  // the lower ones a shade darker, in the shadow of the rest of the coil.
+  // Each ring's lay is offset from the next, or the bands line up into
+  // stripes running down the whole coil and it reads as a barrel again.
+  for (let k = rings - 1; k >= 0; k--) {
+    const shade = k === 0 ? {} : { mid: '#9c6a34', light: '#d6ad6c' };
+    s += ropeStrand(ringPath(cx, top + k * step, rx, ry), { offset: k * 0.55, ...shade });
+  }
+  // The free end, off the front of the top ring and hanging down over the
+  // rest - which is what says "rope" rather than "a stack of rings".
+  const fx = cx + rx * 0.62;
+  const fy = top + ry * 0.78;
+  const ex = fx + 0.5;
+  const ey = fy + 8.3;
+  s += ropeStrand(`M${r2(fx)} ${r2(fy)}C${r2(fx + 1.6)} ${r2(fy + 2.4)} ${r2(fx + 1.2)} ${r2(fy + 5.2)} ${r2(ex)} ${r2(ey)}`);
+  // A whipping just above the end, and the fibres fraying out below it.
+  s += `<path d="M${r2(ex - 1.7)} ${r2(ey - 1.9)}l3.3.5" fill="none" stroke="#4a2c12" stroke-width="2" stroke-linecap="round"/>`
+    + `<path d="M${r2(ex - 1.5)} ${r2(ey - 1.9)}l2.9.44" fill="none" stroke="#e7dca2" stroke-width="0.9" stroke-linecap="round"/>`
+    + `<path d="M${r2(ex - 0.7)} ${r2(ey + 0.3)}l-.8 1.5M${r2(ex)} ${r2(ey + 0.5)}v1.7M${r2(ex + 0.7)} ${r2(ey + 0.3)}l.8 1.5"`
+    + ' fill="none" stroke="#ecc98c" stroke-width="0.95" stroke-linecap="round"/>';
+  return s;
+}
+
 export const MATERIAL_ART = {
   // A felled log, cut face turned to the viewer, with a snapped branch
   // sticking out of the top.
@@ -184,16 +235,22 @@ export const MATERIAL_ART = {
   // Flint: one knapped stone, darker and colder than the rest of the rock,
   // with a struck edge down the right and a conchoidal flake scar on the
   // face. The point at the bottom is what says "this is the sharp one".
+  //
+  // Drawn at four fifths of the tile. At full size it was as big as the
+  // whole rock it is knapped out of, which is backwards - and the lines are
+  // thickened to match, so they come out the weight of the rest of the set.
   flint:
-      '<path d="M7.3 3.9l7.9 2.1 4.1 7.2-6.5 7.6-7.7-4.2-1.5-8.2z" fill="#5a6478"/>'
+      '<g transform="translate(12 12.4) scale(0.8) translate(-12 -12.4)">'
+    + '<path d="M7.3 3.9l7.9 2.1 4.1 7.2-6.5 7.6-7.7-4.2-1.5-8.2z" fill="#5a6478"/>'
     + '<path d="M7.3 3.9l7.9 2.1 1.1 5.6-6.9-1.3z" fill="#8794ad"/>'
     + '<path d="M15.2 6l4.1 7.2-6.5 7.6-3.4-9.5z" fill="#3c4457"/>'
     + '<path d="M7.3 3.9l7.9 2.1 4.1 7.2-6.5 7.6-7.7-4.2-1.5-8.2z"'
-    + ' fill="none" stroke="#151a27" stroke-width="1.4" stroke-linejoin="round"/>'
+    + ' fill="none" stroke="#151a27" stroke-width="1.7" stroke-linejoin="round"/>'
     + '<path d="M7.3 3.9l2.1 6 6.9 1.3M9.4 9.9l3.4 9.5"'
-    + ' fill="none" stroke="#151a27" stroke-width="1.15" stroke-linejoin="round"/>'
+    + ' fill="none" stroke="#151a27" stroke-width="1.4" stroke-linejoin="round"/>'
       // the struck edge, catching the light
-    + '<path d="M15.6 7.4l3 5.4" fill="none" stroke="#c3ccdd" stroke-width="1.1" stroke-linecap="round"/>',
+    + '<path d="M15.6 7.4l3 5.4" fill="none" stroke="#c3ccdd" stroke-width="1.35" stroke-linecap="round"/>'
+    + '</g>',
 
   // Fibre: a fan of blades bound near the foot, the way a handful of pulled
   // weeds actually sits in the hand - splayed out from one tie rather than
@@ -225,25 +282,16 @@ export const MATERIAL_ART = {
     + '<path d="M4.4 17.5l7.2-3.3" fill="none" stroke="#c9a94e" stroke-width="3" stroke-linecap="round"/>'
     + '<path d="M5.2 16.6l5.6-2.6" fill="none" stroke="#e6cd84" stroke-width="0.95" stroke-linecap="round"/>',
 
-  // Fibre rope: a hank - two loops of the same rope, bound in the middle by
-  // a few turns. That is how rope is actually stowed for carrying, and it
-  // is a far better silhouette than a coil: the figure of eight is unlike
-  // anything else in the set, where a coil kept closing up into a barrel.
+  // Fibre rope: a coil of it, three rings stacked with the end hanging down
+  // the front. Built by `ropeCoil` above.
   //
-  // Each loop is one stroked ellipse over a darker, wider one, so the ring
-  // gets its own outline for free; the lay is short ticks laid across the
-  // band, worked out round the ellipse rather than placed by hand.
-  rope:
-      '<ellipse cx="6.5" cy="12" rx="4.5" ry="5" fill="none" stroke="#6b4320" stroke-width="4.6"/>'
-    + '<ellipse cx="17.5" cy="12" rx="4.5" ry="5" fill="none" stroke="#6b4320" stroke-width="4.6"/>'
-    + '<ellipse cx="6.5" cy="12" rx="4.5" ry="5" fill="none" stroke="#e0b87a" stroke-width="3"/>'
-    + '<ellipse cx="17.5" cy="12" rx="4.5" ry="5" fill="none" stroke="#e0b87a" stroke-width="3"/>'
-    + '<path d="M9.8 13.4L10.5 16.2 M8.2 15.5L7.1 18 M5.9 15.9L3.4 17 M3.8 14.6L1.2 13.6 M3 12L1.5 9.6 M3.8 9.4L4.1 6.6 M5.9 8.1L7.8 6.2 M8.2 8.5L11 8.5 M9.8 10.6L12 12.4" fill="none" stroke="#a06f36" stroke-width="0.85" stroke-linecap="round"/>'
-    + '<path d="M20.8 13.4L21.5 16.2 M19.2 15.5L18.1 18 M16.9 15.9L14.4 17 M14.8 14.6L12.2 13.6 M14 12L12.5 9.6 M14.8 9.4L15.1 6.6 M16.9 8.1L18.8 6.2 M19.2 8.5L22 8.5 M20.8 10.6L23 12.4" fill="none" stroke="#a06f36" stroke-width="0.85" stroke-linecap="round"/>'
-    + '<path d="M10.1 6.3v11.4M12 6.1v11.8M13.9 6.3v11.4" fill="none" stroke="#6b4320" stroke-width="3.9" stroke-linecap="round"/>'
-    + '<path d="M10.1 6.3v11.4M12 6.1v11.8M13.9 6.3v11.4" fill="none" stroke="#e0b87a" stroke-width="2.4" stroke-linecap="round"/>'
-    + '<path d="M9.2 9.3l1.8-1.7M9.2 12.3l1.8-1.7M9.2 15.3l1.8-1.7M11.1 9.5l1.8-1.7M11.1 12.5l1.8-1.7M11.1 15.5l1.8-1.7M13 9.3l1.8-1.7M13 12.3l1.8-1.7M13 15.3l1.8-1.7"'
-    + ' fill="none" stroke="#a06f36" stroke-width="0.85" stroke-linecap="round"/>',
+  // Two earlier tries are worth not repeating. A flat coil ruled with lines
+  // closed up into a striped barrel. A figure-of-eight hank was drawn after
+  // it, from a reference, and read as a pretzel - two stiff rings with dark
+  // eyes and ticks across them that looked like scratches rather than lay.
+  // What makes this one rope is the twist: the light dash laid along every
+  // strand, offset ring to ring, and the loose end with its whipping.
+  rope: ropeCoil(),
 
   // A stick: one shaved length of wood with the stub of a side branch, laid
   // on the diagonal so it fills a square tile. Drawn as strokes rather than
@@ -259,23 +307,29 @@ export const MATERIAL_ART = {
       // the lit side, along the upper edge
     + '<path d="M5.9 17.5L16.3 7.1" fill="none" stroke="#d7a068" stroke-width="1.05" stroke-linecap="round"/>',
 
-  // Flint knife: a flint blade bound onto a short grip with fibre. The blade
-  // is the same cold stone as the flint, the binding the same straw as the
-  // rope, so what it is made of is readable at a glance.
+  // Flint knife: a flint blade bound onto a short grip with fibre.
+  //
+  // The blade is two facets either side of a spine - a lit one and a shaded
+  // one - in the paler greys of a freshly struck face. It used to be a thin
+  // sliver in the flint's own dark grey inside a heavy outline, which at
+  // tile size was nearly all outline: the middle of the knife read as a
+  // black slot, a hole where the blade should be.
   flintKnife:
       // the grip
       '<path d="M4.2 19.8l4.6-4.6 2.6 2.6-4.6 4.6a1.85 1.85 0 01-2.6-2.6z"'
     + ' fill="#8a5c30" stroke="#2c1a0e" stroke-width="1.3" stroke-linejoin="round"/>'
-      // the binding
-    + '<path d="M8.5 15.5l2.6 2.6-1.5 1.5-2.6-2.6z" fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.2" stroke-linejoin="round"/>'
-    + '<path d="M8.9 17.4l1.3 1.3" fill="none" stroke="#8a7c3e" stroke-width="0.9" stroke-linecap="round"/>'
-      // the blade
-    + '<path d="M10.6 14.3l6.1-6.7 3.3-2.2-1.8 3.6-5.1 7z" fill="#5a6478"/>'
-    + '<path d="M16.7 7.6l3.3-2.2-1.8 3.6-2.6 1.3z" fill="#8794ad"/>'
-    + '<path d="M10.6 14.3l6.1-6.7 3.3-2.2-1.8 3.6-5.1 7z"'
-    + ' fill="none" stroke="#151a27" stroke-width="1.35" stroke-linejoin="round"/>'
-      // the ground edge
-    + '<path d="M12.5 12.9l5-6.8" fill="none" stroke="#c3ccdd" stroke-width="1" stroke-linecap="round"/>',
+    + '<path d="M5.2 19.9l3.4-3.4" fill="none" stroke="#b07a45" stroke-width="0.9" stroke-linecap="round"/>'
+      // the blade: the lit facet, the shaded facet, then one outline over both
+    + '<path d="M8.8 14.6l6.6-7.2 5.2-4-10.5 12.5z" fill="#b3bfd4"/>'
+    + '<path d="M10.1 15.9l10.5-12.5-2 5-7.2 8.8z" fill="#7d8aa4"/>'
+    + '<path d="M8.8 14.6l6.6-7.2 5.2-4-2 5-7.2 8.8z"'
+    + ' fill="none" stroke="#1f2636" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M10.1 15.9l10.5-12.5" fill="none" stroke="#5a6682" stroke-width="0.8" stroke-linecap="round"/>'
+      // the ground edge, catching the light
+    + '<path d="M10 13.9l5.9-6.3 3.3-2.6" fill="none" stroke="#eef2f9" stroke-width="0.85" stroke-linecap="round" stroke-linejoin="round"/>'
+      // the binding, last, so it sits over where the blade goes into the grip
+    + '<path d="M8.3 15.3l2.9 2.9-1.6 1.6-2.9-2.9z" fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.2" stroke-linejoin="round"/>'
+    + '<path d="M8.5 17.6l1.4 1.4M9.4 16.5l1.4 1.4" fill="none" stroke="#8a7c3e" stroke-width="0.85" stroke-linecap="round"/>',
 
   // Flint axe: the same flint, bigger and hafted - a bound head on a stick.
   // Drawn head-up so it is not mistaken for the knife at a glance.
@@ -383,20 +437,30 @@ export const MATERIAL_ART = {
   // Wheat: one ear on its stalk, the grains stepped up both sides in pairs
   // with an awn off each. A solid teardrop reads as a leaf, and it is the
   // stepping that makes it a cereal.
+  //
+  // Everything is rooted ON the stalk and every awn starts at the tip of its
+  // grain. The leaves used to be open curls that began a few pixels out from
+  // the stem, and the awns hung loose beside the grains, so the plant came
+  // apart into pieces floating round a stick.
   wheat:
-      '<path d="M12 21.4V9.6" fill="none" stroke="#b8923c" stroke-width="1.6" stroke-linecap="round"/>'
-    + '<path d="M8.6 17.4c-1.6-1-2.4-2.3-2.4-3.9 1.8.2 3 1 3.6 2.5M15.4 15.6c1.6-1 2.4-2.3 2.4-3.9-1.8.2-3 1-3.6 2.5"'
-    + ' fill="none" stroke="#c9a94e" stroke-width="1.25" stroke-linecap="round"/>'
-      // the grains, in pairs up the ear
-    + '<path d="M11.2 14.6c-1.5-.3-2.4-1.3-2.5-2.9 1.6-.2 2.6.7 2.9 2.5z'
-    + 'M12.8 12.9c1.5-.3 2.4-1.3 2.5-2.9-1.6-.2-2.6.7-2.9 2.5z'
-    + 'M11.2 10.9c-1.5-.3-2.4-1.3-2.5-2.9 1.6-.2 2.6.7 2.9 2.5z'
-    + 'M12.8 9.2c1.5-.3 2.4-1.3 2.5-2.9-1.6-.2-2.6.7-2.9 2.5z'
-    + 'M12 7.4c-.9-1.3-.9-2.7 0-4.2.9 1.5.9 2.9 0 4.2z"'
-    + ' fill="#f0d07a" stroke="#6b5116" stroke-width="1.15" stroke-linejoin="round"/>'
-      // the awns
-    + '<path d="M9.1 11.1L6.6 9.2M10.7 7.4L8.2 5.5M14.9 9.4l2.5-1.9M13.3 5.7l2.5-1.9"'
-    + ' fill="none" stroke="#d8b962" stroke-width="1" stroke-linecap="round"/>',
+      // the leaves, closed shapes whose base is on the stalk
+      '<path d="M12 20.6C9.6 20.2 7.4 18.8 6.5 16.1 9.1 16.5 10.9 17.8 12 19.2z"'
+    + ' fill="#c9a94e" stroke="#6b5116" stroke-width="1.1" stroke-linejoin="round"/>'
+    + '<path d="M12 18.9C14.4 18.5 16.6 17.1 17.5 14.4 14.9 14.8 13.1 16.1 12 17.5z"'
+    + ' fill="#d8b85a" stroke="#6b5116" stroke-width="1.1" stroke-linejoin="round"/>'
+      // the stalk, over the leaves' roots and on up under the ear
+    + '<path d="M12 21.4V6.8" fill="none" stroke="#6b5116" stroke-width="2.5" stroke-linecap="round"/>'
+    + '<path d="M12 21.4V6.8" fill="none" stroke="#b8923c" stroke-width="1.2" stroke-linecap="round"/>'
+      // the awns, each out of the tip of the grain it belongs to
+    + '<path d="M9 12.2L6.8 10.4M15 10.5l2.2-1.8M9 8.5L6.8 6.7M15 6.8l2.2-1.8M12 3.8V1.6"'
+    + ' fill="none" stroke="#d8b962" stroke-width="1" stroke-linecap="round"/>'
+      // the grains, in pairs up the ear, each rooted on the stalk
+    + '<path d="M11.7 15.2c-1.6-.3-2.6-1.4-2.7-3 1.7-.2 2.8.8 3.1 2.6z'
+    + 'M12.3 13.5c1.6-.3 2.6-1.4 2.7-3-1.7-.2-2.8.8-3.1 2.6z'
+    + 'M11.7 11.5c-1.6-.3-2.6-1.4-2.7-3 1.7-.2 2.8.8 3.1 2.6z'
+    + 'M12.3 9.8c1.6-.3 2.6-1.4 2.7-3-1.7-.2-2.8.8-3.1 2.6z'
+    + 'M12 8.1c-.9-1.3-.9-2.8 0-4.3.9 1.5.9 3 0 4.3z"'
+    + ' fill="#f0d07a" stroke="#6b5116" stroke-width="1.15" stroke-linejoin="round"/>',
 
   // Wheat seeds: a small heap of grains, each a pointed oval with a crease
   // down it. Drawn loose rather than in a pouch - a pouch is a container,
@@ -452,6 +516,10 @@ export const MATERIAL_ART = {
 
   // A wooden bucket: staves down the sides, a hoop round the middle and a
   // rope over the top. Tapered, or it is a barrel.
+  //
+  // The handle is one symmetric arc from ear to ear, tied on at both. It
+  // used to start at the left rim and curl off to the right, stopping short
+  // of the other side in mid-air - a rope that was not holding anything up.
   bucket:
       '<path d="M5.2 6.4h13.6l-1.9 14.4a1.2 1.2 0 01-1.2 1H8.3a1.2 1.2 0 01-1.2-1z" fill="#c99359"/>'
       // the staves
@@ -465,11 +533,15 @@ export const MATERIAL_ART = {
       // the hoop
     + '<path d="M6.3 14.3h11.4" fill="none" stroke="#2c1a0e" stroke-width="2.4"/>'
     + '<path d="M6.3 14.3h11.4" fill="none" stroke="#a8763f" stroke-width="1.3"/>'
-      // the rope handle
-    + '<path d="M5.6 7.6c1.4-4.3 4-6.4 7.8-6.4 2.6 0 4.4.9 5.4 2.7"'
+      // the rope handle, ear to ear over the top
+    + '<path d="M5.1 8C5.1 3 8.2 1.4 12 1.4S18.9 3 18.9 8"'
     + ' fill="none" stroke="#3d2c10" stroke-width="2.6" stroke-linecap="round"/>'
-    + '<path d="M5.6 7.6c1.4-4.3 4-6.4 7.8-6.4 2.6 0 4.4.9 5.4 2.7"'
-    + ' fill="none" stroke="#d3b167" stroke-width="1.4" stroke-linecap="round"/>',
+    + '<path d="M5.1 8C5.1 3 8.2 1.4 12 1.4S18.9 3 18.9 8"'
+    + ' fill="none" stroke="#d3b167" stroke-width="1.4" stroke-linecap="round"/>'
+      // the ears it is tied through, one each side just under the rim
+    + '<rect x="3.7" y="7" width="2.8" height="3" rx="0.9" fill="#8a5c30" stroke="#2c1a0e" stroke-width="1.1"/>'
+    + '<rect x="17.5" y="7" width="2.8" height="3" rx="0.9" fill="#8a5c30" stroke="#2c1a0e" stroke-width="1.1"/>'
+    + '<path d="M3.9 8.5h2.4M17.7 8.5h2.4" fill="none" stroke="#d3b167" stroke-width="0.9" stroke-linecap="round"/>',
 
   // A water catcher: the open tub of planks it is, with the water it has
   // caught sitting in it. The water is what says what it is for.
