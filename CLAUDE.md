@@ -68,6 +68,8 @@ with one inhabitant who walks around and works on what is there.
     the grid, the recipes and what the grid adds up to.
   - `src/lookat.js` - the bar at the top naming whatever is under the cursor.
   - `src/highlight.js` - the corner brackets around whatever it is naming.
+  - `src/cutaway.js` - the X-ray cut that shows the selected agent through
+    whatever is between them and the camera.
   - `src/wield.js` - handing a tool to an agent, from either end.
   - `src/icons.js` - the line-art glyphs the panels and crafting both draw,
     materials included.
@@ -194,6 +196,31 @@ with one inhabitant who walks around and works on what is there.
   key while it is on (`onFreeCamera` in `main.js` is the hook). That is not a
   toast: it is a line already on screen for as long as the mode lasts, not a
   notice that appears and goes.
+- **The selected agent is never lost behind the scenery.** `src/cutaway.js`
+  opens a cut between the camera and them whenever the isle or a prop is in
+  the way, and nothing beyond them is touched. Two halves, on purpose:
+  - The ISLE is cut with a tube, in the shader: every lit material gets a
+    few lines that discard fragments inside a cylinder from the eye to the
+    agent's chest, stopping `SHORT_OF` before them so the ground they stand
+    on stays. Being a shader, it follows the camera round as it orbits for
+    free and never touches the instanced meshes. `castFromFront` is the one
+    door that hands it materials, so anything built after boot is cut too.
+  - PROPS are hidden WHOLE, on a layer nothing renders. A tree sliced in
+    half by the tube read as a broken model rather than something moved out
+    of the way. The layer is one the pointer's raycaster does not test and
+    the shadow pass skips, so a click goes straight through a hidden tree and
+    it leaves no shadow over the agent it was hidden to reveal.
+  It only opens when something really is in the way: the isle is checked by
+  stepping along the line through `isSolid` (a cast at the isle is 0.6ms,
+  this is next to nothing) and the props by one cheap cast. That occlusion
+  ray looks at EVERY layer - a prop hidden because it is in the way is still
+  in the way, and testing only the drawn layer shut the cut and put the tree
+  back the next frame. It grows open over a fraction of a second and lingers
+  a moment after the agent comes back into view, so a line that grazes a
+  ridge does not flicker it. Anything the pointer asks about goes through
+  `seen()` in `main.js`, which skips faces the cut has thrown away (the same
+  test as the shader, `cutaway.hides`), or clicking the agent through the
+  hole would walk them into the hill.
 - **The camera keeps itself out of the ground.** The orbit target sits inside
   the isle, so this cannot be a ray cast outward from it - that hits terrain
   immediately. `_clearOfBlocks` in `orbitCamera.js` samples the camera's own

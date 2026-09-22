@@ -18,6 +18,7 @@ import { createPanels } from './panels.js';
 import { createCrafting } from './crafting.js';
 import { createLookAt, propName } from './lookat.js';
 import { createHighlight, HIGHLIGHT_PLAIN, HIGHLIGHT_WORK } from './highlight.js';
+import { createCutaway } from './cutaway.js';
 import { createWield } from './wield.js';
 import { createPlacement } from './placement.js';
 import { createSelectBox } from './selectbox.js';
@@ -139,6 +140,10 @@ function castFromFront(object) {
   object.traverse((o) => {
     if (o.material && o.castShadow) o.material.shadowSide = THREE.FrontSide;
   });
+  // The same one door for the X-ray cut: anything built after boot has to
+  // be able to be cut away as well, or a planted tree would stand solid in
+  // the middle of a hole cut through the hill around it.
+  cutaway.watch(object);
 }
 
 function finishProp(prop, agent = null) {
@@ -213,6 +218,11 @@ function useWorkbench(prop) {
 // The cost is that a surface can now shadow itself, which is what the sun's
 // normalBias in space.js is for. This does not reproduce in headless
 // Chromium; it was confirmed on hardware with ESTER.debug.try(5).
+// The X-ray cut, so the agent being watched can be seen through whatever is
+// between them and the camera. Built before the front-face pass below,
+// which is also what hands it every material in the scene.
+const cutaway = createCutaway({ island, propsGroup, props, camera });
+
 castFromFront(scene);
 
 // What the cursor is over, named at the top of the screen. It only draws;
@@ -1023,7 +1033,7 @@ function handleClick(event) {
     const plot = propUnderPointer();
     if (canSow(plot)) { sowPlot(plot); lookedAt = 0; return; }
     if (!plot) {
-      const ground = raycaster.intersectObject(island, true)[0];
+      const ground = seen(raycaster.intersectObject(island, true));
       if (ground && fillGround(blockAt(ground))) { lookedAt = 0; return; }
     }
     stopCarrying();
@@ -1031,6 +1041,9 @@ function handleClick(event) {
   }
 
   for (const hit of raycaster.intersectObject(scene, true)) {
+    // A face the X-ray cut has thrown away is not on screen, so a click
+    // goes through it to whatever is - the agent in the hole, most likely.
+    if (cutaway.hides(hit.point)) continue;
     let object = hit.object;
     while (object) {
       // An agent: select that one and show its stats. `userData.person` is
@@ -1590,16 +1603,26 @@ function aimRay() {
   return true;
 }
 
+/**
+ * The first hit that is actually on screen. The X-ray cut throws faces away
+ * in the shader, but the geometry is still there to be hit - so anything
+ * the pointer asks about has to skip what the cut has hidden, or the readout
+ * names the hill the agent is standing behind instead of the agent.
+ */
+function seen(hits) {
+  return hits.find((hit) => !cutaway.hides(hit.point)) ?? null;
+}
+
 /** Whatever the pointer is actually over: a prop, or null for the ground. */
 function propUnderPointer() {
-  const hit = raycaster.intersectObject(propsGroup, true)[0];
+  const hit = seen(raycaster.intersectObject(propsGroup, true));
   const prop = hit && props.find((p) => p.id === hit.object.userData.propId);
   if (!prop || prop.gone) return null;
 
   // Something hit first is something in the way - a brow of the isle between
   // the cursor and the prop, most likely. This is the cast that was always
   // here, and it still only runs when a prop was actually hit.
-  const ground = raycaster.intersectObject(island, true)[0];
+  const ground = seen(raycaster.intersectObject(island, true));
   return ground && ground.distance < hit.distance ? null : prop;
 }
 
@@ -1670,7 +1693,7 @@ function updateLookAt() {
     return;
   }
 
-  const ground = raycaster.intersectObject(island, true)[0];
+  const ground = seen(raycaster.intersectObject(island, true));
   if (!ground) { lookAt.show(null); highlight.hide(); return; }
 
   lookAt.show(describeGround(ground));
@@ -1926,6 +1949,9 @@ function frame() {
   updatePanel();
   panels.update();
   updateGround(delta);
+  // After the camera has moved this frame, so the tube is aimed from where
+  // the eye actually is.
+  cutaway.update(selectedAgent(), delta);
   updateLookAt();
   crafting.update();
 
@@ -1942,7 +1968,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { ITEMS, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
+window.ESTER = { cutaway, ITEMS, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
   busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
