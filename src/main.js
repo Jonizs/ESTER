@@ -1652,15 +1652,32 @@ function refreshHover() {
  * The readout at the top of the screen, run from the frame loop rather than
  * from the pointer.
  *
- * Naming the ground needs a cast at the isle and the isle is thousands of
- * instanced blocks (0.6ms a cast against 0.01ms for the props), so it is
- * throttled. It cannot be throttled on the pointer move itself: a move that
- * lands inside the window is simply dropped, and with no further move to
- * retry the readout never catches up - which is exactly what it did. The
- * frame loop always comes round again.
+ * It runs EVERY frame the view has changed - the pointer moved, or the
+ * camera did - so the brackets keep up with the cursor at full frame rate.
+ * It used to be throttled to every 80ms, because naming the ground needs a
+ * cast at the isle (0.6ms against 0.01ms for the props), and that left the
+ * brackets visibly trailing the cursor at 12 updates a second. A cast a
+ * frame while something is moving is affordable; what was never affordable
+ * was casting every frame while nothing is, so a still view is only looked
+ * at again every `IDLE_MS` - for what changes under a still cursor, an
+ * agent walking into it or a crop coming on.
+ *
+ * It still cannot be driven from the pointer move itself: a move is not
+ * the only thing that changes what is under the cursor, and the frame loop
+ * always comes round again.
  */
-const LOOK_EVERY_MS = 80;
+const IDLE_MS = 200;
+// 0 means "look again now", which is how shift, a sow and the rest force it.
 let lookedAt = 0;
+let lookedFrom = '';
+
+/** Where the pointer and the camera are, as one string to compare. */
+function viewKey() {
+  const p = camera.position;
+  const q = camera.quaternion;
+  return `${pointerAt.x},${pointerAt.y}|${p.x.toFixed(3)},${p.y.toFixed(3)},${p.z.toFixed(3)}`
+    + `|${q.x.toFixed(4)},${q.y.toFixed(4)},${q.z.toFixed(4)},${q.w.toFixed(4)}`;
+}
 
 function updateLookAt() {
   if (placement.isActive()) {
@@ -1675,8 +1692,10 @@ function updateLookAt() {
   }
 
   const now = performance.now();
-  if (now - lookedAt < LOOK_EVERY_MS) return;
+  const from = viewKey();
+  if (lookedAt !== 0 && from === lookedFrom && now - lookedAt < IDLE_MS) return;
   lookedAt = now;
+  lookedFrom = from;
 
   if (!aimRay()) { lookAt.hide(); highlight.hide(); return; }
 

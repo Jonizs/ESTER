@@ -417,9 +417,9 @@ with one inhabitant who walks around and works on what is there.
   armed and would work *here* - shift with a tool that can till or dig this
   cell, or seeds on the cursor over a plot that can take them. It never
   lights ground the click would refuse: a mark that sometimes lies is worse
-  than no mark. It rides the same throttled pass as the readout, and
-  pressing or releasing shift clears the throttle so the mark appears with
-  the key rather than waiting for the mouse to move.
+  than no mark. It rides the same pass as the readout, and pressing or releasing shift
+  forces that pass so the mark appears with the key rather than waiting for
+  the mouse to move.
 - **A click only walks to a block of the ISLE.** `handleClick` casts at the
   whole scene, and anything there that is neither an agent, a prop nor one
   of the isle's own meshes is passed over. The click-wave rings are pooled
@@ -437,14 +437,20 @@ with one inhabitant who walks around and works on what is there.
   aligned and untransformed, so the geometry normal is already the world
   one. The cursor's brackets and the click read the same answer, which is
   the point: an armed shift must light the cell it would actually work.
-- **The readout runs off the frame loop, never off the pointer.** Naming the
-  ground needs a cast at the isle and the isle is thousands of instanced
-  blocks - 0.6ms a cast against 0.01ms for the props - so it is throttled to
-  every 80ms. Throttling it on the pointer move instead drops the move that
-  lands inside the window, and with nothing to retry it the readout never
-  catches up, which is exactly what it did. The frame loop always comes round
-  again. The prop *hover* keeps its own cheap path, and its rule stands: the
-  isle is only cast at once a prop has actually been hit.
+- **The readout runs off the frame loop, never off the pointer - and at the
+  full frame rate while anything is moving.** Naming the ground needs a cast
+  at the isle (0.6ms, against 0.01ms for the props). It was throttled to
+  every 80ms and the brackets visibly trailed the cursor at 12 updates a
+  second, so now `updateLookAt` looks again on every frame the pointer or
+  the camera has moved (`viewKey`), and only every `IDLE_MS` (200) when
+  nothing has - which still catches what changes under a still cursor, an
+  agent walking into it or a crop coming on. Driving it from the pointer
+  move instead is still wrong: a move is not the only thing that changes
+  what is under the cursor, and the frame loop always comes round again.
+  `lookedAt = 0` forces the next frame to look, which is how shift and a
+  sow make it answer at once. The prop *hover* keeps its own cheap path, and
+  its rule stands: the isle is only cast at once a prop has actually been
+  hit.
 - **A tool is an instance in a hand, not a name.** `agent.tool` is
   `{ item, left }` and it is *out* of the inventory while it is held - a tool
   in someone's hand is not stock on the bench, and the crafting screen must
