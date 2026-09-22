@@ -1043,7 +1043,7 @@ function handleClick(event) {
   for (const hit of raycaster.intersectObject(scene, true)) {
     // A face the X-ray cut has thrown away is not on screen, so a click
     // goes through it to whatever is - the agent in the hole, most likely.
-    if (cutaway.hides(hit.point)) continue;
+    if (cutaway.hidesHit(hit)) continue;
     let object = hit.object;
     while (object) {
       // An agent: select that one and show its stats. `userData.person` is
@@ -1610,7 +1610,7 @@ function aimRay() {
  * names the hill the agent is standing behind instead of the agent.
  */
 function seen(hits) {
-  return hits.find((hit) => !cutaway.hides(hit.point)) ?? null;
+  return hits.find((hit) => !cutaway.hidesHit(hit)) ?? null;
 }
 
 /** Whatever the pointer is actually over: a prop, or null for the ground. */
@@ -1751,6 +1751,15 @@ canvas.addEventListener('pointerleave', () => {
   pointerAt = null;
   refreshHover();
   highlight.hide();
+});
+
+// G: the see-through camera on or off. A key rather than a setting in a
+// menu, because whether it is wanted depends on what is being looked at.
+window.addEventListener('keydown', (event) => {
+  if (menu.isOpen() || panels.isOpen() || crafting.isOpen()) return;
+  if (settings.actionFor(event.key) !== 'toggleCutaway') return;
+  event.preventDefault();
+  document.body.classList.toggle('cutaway-off', !cutaway.toggle());
 });
 
 // The wield key: with an agent selected it asks what they should carry.

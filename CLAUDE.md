@@ -197,30 +197,34 @@ with one inhabitant who walks around and works on what is there.
   toast: it is a line already on screen for as long as the mode lasts, not a
   notice that appears and goes.
 - **The selected agent is never lost behind the scenery.** `src/cutaway.js`
-  opens a cut between the camera and them whenever the isle or a prop is in
-  the way, and nothing beyond them is touched. Two halves, on purpose:
-  - The ISLE is cut with a tube, in the shader: every lit material gets a
-    few lines that discard fragments inside a cylinder from the eye to the
-    agent's chest, stopping `SHORT_OF` before them so the ground they stand
-    on stays. Being a shader, it follows the camera round as it orbits for
-    free and never touches the instanced meshes. `castFromFront` is the one
-    door that hands it materials, so anything built after boot is cut too.
-  - PROPS are hidden WHOLE, on a layer nothing renders. A tree sliced in
-    half by the tube read as a broken model rather than something moved out
-    of the way. The layer is one the pointer's raycaster does not test and
-    the shadow pass skips, so a click goes straight through a hidden tree and
-    it leaves no shadow over the agent it was hidden to reveal.
-  It only opens when something really is in the way: the isle is checked by
-  stepping along the line through `isSolid` (a cast at the isle is 0.6ms,
-  this is next to nothing) and the props by one cheap cast. That occlusion
-  ray looks at EVERY layer - a prop hidden because it is in the way is still
-  in the way, and testing only the drawn layer shut the cut and put the tree
-  back the next frame. It grows open over a fraction of a second and lingers
-  a moment after the agent comes back into view, so a line that grazes a
-  ridge does not flicker it. Anything the pointer asks about goes through
-  `seen()` in `main.js`, which skips faces the cut has thrown away (the same
-  test as the shader, `cutaway.hides`), or clicking the agent through the
-  hole would walk them into the hill.
+  takes away whatever is between the camera and them once they are FULLY out
+  of sight, and nothing beyond them is touched. G toggles it (`toggleCutaway`
+  in `settings.js`); off, nothing is ever cut or hidden, and the help line
+  says which it is.
+  - It waits for FULLY hidden: head, chest, feet and both shoulders all
+    blocked. Opening the moment a ridge covered their feet took the scenery
+    away while they were still plainly in view.
+  - The ISLE loses WHOLE BLOCKS. Only the isle's instanced meshes are
+    patched, and the shader tests each block's CENTRE against a tube from
+    the eye to the agent's chest, throwing the entire block away if it is in
+    it. Testing each fragment instead cut a round lens through the terrain
+    with block edges sliced along it - a hole in the picture rather than
+    blocks taken out of the way. Being a shader it follows the camera round
+    as it orbits, and the instance matrices are never touched.
+  - Nothing at or below the agent's feet is ever taken (`uCutFloor`): the
+    ground they stand on cannot be what hides them, and a hole opening under
+    their feet read as them falling into the isle.
+  - PROPS are hidden WHOLE, on a layer nothing renders, picks or casts
+    shadows from - so a click goes through a hidden tree and it leaves no
+    shadow over the agent.
+  The occlusion check steps through `isSolid` for the isle (a cast at it is
+  0.6ms) and casts at the props on EVERY layer - a prop hidden because it is
+  in the way is still in the way, or hiding it would put it straight back.
+  It lingers a moment once they are back in view so a grazing line does not
+  flicker. Anything the pointer asks about goes through `seen()` in
+  `main.js`, which uses `cutaway.hidesHit` - the same block-centre test as
+  the shader, or clicking the agent through the hole walks them into the
+  hill.
 - **The camera keeps itself out of the ground.** The orbit target sits inside
   the isle, so this cannot be a ray cast outward from it - that hits terrain
   immediately. `_clearOfBlocks` in `orbitCamera.js` samples the camera's own

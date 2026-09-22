@@ -2525,3 +2525,8 @@ body.free-camera .hint-free b { color: var(--accent); }
   font-size: 9px;
   letter-spacing: 0.06em;
 }
+
+/* Whether the see-through camera is on, said on the help line that names its
+   key - the same as the free camera's line, not a notice that comes and goes. */
+#help .cutaway-state::after { content: '(on)'; color: var(--accent); }
+body.cutaway-off #help .cutaway-state::after { content: '(off)'; color: var(--dim); }

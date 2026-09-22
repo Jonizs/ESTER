@@ -5,11 +5,20 @@ import * as THREE from 'three';
  * something standing on it, whatever lies between the camera and them is cut
  * away so they can be seen, and whatever lies beyond them is left alone.
  *
- * The isle is cut with a tube. Every material in the scene gets a few lines
- * of shader that throw away any fragment inside a cylinder running from the
- * eye to the agent's chest and stopping just short of them - so it follows
- * the camera round as it orbits for free, and it cuts a hill block by block
- * without touching the instanced meshes at all.
+ * The isle loses WHOLE BLOCKS. The isle's instanced meshes get a few lines
+ * of shader that ask where each block's CENTRE is, and throw the entire
+ * block away if that centre is inside a tube running from the eye to the
+ * agent's chest. It used to test each fragment instead, which cut a round
+ * lens through the terrain with the edges of blocks sliced off along it -
+ * a hole in the picture rather than blocks taken out of the way. Testing
+ * the centre makes it all of a block or none of it. Being a shader it still
+ * follows the camera round as it orbits, and the instance matrices are
+ * never touched, so digging and farmland are none the wiser.
+ *
+ * Nothing at or below the agent's feet is ever taken away (`uCutFloor`):
+ * the ground they are standing on, and the ground in front of it, cannot be
+ * what is hiding them, and a hole opening up under their feet read as the
+ * agent falling into the isle.
  *
  * Props are not cut, they are HIDDEN, whole. A tree sliced down the middle
  * by the tube read as a broken model rather than as something moved out of
@@ -29,7 +38,7 @@ import * as THREE from 'three';
  * still stands in the sun's way, which is the world being honest about it.
  */
 
-const RADIUS = 1.5;          // how wide the tube is, in blocks
+const RADIUS = 1.3;          // how far a block's centre may be from the line
 const SHORT_OF = 0.9;        // where it stops, before the agent's chest
 const CHEST = 0.9;           // the height on the agent the tube is aimed at
 const OPEN_RATE = 7;         // blocks of radius a second, growing or shrinking
@@ -40,12 +49,20 @@ export function createCutaway({ island, propsGroup, props, camera }) {
   const uniforms = {
     uCutEye: { value: new THREE.Vector3() },
     uCutAt: { value: new THREE.Vector3() },
-    uCutRadius: { value: 0 }
+    uCutRadius: { value: 0 },
+    uCutFloor: { value: -1e9 }
   };
+
+  // Off with G. When off nothing is ever cut or hidden, whoever is selected.
+  let enabled = true;
 
   const patched = new WeakSet();
 
-  /** Give one material the cut. Anything but a lit mesh material is left be. */
+  /**
+   * Give one of the isle's materials the cut. Only instanced meshes are
+   * patched - the isle's blocks. Props are hidden whole by layer instead,
+   * and the agents are never cut at all.
+   */
   function patch(material) {
     if (!material || patched.has(material)) return;
     if (!material.isMeshStandardMaterial) return;
@@ -60,10 +77,14 @@ export function createCutaway({ island, propsGroup, props, camera }) {
       // borrowed from three's own `worldPosition`, which only exists when
       // some other feature happens to have asked for it - and the isle is
       // instanced, so the instance's own matrix has to go in too.
+      // The CENTRE of the block this vertex belongs to, which every vertex
+      // of the block agrees on - so the test below says yes or no for the
+      // whole block at once. A block pressed down into a plot is still
+      // centred on its cell as far as this is concerned, near enough.
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vCutWorld;')
         .replace('#include <project_vertex>', `#include <project_vertex>
-          vec4 cutAt = vec4( transformed, 1.0 );
+          vec4 cutAt = vec4( 0.0, 0.0, 0.0, 1.0 );
           #ifdef USE_INSTANCING
             cutAt = instanceMatrix * cutAt;
           #endif
@@ -74,7 +95,8 @@ export function createCutaway({ island, propsGroup, props, camera }) {
           varying vec3 vCutWorld;
           uniform vec3 uCutEye;
           uniform vec3 uCutAt;
-          uniform float uCutRadius;`)
+          uniform float uCutRadius;
+          uniform float uCutFloor;`)
         .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
           if ( uCutRadius > 0.001 ) {
             vec3 cutAxis = uCutAt - uCutEye;
@@ -82,7 +104,8 @@ export function createCutaway({ island, propsGroup, props, camera }) {
             vec3 cutDir = cutAxis / cutLen;
             vec3 cutRel = vCutWorld - uCutEye;
             float cutT = dot( cutRel, cutDir );
-            if ( cutT > 0.0 && cutT < cutLen - ${SHORT_OF.toFixed(2)}
+            if ( vCutWorld.y + 0.5 > uCutFloor + 0.01
+                 && cutT > 0.0 && cutT < cutLen - ${SHORT_OF.toFixed(2)}
                  && length( cutRel - cutDir * cutT ) < uCutRadius ) discard;
           }`);
     };
@@ -95,7 +118,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
   /** Give everything under an object the cut. Idempotent. */
   function watch(object) {
     object.traverse((o) => {
-      if (!o.material) return;
+      if (!o.material || !o.isInstancedMesh) return;
       for (const m of Array.isArray(o.material) ? o.material : [o.material]) patch(m);
     });
   }
@@ -121,10 +144,10 @@ export function createCutaway({ island, propsGroup, props, camera }) {
    * a sunken plot be clicked are invisible and hide nothing, so they are
    * skipped.
    */
-  function hidden() {
-    const len = eye.distanceTo(at) - SHORT_OF;
+  function blockedTo(point) {
+    const len = eye.distanceTo(point) - 0.35;
     if (len <= 0) return false;
-    dir.subVectors(at, eye).normalize();
+    dir.subVectors(point, eye).normalize();
 
     for (let t = 0.3; t < len; t += 0.2) {
       probe.copy(eye).addScaledVector(dir, t);
@@ -134,6 +157,27 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     ray.set(eye, dir);
     ray.far = len;
     return ray.intersectObject(propsGroup, true).some((hit) => !hit.object.userData.isHitPad);
+  }
+
+  // Head, chest, feet and both shoulders, relative to where they stand.
+  const MARKS = [[0, 1.45, 0], [0, 0.9, 0], [0, 0.2, 0], [0.28, 0.9, 0], [-0.28, 0.9, 0]];
+  const mark = new THREE.Vector3();
+  const side = new THREE.Vector3();
+
+  /**
+   * Whether the agent is FULLY out of sight - every one of a handful of
+   * points on them, head to feet and shoulder to shoulder, blocked. A cut
+   * that opened the moment a ridge hid their feet took the scenery away
+   * while the agent was still plainly standing there.
+   */
+  function hidden(agent) {
+    const base = agent.mesh.position;
+    // "Sideways" is across the line of sight, so the shoulders are the ones
+    // the camera would actually see either side of them.
+    side.subVectors(base, eye).setY(0);
+    if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+    side.normalize().set(-side.z, 0, side.x);
+    return MARKS.every(([s, y]) => blockedTo(mark.copy(base).addScaledVector(side, s).setY(base.y + y)));
   }
 
   // --- the props in the way -------------------------------------------------
@@ -191,11 +235,12 @@ export function createCutaway({ island, propsGroup, props, camera }) {
    */
   function update(agent, dt) {
     let want = 0;
-    if (agent) {
+    if (agent && enabled) {
       eye.copy(camera.position);
       at.copy(agent.mesh.position);
       at.y += CHEST;
-      if (hidden()) linger = LINGER;
+      uniforms.uCutFloor.value = agent.mesh.position.y;
+      if (hidden(agent)) linger = LINGER;
       else linger = Math.max(0, linger - dt);
       if (linger > 0) want = RADIUS;
     } else {
@@ -222,6 +267,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
    */
   function hides(point) {
     if (radius <= 0.001) return false;
+    if (point.y + 0.5 <= uniforms.uCutFloor.value + 0.01) return false;
     const axis = dir.subVectors(uniforms.uCutAt.value, uniforms.uCutEye.value);
     const len = axis.length();
     axis.divideScalar(len);
@@ -231,8 +277,29 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     return probe.addScaledVector(axis, -t).length() < radius;
   }
 
+  /**
+   * Whether a ray's hit is on a block the cut has taken away. The shader
+   * decides by the block's centre, so this does too - the hit point itself
+   * is on a face and would disagree along every edge.
+   */
+  const centre = new THREE.Vector3();
+  const instance = new THREE.Matrix4();
+  function hidesHit(hit) {
+    if (!hit.object.isInstancedMesh || hit.instanceId === undefined) return false;
+    hit.object.getMatrixAt(hit.instanceId, instance);
+    centre.setFromMatrixPosition(instance).applyMatrix4(hit.object.matrixWorld);
+    return hides(centre);
+  }
+
   return {
-    watch, update, hides, uniforms,
+    watch, update, hides, hidesHit, uniforms,
+    get enabled() { return enabled; },
+    /** G: switch the whole thing on or off. Off puts everything back. */
+    toggle() {
+      enabled = !enabled;
+      if (!enabled) { radius = 0; linger = 0; uniforms.uCutRadius.value = 0; hideOnly(new Set()); }
+      return enabled;
+    },
     get radius() { return radius; },
     /** The props hidden right now, for anything that needs to know. */
     isHidden: (prop) => hiddenProps.has(prop)
