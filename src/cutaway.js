@@ -15,10 +15,10 @@ import * as THREE from 'three';
  * follows the camera round as it orbits, and the instance matrices are
  * never touched, so digging and farmland are none the wiser.
  *
- * Nothing at or below the agent's feet is ever taken away (`uCutFloor`):
- * the ground they are standing on, and the ground in front of it, cannot be
- * what is hiding them, and a hole opening up under their feet read as the
- * agent falling into the isle.
+ * The one block the agent is standing on is never taken (`uCutKeep`), or
+ * they would be left standing on nothing. Everything else in the tube goes,
+ * lower ground included - holding back everything below their feet left
+ * whole slopes standing in the way when the camera looked down at them.
  *
  * Props are not cut, they are HIDDEN, whole. A tree sliced down the middle
  * by the tube read as a broken model rather than as something moved out of
@@ -38,10 +38,10 @@ import * as THREE from 'three';
  * still stands in the sun's way, which is the world being honest about it.
  */
 
-const RADIUS = 1.3;          // how far a block's centre may be from the line
+const RADIUS = 3.3;          // how far a block's centre may be from the line - wide, so the gap is a proper view and not a slot
 const SHORT_OF = 0.9;        // where it stops, before the agent's chest
 const CHEST = 0.9;           // the height on the agent the tube is aimed at
-const OPEN_RATE = 7;         // blocks of radius a second, growing or shrinking
+const OPEN_RATE = 16;        // blocks of radius a second, growing or shrinking
 const LINGER = 0.35;         // seconds it stays open once they are back in view
 const HIDDEN_LAYER = 1;      // a layer nothing renders or picks from
 
@@ -50,7 +50,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     uCutEye: { value: new THREE.Vector3() },
     uCutAt: { value: new THREE.Vector3() },
     uCutRadius: { value: 0 },
-    uCutFloor: { value: -1e9 }
+    uCutKeep: { value: new THREE.Vector3(0, -1e9, 0) }
   };
 
   // Off with G. When off nothing is ever cut or hidden, whoever is selected.
@@ -96,7 +96,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
           uniform vec3 uCutEye;
           uniform vec3 uCutAt;
           uniform float uCutRadius;
-          uniform float uCutFloor;`)
+          uniform vec3 uCutKeep;`)
         .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
           if ( uCutRadius > 0.001 ) {
             vec3 cutAxis = uCutAt - uCutEye;
@@ -104,7 +104,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
             vec3 cutDir = cutAxis / cutLen;
             vec3 cutRel = vCutWorld - uCutEye;
             float cutT = dot( cutRel, cutDir );
-            if ( vCutWorld.y + 0.5 > uCutFloor + 0.01
+            if ( distance( vCutWorld, uCutKeep ) > 0.3
                  && cutT > 0.0 && cutT < cutLen - ${SHORT_OF.toFixed(2)}
                  && length( cutRel - cutDir * cutT ) < uCutRadius ) discard;
           }`);
@@ -239,7 +239,12 @@ export function createCutaway({ island, propsGroup, props, camera }) {
       eye.copy(camera.position);
       at.copy(agent.mesh.position);
       at.y += CHEST;
-      uniforms.uCutFloor.value = agent.mesh.position.y;
+      // The block under their feet: their cell, one half block below them.
+      // Read off the heightmap rather than the agent's own height, which
+      // bobs through the air mid-hop.
+      const kx = Math.round(agent.x);
+      const kz = Math.round(agent.z);
+      uniforms.uCutKeep.value.set(kx, island.userData.surface.get(`${kx},${kz}`) ?? -1e9, kz);
       if (hidden(agent)) linger = LINGER;
       else linger = Math.max(0, linger - dt);
       if (linger > 0) want = RADIUS;
@@ -267,7 +272,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
    */
   function hides(point) {
     if (radius <= 0.001) return false;
-    if (point.y + 0.5 <= uniforms.uCutFloor.value + 0.01) return false;
+    if (point.distanceTo(uniforms.uCutKeep.value) < 0.3) return false;
     const axis = dir.subVectors(uniforms.uCutAt.value, uniforms.uCutEye.value);
     const len = axis.length();
     axis.divideScalar(len);

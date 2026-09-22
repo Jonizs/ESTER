@@ -211,9 +211,12 @@ with one inhabitant who walks around and works on what is there.
     with block edges sliced along it - a hole in the picture rather than
     blocks taken out of the way. Being a shader it follows the camera round
     as it orbits, and the instance matrices are never touched.
-  - Nothing at or below the agent's feet is ever taken (`uCutFloor`): the
-    ground they stand on cannot be what hides them, and a hole opening under
-    their feet read as them falling into the isle.
+  - The tube is wide - `RADIUS` 3.3 blocks - so the gap is a real view onto
+    the agent rather than a slot through the hill.
+  - Only the ONE block the agent stands on is kept (`uCutKeep`, read off the
+    heightmap, not their height, which bobs mid-hop). An earlier rule kept
+    everything at or below their feet and was taken out on request: it left
+    whole slopes standing in the way when the camera looked down at them.
   - PROPS are hidden WHOLE, on a layer nothing renders, picks or casts
     shadows from - so a click goes through a hidden tree and it leaves no
     shadow over the agent.
