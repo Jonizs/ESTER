@@ -102,6 +102,39 @@ export const PROP_KINDS = {
     water: { start: 0, max: 500 }
   },
 
+  /**
+   * A length of wooden pipe. It stands on one cell and joins up on its own
+   * to the pipes and water ports beside it - its arms are rebuilt whenever
+   * what is next to it changes (src/machines.js). Walkable, like a plot.
+   */
+  pipe: {
+    label: 'pipe',
+    placed: true,
+    portable: true,
+    item: 'pipe',
+    icon: 'pipe',
+    // What one run of joined-up pipe can carry, in millilitres a second.
+    flow: 20
+  },
+
+  /**
+   * A box with a cog in it. Water goes in through the back, a crank handle
+   * goes on the left, and turning it throws water out of the front over the
+   * 3x3 patch of ground in front of it. `facing` is what lets it be turned
+   * round - R while it is being placed, a wrench once it is down.
+   */
+  sprinkler: {
+    label: 'sprinkler',
+    placed: true,
+    portable: true,
+    item: 'sprinkler',
+    icon: 'sprinkler',
+    facing: true,
+    water: { start: 0, max: 600 },
+    // Millilitres a second thrown onto EACH of the nine cells while cranked.
+    spray: 10
+  },
+
   // The workbench is not harvested - it is repaired once, and then it is a
   // door into the crafting screen rather than a job.
   workbench: {
@@ -654,6 +687,160 @@ function buildWorkbench(g, repaired) {
   }
 }
 
+// --- pipes -------------------------------------------------------------------
+
+// A pipe is a square wooden duct lying just off the ground.
+const PIPE_WIDTH = 0.2;
+const PIPE_Y = 0.2;
+const PIPE_WOOD = 0xb07a45;
+const PIPE_BAND = 0x7a4f28;
+
+// How far an arm reaches for each kind of neighbour. Level, it meets the
+// neighbour's arm at the shared edge. Down a block, it runs out over the
+// ledge to the riser the lower pipe puts up. Up a block, it stops short of
+// the taller column's face and climbs, keeping clear of the block.
+const RISER_AT = 0.38;
+
+// Into a port: far enough to go through a wall standing a little in from the
+// edge of the next cell. Into the bottom of one a block up: just over the
+// top of its column, so it runs in under the floor.
+const PORT_REACH = 0.62;
+const PORT_LOW = 0.12;
+
+/**
+ * Hang a pipe's arms off its hub, one per link.
+ *
+ * `links` is `[{ dx, dz, dh, port, mode }]` (see src/machines.js): which way
+ * it runs, how much higher the neighbour's ground is, whether it is a water
+ * port rather than another pipe, and what the end has been set to with a
+ * wrench. An end into a port is how the mode is seen - an intake end is
+ * narrowed, an outlet end runs on into the thing with a collar round it.
+ *
+ * The meshes are rebuilt rather than moved, so the caller has to hand the
+ * new ones what every prop mesh gets (shadow side, tag, outline).
+ */
+export function setPipeShape(prop, links) {
+  const old = prop.mesh.getObjectByName('arms');
+  if (old) prop.mesh.remove(old);
+
+  const arms = new THREE.Group();
+  arms.name = 'arms';
+  const wood = mat(PIPE_WOOD);
+  const band = mat(PIPE_BAND);
+  const W = PIPE_WIDTH;
+
+  /** A box from `a` to `b` along one axis, `w` across. */
+  function run(dx, dz, from, to, w, material, y = PIPE_Y) {
+    const len = to - from;
+    if (len <= 0.001) return;
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(dx ? len : w, w, dz ? len : w),
+      material
+    );
+    const mid = (from + to) / 2;
+    box.position.set(dx * mid, y, dz * mid);
+    box.castShadow = true;
+    arms.add(box);
+  }
+
+  /** The last stretch into a port, drawn the way its end is set. */
+  function end(dx, dz, from, to, y, mode) {
+    if (mode === 'in') {
+      // Narrowed: the last stretch before the thing is a thinner neck.
+      run(dx, dz, from, to - 0.16, W, wood, y);
+      run(dx, dz, to - 0.16, to, W * 0.55, band, y);
+    } else if (mode === 'out') {
+      // Run on into the thing, with a collar where it goes in.
+      run(dx, dz, from, to + 0.12, W, wood, y);
+      run(dx, dz, to - 0.1, to - 0.02, W + 0.1, band, y);
+    } else {
+      run(dx, dz, from, to, W, wood, y);
+    }
+  }
+
+  /** A vertical length at `at` along the arm, from `y0` up to `y1`. */
+  function riser(dx, dz, at, y0, y1) {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(W, y1 - y0 + W, W), wood);
+    box.position.set(dx * at, (y0 + y1) / 2, dz * at);
+    box.castShadow = true;
+    arms.add(box);
+  }
+
+  for (const link of links) {
+    const { dx, dz, dh } = link;
+
+    if (link.port) {
+      if (dh > 0) {
+        // Into the BOTTOM of a thing standing a block higher: up the face of
+        // its column and in under its floor.
+        run(dx, dz, 0, RISER_AT + W / 2, W, wood);
+        riser(dx, dz, RISER_AT, PIPE_Y, dh + PORT_LOW);
+        end(dx, dz, RISER_AT - W / 2, 0.7, dh + PORT_LOW, link.mode);
+      } else {
+        // Into its side, on the level.
+        end(dx, dz, 0, PORT_REACH, PIPE_Y, link.mode);
+      }
+      continue;
+    }
+
+    // Another pipe. Level, the two arms meet at the shared edge; down a
+    // block, this one runs out over the ledge to the riser the lower one
+    // puts up; up a block, it stops short of the taller column and climbs.
+    let reach = 0.5;
+    if (dh < 0) reach = 1 - RISER_AT + W / 2;
+    if (dh > 0) reach = RISER_AT + W / 2;
+    run(dx, dz, 0, reach, W, wood);
+    if (dh > 0) riser(dx, dz, RISER_AT, PIPE_Y, PIPE_Y + dh);
+
+    // A band where two pipes meet, so a run reads as lengths joined up.
+    if (dh === 0) run(dx, dz, 0.4, 0.5, W + 0.04, band);
+  }
+
+  // A lone pipe still reads as a pipe: a short stub either way.
+  if (links.length === 0) {
+    run(1, 0, 0, 0.3, W, wood);
+    run(-1, 0, 0, 0.3, W, wood);
+  }
+
+  prop.mesh.add(arms);
+}
+
+/**
+ * Put a crank handle on a machine's crank side, or take it off.
+ *
+ * The machine is built facing +Z with its cog on +X, so the handle goes on
+ * there too and turns with the rest of it. The part that spins is named
+ * `crank-arm`, which is what src/machines.js turns while it is being worked.
+ */
+export function setCrank(prop, on) {
+  prop.crank = !!on;
+  const old = prop.mesh.getObjectByName('crank');
+  if (old) prop.mesh.remove(old);
+  if (!on) return;
+
+  const crank = new THREE.Group();
+  crank.name = 'crank';
+
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, 0.08), mat(0x5a3a1d));
+  shaft.position.set(0.54, 0.3, 0);
+  crank.add(shaft);
+
+  // The arm turns about the shaft, so it is its own group pivoted there.
+  const arm = new THREE.Group();
+  arm.name = 'crank-arm';
+  arm.position.set(0.64, 0.3, 0);
+  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.36, 0.1), mat(0xc99359));
+  lever.position.y = 0.14;
+  arm.add(lever);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, 0.08), mat(0xd3b167));
+  grip.position.set(0.1, 0.3, 0);
+  arm.add(grip);
+  crank.add(arm);
+
+  crank.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  prop.mesh.add(crank);
+}
+
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...opts });
 }
@@ -867,6 +1054,87 @@ function buildProp(kind, salt) {
     water.scale.y = 0.001;
     water.position.y = 0.1;
     g.add(water);
+    return g;
+  }
+
+  if (kind === 'pipe') {
+    // Only the hub: the arms depend on what is beside it, and
+    // `setPipeShape` hangs them off this once that is known.
+    const hub = new THREE.Mesh(
+      new THREE.BoxGeometry(PIPE_WIDTH + 0.06, PIPE_WIDTH + 0.06, PIPE_WIDTH + 0.06),
+      mat(PIPE_BAND)
+    );
+    hub.position.y = PIPE_Y;
+    hub.castShadow = true;
+    g.add(hub);
+    return g;
+  }
+
+  if (kind === 'sprinkler') {
+    // Built facing +Z: the nozzle out of the front, the water port on the
+    // back and the cog on the +X side, where the crank handle goes on. The
+    // whole group is turned for the other three facings.
+    const WALL = 0x8a5c30;
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.8), mat(WALL));
+    floor.position.y = 0.05;
+    floor.castShadow = true;
+    g.add(floor);
+
+    for (const [dx, dz, w, d] of [[0, 0.36, 0.8, 0.08], [0, -0.36, 0.8, 0.08],
+                                  [0.36, 0, 0.08, 0.8], [-0.36, 0, 0.08, 0.8]]) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 0.56, d), mat(0xa8763f));
+      wall.position.set(dx, 0.28, dz);
+      wall.castShadow = true;
+      g.add(wall);
+    }
+
+    // The water inside, the same named block a catcher has, so
+    // `setWaterLevel` raises it the same way.
+    const water = new THREE.Mesh(
+      new THREE.BoxGeometry(0.64, 1, 0.64),
+      mat(0x3f9fd8, { transparent: true, opacity: 0.85 })
+    );
+    water.name = 'water';
+    water.scale.y = 0.001;
+    water.position.y = 0.1;
+    g.add(water);
+
+    // The nozzle: a stub out of the front wall, tipped up so it throws the
+    // water forward over the patch in front.
+    const nozzle = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.42), mat(PIPE_WOOD));
+    nozzle.position.set(0, 0.46, 0.5);
+    nozzle.rotation.x = -0.45;
+    nozzle.castShadow = true;
+    g.add(nozzle);
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.06), mat(PIPE_BAND));
+    lip.position.set(0, 0.55, 0.69);
+    lip.rotation.x = -0.45;
+    g.add(lip);
+
+    // The water port on the back, banded blue so it reads as the way in.
+    const port = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.14), mat(PIPE_WOOD));
+    port.position.set(0, 0.2, -0.45);
+    g.add(port);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.05), mat(0x3f9fd8, { emissive: 0x0d3550 }));
+    band.position.set(0, 0.2, -0.5);
+    g.add(band);
+
+    // The cog on the crank side: a wheel with teeth, flat against the wall.
+    const cog = new THREE.Group();
+    cog.name = 'cog';
+    const wheel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.3, 0.3), mat(0xc99359));
+    cog.add(wheel);
+    for (let i = 0; i < 4; i++) {
+      const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.42, 0.1), mat(0xa8763f));
+      tooth.rotation.x = (i * Math.PI) / 4;
+      cog.add(tooth);
+    }
+    const axle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), mat(0x5a3a1d));
+    axle.position.x = 0.04;
+    cog.add(axle);
+    cog.position.set(0.43, 0.3, 0);
+    cog.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    g.add(cog);
     return g;
   }
 

@@ -6,7 +6,7 @@ import {
   createProps, setPropHighlight, setPropOutline, setWorkbenchState,
   canMove, canPlace, placeProp, footprintCells, syncBlocked,
   spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds, setWaterLevel,
-  setCropStage, cropStageOf, buildOutline, tagProp,
+  setCropStage, cropStageOf, buildOutline, tagProp, setCrank,
   GROUND_OFFSET, FARMLAND_SINK, FARMLAND_SOIL, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
@@ -30,6 +30,7 @@ import { createSaves } from './save.js';
 import { createStarfields } from './starfield.js';
 import { autoFullscreen } from './fullscreen.js';
 import { createMusic } from './music.js';
+import { createMachines, crankCell, modeLabel } from './machines.js';
 
 const canvas = document.getElementById('viewport');
 
@@ -225,6 +226,23 @@ function useWorkbench(prop) {
 const cutaway = createCutaway({ island, propsGroup, props, camera });
 
 castFromFront(scene);
+
+/**
+ * The water works - pipes joining themselves up, water running down them,
+ * and the sprinklers on the end. Anything it rebuilds (a pipe's arms, a
+ * crank going on) is handed back here for what every prop mesh gets.
+ */
+const machines = createMachines({
+  scene,
+  surface,
+  props,
+  onRebuilt: (prop) => {
+    castFromFront(prop.mesh);
+    tagProp(prop);
+    buildOutline(prop);
+    if (hovered === prop) setPropOutline(prop, true);
+  }
+});
 
 // What the cursor is over, named at the top of the screen. It only draws;
 // what it says about each thing is decided in `describeProp` below.
@@ -511,23 +529,100 @@ function fillBucket(agent, source, queue = false) {
   }, queue);
 }
 
-/** A click on a plot with water in the bucket: pour it in. */
+/**
+ * A click on a plot with water in the bucket: pour it in. The same goes for
+ * anything else that holds water and is not a source - a sprinkler's box is
+ * filled by hand the same way, when there is no pipe to it yet.
+ */
 function waterFarmland(agent, plot, queue = false) {
   const bucket = holding(agent, (t) => t.holds === 'water');
   if (!bucket || agent.tool.left <= 0) return false;
-  if (plot.water >= PROP_KINDS.farmland.water.max) return false;
+  const max = PROP_KINDS[plot.kind]?.water?.max;
+  if (!max || (plot.water ?? 0) >= max) return false;
 
   return order(agent, plot, {
     seconds: FILL_SECONDS,
     adjacent: true,
-    action: 'Watering the ground',
+    action: plot.kind === 'farmland' ? 'Watering the ground' : 'Filling the sprinkler',
     then: () => {
       if (plot.gone || agent.tool?.item !== 'bucket') return;
-      const room = PROP_KINDS.farmland.water.max - plot.water;
+      const room = max - (plot.water ?? 0);
       const poured = Math.min(room, agent.tool.left);
-      plot.water += poured;
+      plot.water = (plot.water ?? 0) + poured;
       agent.tool.left -= poured;
     }
+  }, queue);
+}
+
+// --- the machines ----------------------------------------------------------
+
+const WRENCH_SECONDS = 1.5;
+const CRANK_SECONDS = 10;
+
+/**
+ * A shift click on the end of a pipe with a wrench: set which way water may
+ * go through it - both ways, into the thing only, or out of it only.
+ *
+ * Which end is the one the cursor was nearest, and the brackets show that
+ * same end before the click, so it is never a guess.
+ */
+function wrenchPipe(agent, pipe, end, queue = false) {
+  if (!holding(agent, (t) => t.wrench) || !end) return false;
+  return order(agent, pipe, {
+    seconds: WRENCH_SECONDS,
+    adjacent: true,
+    action: 'Setting the end of a pipe',
+    then: () => {
+      if (pipe.gone || !holding(agent, (t) => t.wrench)) return;
+      // Still an end into something - the thing may have been moved off it.
+      const now = machines.links(pipe).find((l) => l.port && l.dx === end.dx && l.dz === end.dz);
+      if (!now) return;
+      machines.cycleMode(pipe, now);
+      wearTool(agent, 1);
+    }
+  }, queue);
+}
+
+/**
+ * A shift click on a machine with a wrench: turn it a quarter round, and
+ * show what it now faces. Only with nothing joined to it - a pipe into its
+ * intake or a crank on its side holds it where it is.
+ */
+function wrenchMachine(agent, prop, queue = false) {
+  if (!holding(agent, (t) => t.wrench) || !machines.canRotate(prop)) return false;
+  return order(agent, prop, {
+    seconds: WRENCH_SECONDS,
+    adjacent: true,
+    action: `Turning the ${PROP_KINDS[prop.kind].label} round`,
+    then: () => {
+      if (!holding(agent, (t) => t.wrench) || !machines.canRotate(prop)) return;
+      machines.rotate(prop);
+      wearTool(agent, 1);
+    }
+  }, queue);
+}
+
+/**
+ * A click on a sprinkler with a crank on it: go round to the crank side and
+ * turn it. The water goes out all the way through the work rather than at
+ * the end of it, and only while they are actually standing at the crank -
+ * a machine moved or turned under them stops throwing water.
+ */
+function crankMachine(agent, prop, queue = false) {
+  if (!prop.crank) return false;
+  const cell = crankCell(prop);
+  return order(agent, cell, {
+    seconds: CRANK_SECONDS,
+    action: `Cranking the ${PROP_KINDS[prop.kind].label}`,
+    face: prop,
+    tick: (dt) => {
+      if (prop.gone || !prop.crank) return;
+      const at = crankCell(prop);
+      if (Math.round(agent.x) !== at.x || Math.round(agent.z) !== at.z) return;
+      machines.spray(prop, dt);
+    },
+    // Nothing more at the end: the work was the whole of it.
+    then: () => {}
   }, queue);
 }
 
@@ -696,6 +791,8 @@ const placement = createPlacement({
   // Taken back out of the ground, whatever it had grown so far.
   onPickUp: (prop) => {
     inventory.add(PROP_KINDS[prop.kind].item, 1);
+    // A crank handle comes back off it rather than vanishing with it.
+    if (prop.crank) inventory.add('crankHandle', 1);
     removeProp(prop, propsGroup, props);
     syncBlocked(props, blocked);
   }
@@ -738,6 +835,7 @@ function beginPlanting(item) {
   const extra = {};
   if (PROP_KINDS[kind].grows) { extra.growth = 0; extra.growSeconds = rollGrowSeconds(); }
   if (PROP_KINDS[kind].water) extra.water = PROP_KINDS[kind].water.start;
+  if (PROP_KINDS[kind].facing) extra.facing = 0;
 
   const prop = spawnProp(kind, cell, { surface, group: propsGroup, props, extra });
   castFromFront(prop.mesh);
@@ -834,6 +932,7 @@ function devReset() {
   setHovered(null);
   stopCarrying();
   plantedAt = null;
+  machines.reset();
 
   person.reset();
   inventory.reset();
@@ -879,6 +978,9 @@ const saves = createSaves({
   onDrop: (prop) => { if (prop.kind === 'farmland') dropPlot(prop); else removeProp(prop, propsGroup, props); },
   onSpawn: (prop) => {
     castFromFront(prop.mesh);
+    // Which way a machine faces and the crank on its side are not in the
+    // mesh spawnProp builds; the pipes' arms are drawn on the next frame.
+    machines.dress(prop);
     // A plot is a dent in the isle and a crop at some stage of coming up,
     // and neither of those is in the prop itself - both are rebuilt from
     // what was saved.
@@ -1038,9 +1140,11 @@ function handleClick(event) {
   if (carrying) {
     const plot = propUnderPointer();
     if (canSow(plot)) { sowPlot(plot); lookedAt = 0; return; }
+    if (canAttach(plot)) { attachCrank(plot); lookedAt = 0; return; }
     if (!plot) {
       const ground = seen(raycaster.intersectObject(island, true));
-      if (ground && fillGround(blockAt(ground))) { lookedAt = 0; return; }
+      const block = ground && blockAt(ground);
+      if (block && (fillGround(block) || layPipe(block))) { lookedAt = 0; return; }
     }
     stopCarrying();
     return;
@@ -1074,6 +1178,23 @@ function handleClick(event) {
           if (agent && (waterFarmland(agent, prop, q) || workFarmland(agent, prop, q))) return;
           break;
         }
+        // A pipe and a machine are the wrench's with shift held - the end
+        // of the pipe nearest the click, or a quarter turn of the machine.
+        // Without it a sprinkler is filled from a bucket or cranked, and a
+        // pipe is nothing to click on at all.
+        if (prop && !prop.gone && (prop.kind === 'pipe' || PROP_KINDS[prop.kind]?.facing)) {
+          const agent = selectedAgent();
+          const q = queueing(event);
+          if (!agent) return;
+          if (tilling(event)) {
+            if (prop.kind === 'pipe') wrenchPipe(agent, prop, machines.pipeEndAt(prop, hit.point), q);
+            else wrenchMachine(agent, prop, q);
+            return;
+          }
+          if (prop.kind === 'sprinkler') waterFarmland(agent, prop, q) || crankMachine(agent, prop, q);
+          return;
+        }
+
         if (prop && !prop.gone && prop.kind === 'waterCatcher') {
           const agent = selectedAgent();
           if (agent) fillBucket(agent, prop, queueing(event));
@@ -1456,7 +1577,7 @@ let carrying = null;
 
 function beginCarrying(item) {
   const spec = ITEMS[item];
-  if (!spec || !(spec.sows || spec.fills)) return false;
+  if (!spec || !(spec.sows || spec.fills || spec.lays || spec.attaches)) return false;
   if (inventory.count(item) < 1) return false;
   carrying = item;
   panels.close();
@@ -1518,10 +1639,58 @@ function fillGround(cell) {
   return true;
 }
 
+/**
+ * Whether the pipe on the cursor could be laid on this block: the top of its
+ * column, with nothing standing there - a prop, or an agent.
+ */
+function canLay(block) {
+  const kind = carrying && ITEMS[carrying].lays;
+  if (!kind) return false;
+  if (surface.get(`${block.x},${block.z}`) !== block.y) return false;
+  return !!canPlace(surface, kind, block, {
+    props,
+    keepClear: agents.map((a) => ({ x: Math.round(a.x), z: Math.round(a.z) }))
+  });
+}
+
+/** Lay a length of pipe. It joins itself up to its neighbours next frame. */
+function layPipe(block) {
+  if (!canLay(block)) return false;
+  const kind = ITEMS[carrying].lays;
+  if (!inventory.take(carrying, 1)) return false;
+  const pipe = spawnProp(kind, { x: block.x, z: block.z }, {
+    surface, group: propsGroup, props, extra: { modes: {} }
+  });
+  castFromFront(pipe.mesh);
+  syncBlocked(props, blocked);
+  spendCarried();
+  return true;
+}
+
+/** Whether the crank handle on the cursor could go onto this machine. */
+function canAttach(prop) {
+  if (!carrying || ITEMS[carrying].attaches !== 'crank') return false;
+  return !!prop && !prop.gone && !!PROP_KINDS[prop.kind]?.facing && !prop.crank;
+}
+
+function attachCrank(prop) {
+  if (!canAttach(prop)) return false;
+  if (!inventory.take(carrying, 1)) return false;
+  setCrank(prop, true);
+  castFromFront(prop.mesh);
+  tagProp(prop);
+  buildOutline(prop);
+  if (hovered === prop) setPropOutline(prop, true);
+  spendCarried();
+  return true;
+}
+
 /** The cell whatever is on the cursor would go into, or null. */
 function carryTargetAt(block) {
-  if (!carrying || !ITEMS[carrying].fills) return null;
-  return canFill(block) ? { x: block.x, y: block.y + 1, z: block.z } : null;
+  if (!carrying) return null;
+  if (ITEMS[carrying].fills) return canFill(block) ? { x: block.x, y: block.y + 1, z: block.z } : null;
+  if (ITEMS[carrying].lays) return canLay(block) ? { x: block.x, y: block.y + 1, z: block.z } : null;
+  return null;
 }
 
 function setHovered(prop) {
@@ -1540,7 +1709,7 @@ function setHovered(prop) {
  * added by whatever owns that state, so this stays the one place a prop is
  * described and nothing has to reach into the readout itself.
  */
-function describeProp(prop) {
+function describeProp(prop, end = null) {
   const kind = PROP_KINDS[prop.kind];
   const what = { name: propName(prop), item: kind?.icon ?? null };
 
@@ -1570,8 +1739,22 @@ function describeProp(prop) {
     what.bar = { value: prop.growth, max: kind.growSeconds, colour: ripe(prop) ? '#e8cc63' : '#6aa84f' };
   }
 
+  // A pipe says what it runs into, and - with a wrench's shift held over
+  // one of those ends - what that end is set to.
+  if (prop.kind === 'pipe') {
+    const ends = machines.links(prop).filter((l) => l.port);
+    what.note = ends.length === 0
+      ? 'joined to nothing'
+      : ends.map((l) => `${propName(l.tank)}: ${modeLabel(l.mode)}`).join(' \u00b7 ');
+    if (end) what.note = `${propName(end.tank)} end: ${modeLabel(end.mode)} \u00b7 shift-click to change`;
+  }
+
+  // A machine with nothing to turn it by says so.
+  if (kind?.facing && !prop.crank) what.note = `${what.note} \u00b7 no crank`;
+
   // Bare turned ground that the seeds on the cursor could go into says so.
   if (canSow(prop)) what.note = `${what.note ?? ''} \u00b7 click to sow`.trim();
+  if (canAttach(prop)) what.note = `${what.note ?? ''} \u00b7 click to attach`.trim();
   return what;
 }
 
@@ -1628,6 +1811,11 @@ function seen(hits) {
 
 /** Whatever the pointer is actually over: a prop, or null for the ground. */
 function propUnderPointer() {
+  return propHitUnderPointer()?.prop ?? null;
+}
+
+/** The same, with where on it the ray landed: `{ prop, hit }` or null. */
+function propHitUnderPointer() {
   const hit = seen(raycaster.intersectObject(propsGroup, true));
   const prop = hit && props.find((p) => p.id === hit.object.userData.propId);
   if (!prop || prop.gone) return null;
@@ -1636,7 +1824,7 @@ function propUnderPointer() {
   // the cursor and the prop, most likely. This is the cast that was always
   // here, and it still only runs when a prop was actually hit.
   const ground = seen(raycaster.intersectObject(island, true));
-  return ground && ground.distance < hit.distance ? null : prop;
+  return ground && ground.distance < hit.distance ? null : { prop, hit };
 }
 
 function refreshHover() {
@@ -1716,12 +1904,26 @@ function updateLookAt() {
     }
   }
 
-  const prop = propUnderPointer();
-  if (prop) {
+  const under = propHitUnderPointer();
+  if (under) {
+    const { prop, hit } = under;
+    // A wrench with shift held picks out the end of a pipe it would set, and
+    // lights a machine it would turn. It never lights one it would refuse.
+    const wrench = shiftHeld && holding(selectedAgent(), (t) => t.wrench);
+    if (wrench && prop.kind === 'pipe') {
+      const end = machines.pipeEndAt(prop, hit.point);
+      if (end) {
+        lookAt.show(describeProp(prop, end));
+        highlight.showBox(machines.endBox(prop, end), HIGHLIGHT_WORK);
+        return;
+      }
+    }
     lookAt.show(describeProp(prop));
     // A plot waiting for the seeds on the cursor lights up: that is the
-    // whole of what says where they may go.
-    highlight.showBox(propBox(prop), canSow(prop) ? HIGHLIGHT_WORK : HIGHLIGHT_PLAIN);
+    // whole of what says where they may go. A machine the crank on the
+    // cursor could go onto does the same.
+    const armed = canSow(prop) || canAttach(prop) || (wrench && machines.canRotate(prop));
+    highlight.showBox(propBox(prop), armed ? HIGHLIGHT_WORK : HIGHLIGHT_PLAIN);
     return;
   }
 
@@ -2008,6 +2210,7 @@ function frame() {
   updatePanel();
   panels.update();
   updateGround(delta);
+  machines.update(delta);
   // After the camera has moved this frame, so the tube is aimed from where
   // the eye actually is.
   cutaway.update(selectedAgent(), delta);
@@ -2027,7 +2230,8 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { cutaway, ITEMS, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
+window.ESTER = { cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
+  attachCrank, canAttach, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
   busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });

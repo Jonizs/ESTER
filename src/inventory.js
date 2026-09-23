@@ -101,7 +101,24 @@ export const ITEMS = {
   },
 
   // An item that puts a station on the ground, the way a sapling does.
-  waterCatcher: { label: 'Water Catcher', tint: '#8ad8ff', plants: 'waterCatcher' }
+  waterCatcher: { label: 'Water Catcher', tint: '#8ad8ff', plants: 'waterCatcher' },
+
+  // --- water works ----------------------------------------------------------
+  // A length of pipe is laid straight off the cursor, one cell per click -
+  // `lays` names the prop kind it becomes. It needs no positioning beyond
+  // which cell: it joins up to whatever is beside it on its own.
+  pipe: { label: 'Wooden Pipe', tint: '#d9a866', lays: 'pipe' },
+  // Only ever an ingredient.
+  cog: { label: 'Wooden Cog', tint: '#e8b878' },
+  // Goes onto a machine's crank side off the cursor. `attaches` names what
+  // it becomes on the machine, the way `sows` names what a seed goes into.
+  crankHandle: { label: 'Crank Handle', tint: '#f0c890', attaches: 'crank' },
+  // The wrench does no gathering: a shift click with it sets the end of a
+  // pipe, or turns a machine round - see src/machines.js.
+  flintWrench: {
+    label: 'Flint Wrench', tint: '#9fb4e0', uses: 120, serves: ['flintWrench'], wields: true, wrench: true
+  },
+  sprinkler: { label: 'Basic Sprinkler', tint: '#7fc8f0', plants: 'sprinkler' }
 };
 
 /** Whether an item is worn down by use rather than spent outright. */

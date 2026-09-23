@@ -325,7 +325,12 @@ export class Person {
   }
 
   /** The same, leaving the queue alone - what the queue itself runs. */
-  _doAt(target, { seconds = 1, action = null, then = null, adjacent = false } = {}) {
+  //
+  // `tick` is called with the frame's delta for every frame of the work
+  // itself - cranking a machine does its work all the way through rather than
+  // at the end - and `face` is what they turn to look at when the cell they
+  // are standing on is not it.
+  _doAt(target, { seconds = 1, action = null, then = null, adjacent = false, tick = null, face = null } = {}) {
     const cells = target.kind
       ? footprintCells(target.kind, target)
       : [{ x: target.x, z: target.z }];
@@ -334,7 +339,7 @@ export class Person {
     this.task = {
       prop: target.kind ? target : null,
       at: { x: target.x, z: target.z },
-      seconds, elapsed: 0, action, then
+      seconds, elapsed: 0, action, then, tick, face
     };
     this.action = null;        // nothing is said until they get there
     return true;
@@ -366,9 +371,10 @@ export class Person {
       // A job with its own `then` says what it is; a plain one on a prop
       // takes the line off the kind, which is where it has always been.
       this.action = this.task.action ?? PROP_KINDS[prop.kind].action;
-      const face = prop ?? at;
+      const face = this.task.face ?? prop ?? at;
       this.mesh.rotation.y = Math.atan2(face.x - this.x, face.z - this.z);
 
+      this.task.tick?.(dt);
       this.task.elapsed += dt;
       if (this.task.elapsed >= this.task.seconds) {
         const done = this.task.then;

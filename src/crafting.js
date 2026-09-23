@@ -215,6 +215,66 @@ export const RECIPES = [
       5: 'plank', 7: 'plank', 8: 'rope',
       9: 'plank', 10: 'plank', 11: 'plank', 12: 'rope'
     }
+  },
+  {
+    // Two rows of three planks, each bound at the end with rope.
+    id: 'pipe',
+    label: 'Wooden Pipe',
+    item: 'pipe',
+    yield: 4,
+    slots: {
+      1: 'plank', 2: 'plank', 3: 'plank', 4: 'rope',
+      5: 'plank', 6: 'plank', 7: 'plank', 8: 'rope'
+    }
+  },
+  {
+    // Two sticks for the axle, two planks beside them for the wheel.
+    id: 'cog',
+    label: 'Wooden Cog',
+    item: 'cog',
+    yield: 1,
+    slots: {
+      1: 'stick', 2: 'plank',
+      5: 'stick', 6: 'plank'
+    }
+  },
+  {
+    // The cog on the end of an arm of planks, and a rope grip bent down off
+    // the far end of it.
+    id: 'crankHandle',
+    label: 'Crank Handle',
+    item: 'crankHandle',
+    yield: 1,
+    slots: {
+      1: 'cog', 2: 'plank', 3: 'plank',
+      7: 'rope'
+    }
+  },
+  {
+    // A jaw of flint at the top corner and a stick handle running away from
+    // it corner to corner.
+    id: 'flintWrench',
+    label: 'Flint Wrench',
+    item: 'flintWrench',
+    yield: 1,
+    slots: {
+      1: 'flint', 2: 'flint',
+      5: 'flint', 6: 'stick',
+      11: 'stick',
+      16: 'stick'
+    }
+  },
+  {
+    // A cog boxed in by planks on every side.
+    id: 'sprinkler',
+    label: 'Basic Sprinkler',
+    item: 'sprinkler',
+    yield: 1,
+    slots: {
+      1: 'plank', 2: 'plank', 3: 'plank',
+      5: 'plank', 6: 'cog', 7: 'plank',
+      9: 'plank', 10: 'plank', 11: 'plank'
+    }
   }
 ];
 

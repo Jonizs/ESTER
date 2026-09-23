@@ -32,6 +32,10 @@ const KEY = 'ester:save';
 // 2: the inventory grew tools, which carry how worn each one is, so what it
 //    writes went from `{ wood: 3 }` to `{ held, tools }`.
 // 3: agents carry a tool, and props gained water and what is sown in them.
+//
+// Still 3 with the water works: a machine's `facing`, its `crank` and a
+// pipe's end `modes` are only ever ADDED to an entry, never a change to what
+// was there, so an older save is read whole and simply has none of them.
 const SAVE_VERSION = 3;
 
 // How often the run is written down while it is being played.
@@ -87,6 +91,11 @@ export function createSaves({
         }
         // What its shape was rolled from, so it comes back the same one.
         if (prop.salt !== undefined) entry.salt = prop.salt;
+        // The water works: which way a machine faces, the crank on its side,
+        // and what each end of a pipe has been set to with a wrench.
+        if (prop.facing !== undefined) entry.facing = prop.facing;
+        if (prop.crank) entry.crank = true;
+        if (prop.modes && Object.keys(prop.modes).length) entry.modes = { ...prop.modes };
         return entry;
       })
     };
@@ -155,6 +164,9 @@ export function createSaves({
           extra.growth = entry.growth ?? 0;
         }
         if (entry.salt !== undefined) extra.salt = entry.salt;
+        if (entry.facing !== undefined) extra.facing = entry.facing;
+        if (entry.crank) extra.crank = true;
+        if (entry.kind === 'pipe') extra.modes = { ...(entry.modes ?? {}) };
         const prop = spawnProp(entry.kind, entry, { surface, group: propsGroup, props, extra });
         onSpawn?.(prop);
         continue;

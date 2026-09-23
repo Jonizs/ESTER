@@ -3,6 +3,7 @@ import {
   PROP_KINDS, GROUND_OFFSET,
   canMove, canPlace, placeProp, footprintCells, footprintCentre, footprintOf, syncBlocked
 } from './props.js';
+import { buildGuide, disposeGuide, applyFacing } from './machines.js';
 
 /**
  * Moving a placed station around the isle - and planting one that is not
@@ -48,6 +49,7 @@ export function createPlacement({
   const title = root.querySelector('.mover-what');
   const hint = root.querySelector('.mover-hint');
   const pickUpButton = root.querySelector('#mover-pickup');
+  const rotateButton = root.querySelector('#mover-rotate');
 
   // The footprint under the station: one flat tile per cell it covers, plus
   // the outline of the whole rectangle.
@@ -68,6 +70,7 @@ export function createPlacement({
   let planting = false;       // it is being put down, not repositioned
   let refused = 0;            // seconds of red left on the footprint
   let dragging = false;       // the left button is down on the isle
+  let guide = null;           // what a machine will touch, drawn on the isle
 
   const isActive = () => prop !== null;
 
@@ -101,6 +104,28 @@ export function createPlacement({
     // Just clear of the block face, so it does not z-fight with the turf.
     marker.position.set(centre.x, surface.get(`${prop.x},${prop.z}`) + GROUND_OFFSET + 0.03, centre.z);
     marker.visible = true;
+    showGuide();
+  }
+
+  /**
+   * A machine shows what it will do wherever it is put: the cells it waters,
+   * its crank side in red and its intake in blue. Rebuilt on every step and
+   * every turn, so it is always telling the truth about where it stands now.
+   */
+  function showGuide() {
+    disposeGuide(guide);
+    guide = null;
+    if (!prop || !PROP_KINDS[prop.kind]?.facing) return;
+    guide = buildGuide(prop, surface);
+    scene.add(guide);
+  }
+
+  /** A quarter turn round, for anything that faces a way. R, or ROTATE. */
+  function rotate() {
+    if (!isActive() || !PROP_KINDS[prop.kind]?.facing) return;
+    prop.facing = ((prop.facing ?? 0) + 1) % 4;
+    applyFacing(prop);
+    showGuide();
   }
 
   // --- moving it ----------------------------------------------------------
@@ -219,7 +244,10 @@ export function createPlacement({
 
     const { w, d } = footprintOf(prop.kind);
     title.textContent = PROP_KINDS[prop.kind].label.toUpperCase();
-    hint.textContent = `Needs ${w * d} solid ${w * d === 1 ? 'block' : 'blocks'}, level and clear`;
+    const turns = !!PROP_KINDS[prop.kind]?.facing;
+    hint.textContent = `Needs ${w * d} solid ${w * d === 1 ? 'block' : 'blocks'}, level and clear`
+      + (turns ? ' \u00b7 R turns it' : '');
+    rotateButton.hidden = !turns;
     // Only something already standing can be taken back into the inventory;
     // one still being planted is put away with CANCEL.
     pickUpButton.hidden = planting || !PROP_KINDS[prop.kind]?.portable;
@@ -233,7 +261,7 @@ export function createPlacement({
   function begin(next) {
     if (!canMove(next)) return false;
     planting = false;
-    origin = { x: next.x, z: next.z };
+    origin = { x: next.x, z: next.z, facing: next.facing };
     return start(next);
   }
 
@@ -256,6 +284,8 @@ export function createPlacement({
     planting = false;
     dragging = false;
     marker.visible = false;
+    disposeGuide(guide);
+    guide = null;
     root.hidden = true;
     canvas.style.cursor = '';
     syncBlocked(props, blocked);
@@ -284,7 +314,11 @@ export function createPlacement({
     if (!isActive()) return;
     const dropped = prop;
     const wasPlanting = planting;
-    if (!wasPlanting) placeProp(prop, origin, surface);
+    if (!wasPlanting) {
+      placeProp(prop, origin, surface);
+      // A turn made during the move is put back with it.
+      if (origin.facing !== undefined) { prop.facing = origin.facing; applyFacing(prop); }
+    }
     finish();
     if (wasPlanting) onDiscard?.(dropped);
   }
@@ -350,6 +384,7 @@ export function createPlacement({
   root.querySelector('#mover-place').addEventListener('click', commit);
   root.querySelector('#mover-cancel').addEventListener('click', cancel);
   pickUpButton.addEventListener('click', pickUp);
+  rotateButton.addEventListener('click', rotate);
 
   // --- keyboard -----------------------------------------------------------
   // Capture phase, before the pause menu, so Esc puts the station back
@@ -371,6 +406,16 @@ export function createPlacement({
       return;
     }
 
+    // R turns it. Hard-wired like the arrows, Enter and Esc here, rather
+    // than a binding: the camera's own R (reset view) is stood down while
+    // the mover is up, so the key is free for as long as this is.
+    if (event.key === 'r' || event.key === 'R') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      rotate();
+      return;
+    }
+
     const steps = {
       ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]
     };
@@ -383,7 +428,7 @@ export function createPlacement({
 
   root.hidden = true;
   return {
-    begin, plant, commit, cancel, pickUp, isActive, update, moveTo, nudge, dragToPointer,
+    begin, plant, commit, cancel, pickUp, rotate, isActive, update, moveTo, nudge, dragToPointer,
     get prop() { return prop; },
     get planting() { return planting; }
   };

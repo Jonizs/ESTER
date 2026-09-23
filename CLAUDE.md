@@ -78,7 +78,11 @@ with one inhabitant who walks around and works on what is there.
   - `src/music.js` - the soundtrack, synthesised live with Web Audio.
   - `src/inventory.js` - what has been gathered, and the item list (an item
     with `plants` gets a PLANT button on its tile and opens the mover; one
-    with `sows` or `fills` gets one that arms the cursor instead).
+    with `sows`, `fills`, `lays` or `attaches` gets one that arms the cursor
+    instead).
+  - `src/machines.js` - the water works: pipes joining themselves up, water
+    running down them, sprinklers and their crank, and the guide a machine
+    draws on the isle while it is placed or turned.
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/save.js` - the run, written down and read back on launch.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
@@ -1166,6 +1170,52 @@ with one inhabitant who walks around and works on what is there.
   piece owns its own `reset()` (`person.js`, `inventory.js`,
   `progression.js`), so anything that gains run state should gain one too and
   be called from `devReset` - otherwise it quietly survives the reset.
+
+- **Pipes join themselves up; nothing is told a pipe was laid.**
+  `machines.update` builds a signature of every pipe and port (kind, cell,
+  facing, ground height, end modes) each frame and relinks only when it
+  changes, which is what keeps a station being dragged in the mover joined
+  up the whole way. A pipe links to a pipe up to one block higher or lower
+  (the lower one puts up the riser), and to a thing's PORT on the level (its
+  side) or from one block below (its bottom). Rebuilt arms go back through
+  `onRebuilt` for `castFromFront`, `tagProp` and `buildOutline`, the same as
+  a crop.
+- **Water moves by gravity only, 20ml a second per network.** Everything
+  joined by one run of pipe is one network (`PROP_KINDS.pipe.flow`); water
+  goes from a tank that gives into one that takes only if the taker's ground
+  is at or below the giver's. Two catchers on the level stop once they are
+  equally full, or they would slosh forever. A catcher has ports on all four
+  sides and gives and takes; a sprinkler has one port, on its back, and only
+  takes.
+- **An end's mode is on the PIPE, keyed by direction.** `pipe.modes["dx,dz"]`
+  is `in` (the thing only takes - drawn as a narrowed neck), `out` (it only
+  gives - the pipe runs on into it with a collar) or absent for both ways. A
+  shift click with a wrench (`ITEMS.flintWrench.wrench`) cycles the end
+  nearest the click, and the brackets pick out that same end before the
+  click; the readout says what it is set to.
+- **A machine faces a way, and its sides mean things.** `prop.facing` 0-3
+  counts +Z, +X, -Z, -X; the mesh is built facing +Z with the cog on +X, so
+  the crank side is always the next side round from the front and the intake
+  is the back (`sidesOf` in `machines.js`). R (or ROTATE) turns it in the
+  mover, hard-wired like the arrows there since the camera's R is stood down
+  while the mover is up; a wrench turns it once it is down, but only with no
+  crank on it and no pipe into it. Either way the guide shows - the nine
+  spray cells, the crank side outlined red, the intake filled blue - for as
+  long as the mover is up, or three seconds after a wrench.
+- **Cranking waters as it goes, not at the end.** `doAt` takes `tick` (called
+  every frame of the work) and `face` (what to turn to when standing on the
+  cell rather than beside the thing). The crank job stands the agent ON the
+  crank cell and sprays only while they are actually there: 10ml a second
+  onto each of the nine cells, 90 in all whether or not anything is there to
+  catch it, until the box is dry. A plain click on a sprinkler pours a bucket
+  into it first if there is one in hand, and cranks it otherwise.
+- **A crank handle goes on off the cursor, and comes back with the machine.**
+  `attaches: 'crank'` arms the cursor; a click on a machine with no crank
+  puts one on (`setCrank` in `props.js`). There is no taking it off on its
+  own - PICK UP on the machine returns the crank handle as well.
+- **A pipe is laid off the cursor, one cell per click** (`lays` in `ITEMS`),
+  on the top of a column with nothing standing there. It is `portable`, so
+  the move key and PICK UP take one back up.
 
 ## Commands
 

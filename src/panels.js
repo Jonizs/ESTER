@@ -175,11 +175,14 @@ export function createPanels({ settings, agents, inventory, progression, blocked
         // Seeds go into ground already turned over and earth goes back into
         // a hole, so their button arms the cursor rather than opening the
         // mover: the screen closes and the next click puts one down.
-        if (ITEMS[entry.item].sows || ITEMS[entry.item].fills) {
+        // A pipe is laid the same way, one cell a click, and a crank handle
+        // goes onto the side of a machine.
+        const spec = ITEMS[entry.item];
+        if (spec.sows || spec.fills || spec.lays || spec.attaches) {
           const carry = document.createElement('button');
           carry.type = 'button';
           carry.className = 'tile-action';
-          carry.textContent = ITEMS[entry.item].sows ? 'Plant' : 'Place';
+          carry.textContent = spec.sows ? 'Plant' : spec.attaches ? 'Attach' : 'Place';
           carry.addEventListener('click', (event) => {
             event.stopPropagation();
             onCarryItem?.(entry.item);

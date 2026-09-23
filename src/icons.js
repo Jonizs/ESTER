@@ -145,6 +145,36 @@ function ropeCoil({ rings = 3, cx = 11.4, top = 7.6, rx = 7.8, ry = 4.1, step = 
   return s;
 }
 
+/**
+ * A cog wheel's outline: `teeth` square teeth round a rim, as one closed
+ * path. Worked out rather than drawn, for the same reason the rope is - it
+ * is dozens of points, and the cog, the crank and the sprinkler all carry
+ * one at a different size.
+ */
+function gearPath(cx, cy, outer, inner, teeth = 8) {
+  const pts = [];
+  const step = (Math.PI * 2) / teeth;
+  for (let i = 0; i < teeth; i++) {
+    const a = i * step - Math.PI / 2;
+    // Each tooth is a quarter of a step either side of its middle, and the
+    // gap between two is the rim.
+    for (const [da, r] of [[-0.5, inner], [-0.26, inner], [-0.2, outer], [0.2, outer], [0.26, inner]]) {
+      pts.push([cx + Math.cos(a + da * step) * r, cy + Math.sin(a + da * step) * r]);
+    }
+  }
+  return `M${pts.map(([x, y]) => `${r2(x)} ${r2(y)}`).join('L')}z`;
+}
+
+/** A painted wooden cog: rim and teeth, a lit face, and the axle hole. */
+function cogArt(cx, cy, outer, inner, { teeth = 8, line = 1.2 } = {}) {
+  return `<path d="${gearPath(cx, cy, outer, inner, teeth)}" fill="#c99359"`
+    + ` stroke="#3d2411" stroke-width="${line}" stroke-linejoin="round"/>`
+    + `<circle cx="${cx}" cy="${cy}" r="${r2(inner * 0.72)}" fill="#e0b070"/>`
+    + `<path d="M${r2(cx - inner * 0.5)} ${r2(cy - inner * 0.3)}a${r2(inner * 0.6)} ${r2(inner * 0.6)} 0 0 1 ${r2(inner * 0.8)} -${r2(inner * 0.25)}"`
+    + ` fill="none" stroke="#f3cf92" stroke-width="${r2(line * 0.8)}" stroke-linecap="round"/>`
+    + `<circle cx="${cx}" cy="${cy}" r="${r2(inner * 0.3)}" fill="#3d2411"/>`;
+}
+
 export const MATERIAL_ART = {
   // A felled log, cut face turned to the viewer, with a snapped branch
   // sticking out of the top.
@@ -560,7 +590,84 @@ export const MATERIAL_ART = {
     + '<ellipse cx="12" cy="8.4" rx="6.4" ry="1.4" fill="#3f9fd8"/>'
       // a drop falling into it
     + '<path d="M12 1.2c1.5 1.8 2.2 3.1 2.2 4a2.2 2.2 0 01-4.4 0c0-.9.7-2.2 2.2-4z"'
-    + ' fill="#6fc4ee" stroke="#15496e" stroke-width="1.2" stroke-linejoin="round"/>'
+    + ' fill="#6fc4ee" stroke="#15496e" stroke-width="1.2" stroke-linejoin="round"/>',
+
+  // A wooden pipe: two lengths of square duct joined by a band, seen the
+  // three-quarter way the planks are, with the open end turned to the
+  // viewer. The dark hole in the end is what says it carries something.
+  pipe:
+      // the long front face, then the lit top - long and slim, because a
+      // short fat one reads as a crate at tile size
+      '<path d="M1.4 12.6h15.8v5H1.4z" fill="#a8763f"/>'
+    + '<path d="M1.4 12.6l3-3h15.8l-3 3z" fill="#e0b070"/>'
+    + '<path d="M3.2 11.6l1.8-1.8M13.6 11.6l1.8-1.8" fill="none" stroke="#c99359" stroke-width="0.8" stroke-linecap="round"/>'
+      // the open end, and the dark bore inside it
+    + '<path d="M17.2 12.6l3-3v5l-3 3z" fill="#8a5c30"/>'
+    + '<path d="M17.9 13.4l1.6-1.6v3l-1.6 1.6z" fill="#2a170a"/>'
+      // the band where two lengths meet
+    + '<path d="M8 12.6h2.2v5H8z" fill="#7a4f28"/>'
+    + '<path d="M8 12.6l3-3h2.2l-3 3z" fill="#9c6a3a"/>'
+    + '<path d="M1.4 12.6h15.8v5H1.4zM1.4 12.6l3-3h15.8l-3 3M17.2 17.6l3-3V9.6"'
+    + ' fill="none" stroke="#3d2411" stroke-width="1.2" stroke-linejoin="round"/>'
+    + '<path d="M8 12.6v5M10.2 12.6v5" fill="none" stroke="#3d2411" stroke-width="0.9"/>'
+      // a drop falling from the mouth of it
+    + '<path d="M20.4 17.4c1 1.2 1.5 2.1 1.5 2.8a1.5 1.5 0 01-3 0c0-.7.5-1.6 1.5-2.8z"'
+    + ' fill="#6fc4ee" stroke="#15496e" stroke-width="1" stroke-linejoin="round"/>',
+
+  // A wooden cog, face on: the one silhouette everything with a cog in it
+  // shares, so the crank and the sprinkler read as made of one.
+  cog: cogArt(12, 12, 9.4, 6.8, { teeth: 8, line: 1.3 }),
+
+  // A crank handle: the cog it turns on, an arm of plank out from its middle
+  // and a rope-bound grip standing up off the far end.
+  crankHandle:
+      cogArt(7.2, 16.4, 5.6, 4, { teeth: 7, line: 1.1 })
+      // the arm, running up and out from the axle
+    + '<path d="M6.3 15.2l10.4-9 1.8 2.1-10.4 9z" fill="#b07a45" stroke="#3d2411" stroke-width="1.2" stroke-linejoin="round"/>'
+    + '<path d="M7.6 15.4l9.6-8.3" fill="none" stroke="#e0b070" stroke-width="0.8" stroke-linecap="round"/>'
+      // the grip, bound in rope
+    + '<path d="M16 7.6V2.2h3.2v5.4z" fill="#d3b167" stroke="#3d2c10" stroke-width="1.2" stroke-linejoin="round"/>'
+    + '<path d="M16 3.6h3.2M16 5h3.2M16 6.4h3.2" fill="none" stroke="#8a6a2a" stroke-width="0.8"/>'
+    + '<circle cx="7.2" cy="16.4" r="1.3" fill="#3d2411"/>',
+
+  // A flint wrench: an open jaw knapped out of flint on a stick handle. The
+  // gap in the jaw is the whole of what says wrench rather than hammer.
+  flintWrench:
+      // the handle, corner to corner
+      '<path d="M9.6 12l2-2 10 10.2-2 2z" fill="#a86f3d" stroke="#2c1a0e" stroke-width="1.3" stroke-linejoin="round"/>'
+    + '<path d="M11.4 11.6l9 9.2" fill="none" stroke="#c99359" stroke-width="0.9" stroke-linecap="round"/>'
+      // the head, with its jaw open to the top right
+    + '<path d="M2.2 8.6L4.8 3l4.6-1.2-.4 3.6-2.2 1.3.4 2.3 2.4.7 3.4-1.8-.2 4.4-5.6 2.2z" fill="#5a6478"/>'
+    + '<path d="M2.2 8.6L4.8 3l4.6-1.2-.4 3.6-2.2 1.3-4.2 2.4z" fill="#8794ad"/>'
+    + '<path d="M9.6 9.7l3.4-1.8-.2 4.4-5.6 2.2 1.4-3.6z" fill="#3c4457"/>'
+    + '<path d="M2.2 8.6L4.8 3l4.6-1.2-.4 3.6-2.2 1.3.4 2.3 2.4.7 3.4-1.8-.2 4.4-5.6 2.2z"'
+    + ' fill="none" stroke="#151a27" stroke-width="1.35" stroke-linejoin="round"/>'
+    + '<path d="M4 7.4l1.2-3" fill="none" stroke="#c3ccdd" stroke-width="1" stroke-linecap="round"/>'
+      // the binding where the handle goes into the head
+    + '<path d="M8.4 11.4l2.4-2.3 2 2-2.4 2.3z" fill="#d9cd8a" stroke="#2f2a12" stroke-width="1.15" stroke-linejoin="round"/>',
+
+  // A basic sprinkler: the wooden box, water in the top, a cog on its side
+  // and the spout throwing an arc of drops out of the front.
+  sprinkler:
+      // the box, three-quarter view
+      '<path d="M3 11.4h11.4v9.2H3z" fill="#a8763f"/>'
+    + '<path d="M14.4 11.4l4.2-3.6v9.2l-4.2 3.6z" fill="#8a5c30"/>'
+    + '<path d="M3 11.4l4.2-3.6h11.4l-4.2 3.6z" fill="#e0b070"/>'
+      // the water sitting in its open top
+    + '<path d="M5.2 10.8l2.7-2.3h8.3l-2.7 2.3z" fill="#3f9fd8"/>'
+    + '<path d="M3 11.4h11.4v9.2H3zM3 11.4l4.2-3.6h11.4l-4.2 3.6M14.4 20.6l4.2-3.6V7.8"'
+    + ' fill="none" stroke="#3d2411" stroke-width="1.2" stroke-linejoin="round"/>'
+    + '<path d="M6.8 11.6v8.8M10.6 11.6v8.8" fill="none" stroke="#8a5c30" stroke-width="0.8" opacity="0.7"/>'
+      // the cog on its side
+    + `<path d="${gearPath(16.5, 14.2, 2.6, 1.9, 6)}" fill="#c99359" stroke="#3d2411" stroke-width="0.9" stroke-linejoin="round"/>`
+    + '<circle cx="16.5" cy="14.2" r="0.7" fill="#3d2411"/>'
+      // the spout out of the front, tipped up
+    + '<path d="M4.4 14.2L1.6 11.8l1.4-1.6 2.8 2.4z" fill="#b07a45" stroke="#3d2411" stroke-width="1" stroke-linejoin="round"/>'
+      // the spray it throws
+    + '<path d="M2.2 9.6c1.2-3.2 4.2-5.6 8-6.4" fill="none" stroke="#6fc4ee" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="0.1 2.2"/>'
+    + '<path d="M1.6 5.2c.8 1 1.2 1.7 1.2 2.2a1.2 1.2 0 01-2.4 0c0-.5.4-1.2 1.2-2.2z'
+    + 'M6.2 1.2c.8 1 1.2 1.7 1.2 2.2a1.2 1.2 0 01-2.4 0c0-.5.4-1.2 1.2-2.2z"'
+    + ' fill="#6fc4ee" stroke="#15496e" stroke-width="0.9" stroke-linejoin="round"/>'
 };
 
 /** An `<svg>` holding one of the glyphs above. */
