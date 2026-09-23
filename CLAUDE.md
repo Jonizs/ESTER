@@ -550,6 +550,19 @@ with one inhabitant who walks around and works on what is there.
   up once anything is on it. It is marked `isHitPad`, and `buildOutline` and
   `propBox` both skip it - tracing the edges of a box nobody can see draws a
   cage around thin air.
+- **A bare plot's hitbox only says "a plot is along here" - the SOIL says
+  which one.** The pad fills its whole cell and stands over the rim, so a ray
+  aimed at the soil of one plot in a field passes through the pad of the
+  plot in front first: two aims in three went to the wrong plot, which is
+  what "seeds are too hard to plant" was. `propHitUnderPointer` skips a bare
+  plot's pad and reads the plot off the isle block the ray lands on
+  (`plotOnBlock`); a sown plot's pad still counts, because the crop really
+  is what stands in front. `handleClick` asks the same function, so the
+  click goes where the brackets are, and `propBox` draws a plot as its whole
+  cell, soil to crop top, rather than a box round the blades. Measured over a
+  4x4 field: bare plots went from 137/400 aims on the right plot to 361, with
+  none on the wrong one - the rest are the outer edge, where the grass rim
+  really is in front.
 - **Some things are carried on the CURSOR, and that is not the mover.** A
   sapling has to be *positioned* - it needs room, and where exactly it goes
   matters - so it earns arrows and a PLACE button. A seed only ever goes

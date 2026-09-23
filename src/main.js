@@ -1161,13 +1161,18 @@ function handleClick(event) {
       if (object.userData.person) { selectOnly(object.userData.person); return; }
 
       if (object.userData.propId) {
-        const prop = props.find((p) => p.id === object.userData.propId);
+        let prop = props.find((p) => p.id === object.userData.propId);
         if (prop && prop.kind === 'workbench') { useWorkbench(prop); return; }
 
         // The ground and the water are worked with what is in hand rather
         // than by the prop's own `action`, so they are asked first: a plot
         // is a hoe's job or a bucket's depending on who is standing there.
         if (prop && !prop.gone && prop.kind === 'farmland') {
+          // Which plot is read the same way the cursor reads it, or the
+          // click lands on the plot in front of the one the brackets show.
+          const aimed = propHitUnderPointer()?.prop;
+          if (aimed?.kind !== 'farmland') break;
+          prop = aimed;
           const agent = selectedAgent();
           const q = queueing(event);
           // Sowing has already had its go above. What is left is watering it
@@ -1528,6 +1533,17 @@ function boxOf(object) {
  */
 function propBox(prop) {
   measured.makeEmpty();
+  // A plot is its whole cell, soil to the top of whatever is growing - the
+  // blades alone make a box a hand's breadth across that reads as a miss.
+  if (prop.kind === 'farmland') {
+    const ground = prop.mesh.position.y;
+    let top = ground + 0.02;
+    const crop = prop.mesh.getObjectByName('crop');
+    if (crop) top = Math.max(top, boxOf(crop).max.y);
+    measured.min.set(prop.x - 0.5, ground - FARMLAND_SINK, prop.z - 0.5);
+    measured.max.set(prop.x + 0.5, top, prop.z + 0.5);
+    return measured;
+  }
   prop.mesh.updateWorldMatrix(true, true);
   prop.mesh.traverse((object) => {
     if (!object.isMesh || object.userData.isHitPad) return;
@@ -1816,15 +1832,40 @@ function propUnderPointer() {
 
 /** The same, with where on it the ray landed: `{ prop, hit }` or null. */
 function propHitUnderPointer() {
-  const hit = seen(raycaster.intersectObject(propsGroup, true));
-  const prop = hit && props.find((p) => p.id === hit.object.userData.propId);
-  if (!prop || prop.gone) return null;
+  const hits = raycaster.intersectObject(propsGroup, true).filter((h) => !cutaway.hidesHit(h));
+  if (hits.length === 0) return null;
 
   // Something hit first is something in the way - a brow of the isle between
   // the cursor and the prop, most likely. This is the cast that was always
   // here, and it still only runs when a prop was actually hit.
-  const ground = seen(raycaster.intersectObject(island, true));
-  return ground && ground.distance < hit.distance ? null : { prop, hit };
+  let ground;
+  const groundHit = () => (ground === undefined ? (ground = seen(raycaster.intersectObject(island, true))) : ground);
+
+  for (const hit of hits) {
+    const prop = props.find((p) => p.id === hit.object.userData.propId);
+    if (!prop || prop.gone) continue;
+    // A BARE plot's hitbox only says a plot is somewhere along this ray. It
+    // fills its whole cell and stands over the rim, so a ray aimed at the
+    // soil of one plot passes through the box of the plot in front of it
+    // first - which is what put the cursor on the wrong plot two times in
+    // three. Which plot it is gets read off the soil the ray lands on below.
+    if (prop.kind === 'farmland' && !prop.sown && hit.object.userData.isHitPad) continue;
+    const g = groundHit();
+    if (g && g.distance < hit.distance) break;
+    return { prop, hit };
+  }
+
+  // Nothing standing in the way: the plot is whichever one's soil is under
+  // the cursor, the same block the brackets are drawn around.
+  const g = groundHit();
+  const plot = g && plotOnBlock(blockAt(g));
+  return plot ? { prop: plot, hit: g } : null;
+}
+
+/** The plot whose floor is this block of the isle, or null. */
+function plotOnBlock(block) {
+  if (surface.get(`${block.x},${block.z}`) !== block.y) return null;
+  return props.find((p) => !p.gone && p.kind === 'farmland' && p.x === block.x && p.z === block.z) ?? null;
 }
 
 function refreshHover() {
@@ -2230,7 +2271,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
+window.ESTER = { propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
   attachCrank, canAttach, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
   busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
