@@ -475,11 +475,15 @@ const busyPlot = (prop) => prop.kind === 'farmland' && !!prop.sown && !ripe(prop
  * back to grass. A crop still growing is left alone - turning a field over
  * by accident three minutes in is not something to make easy.
  */
-function workFarmland(agent, plot, queue = false) {
+function workFarmland(agent, plot, queue = false, shift = false) {
   if (!holding(agent, (t) => t.tills)) return false;
   if (plot.sown && !ripe(plot)) return false;
 
   const reaping = ripe(plot);
+  // Putting a plot back to grass undoes the tilling, so it takes the same
+  // shift the tilling did - a plain click on a bare plot is not enough to
+  // throw it away. Reaping stays a plain click.
+  if (!reaping && !shift) return false;
   return order(agent, plot, {
     seconds: reaping ? REAP_SECONDS : TILL_SECONDS,
     adjacent: true,
@@ -1180,7 +1184,11 @@ function handleClick(event) {
           // NOT spent: a crop coming up is scenery, and standing between the
           // player and the ground it grows on would mean a field they cannot
           // walk across or dig beside. It falls through to the isle below.
-          if (agent && (waterFarmland(agent, prop, q) || workFarmland(agent, prop, q))) return;
+          if (agent && (waterFarmland(agent, prop, q) || workFarmland(agent, prop, q, tilling(event)))) return;
+          // A shift click that could not do anything to it is spent, the
+          // same as one on ground that cannot be tilled - it must not fall
+          // through and turn into something else.
+          if (tilling(event)) return;
           break;
         }
         // A pipe and a machine are the wrench's with shift held - the end
@@ -1963,7 +1971,10 @@ function updateLookAt() {
     // A plot waiting for the seeds on the cursor lights up: that is the
     // whole of what says where they may go. A machine the crank on the
     // cursor could go onto does the same.
-    const armed = canSow(prop) || canAttach(prop) || (wrench && machines.canRotate(prop));
+    // A hoe with shift held over a bare plot would put it back to grass.
+    const unTill = shiftHeld && prop.kind === 'farmland' && !prop.sown &&
+      !!holding(selectedAgent(), (t) => t.tills);
+    const armed = canSow(prop) || canAttach(prop) || unTill || (wrench && machines.canRotate(prop));
     highlight.showBox(propBox(prop), armed ? HIGHLIGHT_WORK : HIGHLIGHT_PLAIN);
     return;
   }

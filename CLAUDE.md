@@ -645,9 +645,11 @@ with one inhabitant who walks around and works on what is there.
   says which. A shift click that cannot till, for want of a hoe or because
   something is standing there, is *spent* rather than falling through to the
   walk: a modifier that sometimes does the very thing it was held to avoid is
-  worse than one that occasionally does nothing. Clicks on a plot itself -
-  reaping it, watering it, putting it back to grass - are plain clicks, since
-  a prop under the cursor is not ambiguous the way bare ground is.
+  worse than one that occasionally does nothing. Putting a bare plot back to
+  grass is a SHIFT click too, with the hoe - it undoes the tilling, so it
+  takes the tilling's gesture, and the brackets go green over a plot it
+  would work. A plain click on a bare plot does not throw it away. Reaping
+  and watering stay plain clicks.
 - **A crop only grows while it has water, and that is the whole rule.** Five
   minutes of *watered* growing at 20ml a minute - and a fresh plot is dry,
   so a sown one sits at 0% until somebody brings a bucket. Turned ground
