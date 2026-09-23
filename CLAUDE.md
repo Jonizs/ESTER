@@ -223,7 +223,11 @@ with one inhabitant who walks around and works on what is there.
     whole slopes standing in the way when the camera looked down at them.
   - PROPS are hidden WHOLE, on a layer nothing renders, picks or casts
     shadows from - so a click goes through a hidden tree and it leaves no
-    shadow over the agent.
+    shadow over the agent. Which props go is NOT the wide tube: only those a
+    line from the eye to the agent's head or chest actually passes through
+    (`propsInTheWay`). Testing props against the tube took away the tub, the
+    bench and anything else standing beside the agent in plain sight, and a
+    rock that only covered their feet is not worth taking out either.
   The occlusion check steps through `isSolid` for the isle (a cast at it is
   0.6ms) and casts at the props on EVERY layer - a prop hidden because it is
   in the way is still in the way, or hiding it would put it straight back.
