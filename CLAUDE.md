@@ -1234,6 +1234,15 @@ with one inhabitant who walks around and works on what is there.
 - **A pipe is laid off the cursor, one cell per click** (`lays` in `ITEMS`),
   on the top of a column with nothing standing there. It is `portable`, so
   the move key and PICK UP take one back up.
+- **Ctrl with a wrench takes a machine straight back up.** `mechanical` in
+  `PROP_KINDS` (pipes, sprinklers, mills) marks what it works on; a ctrl
+  click on one while the selected agent holds a wrench puts it in the
+  inventory at once - no walk, no job - with its crank, wheat and flour, via
+  `takeBack`, the same function the mover's PICK UP calls. This is the one
+  place ctrl does not mean "queue", asked for on purpose; ctrl AND shift is
+  still a queued wrench job, and ctrl without a wrench still queues. The
+  brackets go green (and the readout says so) while ctrl is held over one
+  it would take - `ctrlHeld` is tracked the way `shiftHeld` is.
 
 - **A chest and a mill open a SCREEN, so they need nobody selected.** A
   plain click on either opens `src/stations.js`, the way the repaired bench

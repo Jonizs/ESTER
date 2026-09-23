@@ -111,6 +111,8 @@ export const PROP_KINDS = {
     label: 'pipe',
     placed: true,
     portable: true,
+    // A wrench's ctrl click takes it straight back up (main.js).
+    mechanical: true,
     item: 'pipe',
     icon: 'pipe',
     // What one run of joined-up pipe can carry, in millilitres a second.
@@ -127,6 +129,8 @@ export const PROP_KINDS = {
     label: 'sprinkler',
     placed: true,
     portable: true,
+    // A wrench's ctrl click takes it straight back up (main.js).
+    mechanical: true,
     item: 'sprinkler',
     icon: 'sprinkler',
     facing: true,
@@ -158,6 +162,8 @@ export const PROP_KINDS = {
     label: 'mill',
     placed: true,
     portable: true,
+    // A wrench's ctrl click takes it straight back up (main.js).
+    mechanical: true,
     item: 'mill',
     icon: 'mill',
     facing: true,

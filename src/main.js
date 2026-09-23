@@ -860,19 +860,39 @@ const placement = createPlacement({
     syncBlocked(props, blocked);
   },
   // Taken back out of the ground, whatever it had grown so far.
-  onPickUp: (prop) => {
-    inventory.add(PROP_KINDS[prop.kind].item, 1);
-    // A crank handle comes back off it rather than vanishing with it.
-    if (prop.crank) inventory.add('crankHandle', 1);
-    // And whatever was kept in it: a chest's store, a mill's wheat and flour.
-    if (prop.store) emptyInto(prop.store, inventory);
-    if (prop.grain > 0) inventory.add(PROP_KINDS.mill.grinds.from, prop.grain);
-    if (prop.flour > 0) inventory.add(PROP_KINDS.mill.grinds.to, prop.flour);
-    if (stations.prop === prop) stations.close();
-    removeProp(prop, propsGroup, props);
-    syncBlocked(props, blocked);
-  }
+  onPickUp: (prop) => takeBack(prop)
 });
+
+/**
+ * A station off the isle and back into the inventory, with everything on and
+ * in it: a crank handle, a chest's store, a mill's wheat and flour. The
+ * mover's PICK UP and a wrench's ctrl click both come here, so the two can
+ * never disagree about what comes back.
+ */
+function takeBack(prop) {
+  inventory.add(PROP_KINDS[prop.kind].item, 1);
+  // A crank handle comes back off it rather than vanishing with it.
+  if (prop.crank) inventory.add('crankHandle', 1);
+  // And whatever was kept in it: a chest's store, a mill's wheat and flour.
+  if (prop.store) emptyInto(prop.store, inventory);
+  if (prop.grain > 0) inventory.add(PROP_KINDS.mill.grinds.from, prop.grain);
+  if (prop.flour > 0) inventory.add(PROP_KINDS.mill.grinds.to, prop.flour);
+  if (stations.prop === prop) stations.close();
+  if (hovered === prop) setHovered(null);
+  removeProp(prop, propsGroup, props);
+  syncBlocked(props, blocked);
+}
+
+/**
+ * Whether a ctrl click with a wrench would take this straight back up: a
+ * `mechanical` kind - pipes and machines - with a wrench in the selected
+ * agent's hand. Nobody walks anywhere; it is back in the inventory at once.
+ */
+function canWrenchUp(prop) {
+  if (!prop || prop.gone || !PROP_KINDS[prop.kind]?.mechanical) return false;
+  if (placement.prop === prop) return false;
+  return !!holding(selectedAgent(), (t) => t.wrench);
+}
 
 // Where the last sapling went in, so the next one starts beside it rather
 // than back at the agent's feet.
@@ -1277,6 +1297,9 @@ function handleClick(event) {
         if (prop && !prop.gone && (prop.kind === 'pipe' || PROP_KINDS[prop.kind]?.facing)) {
           const agent = selectedAgent();
           const q = queueing(event);
+          // Ctrl with a wrench in hand: straight back into the inventory,
+          // no walk. Shift and ctrl together is still a queued wrench job.
+          if (q && !tilling(event) && canWrenchUp(prop)) { takeBack(prop); lookedAt = 0; return; }
           // A plain click on a mill opens its hopper - a screen again, so
           // with or without anyone selected. Its crank is turned from there.
           if (prop.kind === 'mill' && !tilling(event)) { stations.open(prop); return; }
@@ -1868,6 +1891,7 @@ function describeProp(prop, end = null) {
   // Bare turned ground that the seeds on the cursor could go into says so.
   if (canSow(prop)) what.note = `${what.note ?? ''} \u00b7 click to sow`.trim();
   if (canAttach(prop)) what.note = `${what.note ?? ''} \u00b7 click to attach`.trim();
+  if (ctrlHeld && !shiftHeld && canWrenchUp(prop)) what.note = `${what.note ?? ''} \u00b7 ctrl-click to pick up`.replace(/^ \u00b7 /, '');
   return what;
 }
 
@@ -2063,7 +2087,8 @@ function updateLookAt() {
     // A hoe with shift held over a bare plot would put it back to grass.
     const unTill = shiftHeld && prop.kind === 'farmland' && !prop.sown &&
       !!holding(selectedAgent(), (t) => t.tills);
-    const armed = canSow(prop) || canAttach(prop) || unTill || (wrench && machines.canRotate(prop));
+    const armed = canSow(prop) || canAttach(prop) || unTill || (wrench && machines.canRotate(prop)) ||
+      (ctrlHeld && !shiftHeld && canWrenchUp(prop));
     highlight.showBox(propBox(prop), armed ? HIGHLIGHT_WORK : HIGHLIGHT_PLAIN);
     return;
   }
@@ -2116,9 +2141,25 @@ window.addEventListener('keyup', (event) => { if (event.key === 'Shift') setShif
 // otherwise never noticed.
 window.addEventListener('blur', () => setShift(false));
 
+// Ctrl, the same way, for the wrench's pick-up: the brackets go green over
+// a machine a ctrl click would take back up. Cmd counts, as it does for the
+// queue.
+let ctrlHeld = false;
+
+function setCtrl(down) {
+  if (ctrlHeld === down) return;
+  ctrlHeld = down;
+  lookedAt = 0;
+}
+
+window.addEventListener('keydown', (event) => { if (event.key === 'Control' || event.key === 'Meta') setCtrl(true); });
+window.addEventListener('keyup', (event) => { if (event.key === 'Control' || event.key === 'Meta') setCtrl(false); });
+window.addEventListener('blur', () => setCtrl(false));
+
 canvas.addEventListener('pointermove', (event) => {
   pointerAt = { x: event.clientX, y: event.clientY };
   setShift(event.shiftKey);
+  setCtrl(event.ctrlKey || event.metaKey);
   refreshHover();
 });
 
@@ -2372,7 +2413,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
+window.ESTER = { takeBack, canWrenchUp, stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
   attachCrank, canAttach, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
   busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
