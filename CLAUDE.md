@@ -223,11 +223,17 @@ with one inhabitant who walks around and works on what is there.
     whole slopes standing in the way when the camera looked down at them.
   - PROPS are hidden WHOLE, on a layer nothing renders, picks or casts
     shadows from - so a click goes through a hidden tree and it leaves no
-    shadow over the agent. Which props go is NOT the wide tube: only those a
-    line from the eye to the agent's head or chest actually passes through
-    (`propsInTheWay`). Testing props against the tube took away the tub, the
-    bench and anything else standing beside the agent in plain sight, and a
-    rock that only covered their feet is not worth taking out either.
+    shadow over the agent. A prop goes when it is in the tube (its box within
+    `RADIUS` of the line, so everything between the camera and the agent
+    clears out together) AND in front of the agent: its own middle nearer
+    the eye along the line than they are by `BEHIND_MARGIN`. The in-front
+    test is the one that went wrong - it measured where the line entered the
+    box grown by the whole 3.3 radius, so a tree well BEHIND the agent was
+    "entered" before the line reached them and vanished. Camera -> agent ->
+    tree keeps the tree; a prop level with the agent, beside them, stays.
+    (Narrowing props to "only what covers the head or chest" was tried in
+    between and was wrong the other way: things between the camera and the
+    agent stayed and blocked the view.)
   The occlusion check steps through `isSolid` for the isle (a cast at it is
   0.6ms) and casts at the props on EVERY layer - a prop hidden because it is
   in the way is still in the way, or hiding it would put it straight back.

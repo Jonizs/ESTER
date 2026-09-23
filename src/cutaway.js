@@ -192,37 +192,38 @@ export function createCutaway({ island, propsGroup, props, camera }) {
   }
 
   /**
-   * The props that actually stand between the eye and the agent: every prop
-   * whose box a line from the eye to one of the agent's own points passes
-   * through before it reaches them.
+   * The props in the tube AND in front of the agent.
    *
-   * NOT the wide tube the isle is cut with. That is 3.3 blocks across so a
-   * hill opens onto a proper view, and props used to be tested against it
-   * too - which took away the tub, the bench and whatever else stood BESIDE
-   * the agent, in plain sight, only because they were near the line. Only
-   * what is really in the way goes now - and only what hides their HEAD or
-   * CHEST (`FACE_MARKS`): a rock beside them that covers their feet from
-   * this angle is not worth taking out of the picture, and taking it made
-   * the scenery round the agent blink away for no reason anyone could see.
+   * In the tube: the box comes within `RADIUS` of the line from the eye to
+   * the agent, the same width the isle is cut to, so everything between the
+   * camera and them clears out together.
+   *
+   * In front: the box's own middle is nearer the eye, along that line, than
+   * the agent is by at least `BEHIND_MARGIN`. This is the half that was
+   * wrong. The test used to be where the line first ENTERED the box grown by
+   * the whole radius - 3.3 blocks of padding - so a tree standing well
+   * BEHIND the agent was "entered" long before the line reached them and
+   * vanished from behind them. Measuring the prop itself puts camera ->
+   * agent -> tree back the right way round: the tree stays. Something level
+   * with the agent, beside them, stays too.
    */
-  const target = new THREE.Vector3();
-  const FACE_MARKS = [[0, 1.45], [0, 0.9]];
-  function propsInTheWay(agent) {
+  const BEHIND_MARGIN = 0.5;
+  const mid = new THREE.Vector3();
+  const onLine = new THREE.Vector3();
+  function propsInTheWay() {
     const inWay = new Set();
-    const base = agent.mesh.position;
-    side.subVectors(base, eye).setY(0);
-    if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
-    side.normalize().set(-side.z, 0, side.x);
+    const len = eye.distanceTo(at);
+    if (len <= 0) return inWay;
+    dir.subVectors(at, eye).normalize();
 
     for (const prop of props) {
       if (prop.gone) continue;
-      box.setFromObject(prop.mesh).expandByScalar(0.05);
-      for (const [s, y] of FACE_MARKS) {
-        target.copy(base).addScaledVector(side, s).setY(base.y + y);
-        const reach = eye.distanceTo(target) - 0.3;
-        ray.ray.set(eye, dir.subVectors(target, eye).normalize());
-        if (ray.ray.intersectBox(box, meet) && meet.distanceTo(eye) < reach) { inWay.add(prop); break; }
-      }
+      box.setFromObject(prop.mesh);
+      box.getCenter(mid);
+      const t = mid.sub(eye).dot(dir);
+      if (t <= 0 || t > len - BEHIND_MARGIN) continue;       // behind the eye, or at/behind the agent
+      onLine.copy(eye).addScaledVector(dir, t);
+      if (box.distanceToPoint(onLine) < RADIUS) inWay.add(prop);
     }
     return inWay;
   }
@@ -276,7 +277,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
 
     // Props go the moment the tube opens and come back the moment it shuts;
     // they are whole things, so there is no size to grow them through.
-    hideOnly(want > 0 && agent ? propsInTheWay(agent) : new Set());
+    hideOnly(want > 0 && agent ? propsInTheWay() : new Set());
   }
 
   /**
