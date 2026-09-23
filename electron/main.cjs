@@ -29,6 +29,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
+      // The soundtrack starts on launch rather than waiting for a click.
+      autoplayPolicy: 'no-user-gesture-required',
       preload: path.join(__dirname, 'preload.cjs')
     }
   });

@@ -1,6 +1,6 @@
 /**
- * Settings the pause menu edits: how fast the camera turns, and which key
- * does what.
+ * Settings the pause menu edits: how fast the camera turns, how loud the
+ * music is, and which key does what.
  *
  * Nothing here is written to disk - the game keeps no state between launches,
  * so these last as long as the window does.
@@ -21,6 +21,7 @@ export const ACTIONS = [
   { id: 'moveStation', label: 'Move station', key: 'a' },
   { id: 'wieldTool', label: 'Wield a tool', key: 's' },
   { id: 'toggleCutaway', label: 'See-through camera', key: 'g' },
+  { id: 'toggleMusic', label: 'Music on / off', key: 'm' },
   // One slot per agent, in the order the overview lists them. There is only
   // one agent so far; the rest are here so a second one needs no new wiring.
   { id: 'selectAgent1', label: 'Select agent 1', key: '1' },
@@ -35,6 +36,7 @@ export const ACTIONS = [
 ];
 
 export const CAMERA_SPEED = { min: 0.25, max: 3, step: 0.05, default: 1 };
+export const MUSIC_VOLUME = { min: 0, max: 1, step: 0.05, default: 0.5 };
 
 export function createSettings() {
   const bindings = {};
@@ -42,6 +44,7 @@ export function createSettings() {
 
   return {
     cameraSpeed: CAMERA_SPEED.default,
+    musicVolume: MUSIC_VOLUME.default,
     bindings,
 
     /** The action a pressed key is bound to, or null. Letters ignore case. */
@@ -65,6 +68,7 @@ export function createSettings() {
     reset() {
       for (const action of ACTIONS) bindings[action.id] = action.key;
       this.cameraSpeed = CAMERA_SPEED.default;
+      this.musicVolume = MUSIC_VOLUME.default;
     }
   };
 }

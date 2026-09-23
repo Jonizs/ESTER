@@ -29,6 +29,7 @@ import { createDebug } from './debug.js';
 import { createSaves } from './save.js';
 import { createStarfields } from './starfield.js';
 import { autoFullscreen } from './fullscreen.js';
+import { createMusic } from './music.js';
 
 const canvas = document.getElementById('viewport');
 
@@ -780,9 +781,14 @@ function updateGrowth(dt) {
   }
 }
 
+// The soundtrack, looping from the first click (or from launch, on the
+// desktop). M silences it; the pause menu sets how loud.
+const music = createMusic({ volume: settings.musicVolume });
+
 const menu = createMenu({
   settings,
   controls,
+  music,
   onLeave: leaveGame,
   onDevReset: devReset,
   onSwarm: callSwarm,
@@ -1788,6 +1794,14 @@ window.addEventListener('keydown', (event) => {
   document.body.classList.toggle('cutaway-off', !cutaway.toggle());
 });
 
+// M: the music off, or back on.
+window.addEventListener('keydown', (event) => {
+  if (menu.isOpen()) return;
+  if (settings.actionFor(event.key) !== 'toggleMusic') return;
+  event.preventDefault();
+  music.toggleMute();
+});
+
 // The wield key: with an agent selected it asks what they should carry.
 // Like every other order it needs a selection first - it is a thing being
 // done to an agent, not a screen being opened.
@@ -2005,7 +2019,7 @@ console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props
 // Handle for the devtools console (F12) and for automated testing.
 window.ESTER = { cutaway, ITEMS, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
-  busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
+  busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 // One prop was the target when there was one agent and one job; a box can
 // light a whole stand at once, so `targets` is the list and `targeted` is

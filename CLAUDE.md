@@ -75,6 +75,7 @@ with one inhabitant who walks around and works on what is there.
     materials included.
   - `src/starfield.js` - the drifting motes behind every UI surface.
   - `src/fullscreen.js` - full screen on launch, in a browser.
+  - `src/music.js` - the soundtrack, synthesised live with Web Audio.
   - `src/inventory.js` - what has been gathered, and the item list (an item
     with `plants` gets a PLANT button on its tile and opens the mover; one
     with `sows` or `fills` gets one that arms the cursor instead).
@@ -1078,6 +1079,15 @@ with one inhabitant who walks around and works on what is there.
   A browser cannot be put into full screen without a gesture, so
   `src/fullscreen.js` waits for the first click or key press, asks once, and
   never asks again - someone who leaves with F11 or Esc stays out.
+
+- **The soundtrack is synthesised, not a file.** `src/music.js` builds an
+  80 second ambient loop out of Web Audio oscillators - a pad through eight
+  chords in D, a sub drone, and pentatonic bells off a fixed seed, so every
+  pass is the same piece. Notes are scheduled ahead of the audio clock off a
+  `setInterval`, never the frame loop. A browser only lets it start on the
+  first click or key; Electron's `autoplayPolicy` lets it start on launch.
+  M mutes it (`toggleMusic`) and the pause menu has the volume, which, like
+  the camera speed, is held in memory only.
 
 - **The run survives a restart, and that is the whole point of the save.**
   `WATCH.bat` closes the game and relaunches it on the new build whenever

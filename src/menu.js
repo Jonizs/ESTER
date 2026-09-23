@@ -1,4 +1,4 @@
-import { ACTIONS, CAMERA_SPEED, keyLabel } from './settings.js';
+import { ACTIONS, CAMERA_SPEED, MUSIC_VOLUME, keyLabel } from './settings.js';
 
 /**
  * The pause menu, opened with Esc.
@@ -7,7 +7,7 @@ import { ACTIONS, CAMERA_SPEED, keyLabel } from './settings.js';
  * button. Esc closes the menu, backs out of the keybind page, and cancels a
  * key that is waiting to be bound - so it is never a way to get stuck.
  */
-export function createMenu({ settings, controls, onLeave, onDevReset, onSwarm, onChange }) {
+export function createMenu({ settings, controls, music, onLeave, onDevReset, onSwarm, onChange }) {
   const root = document.getElementById('menu');
   const pages = {
     main: root.querySelector('[data-page="main"]'),
@@ -16,6 +16,8 @@ export function createMenu({ settings, controls, onLeave, onDevReset, onSwarm, o
 
   const speedInput = root.querySelector('#camera-speed');
   const speedValue = root.querySelector('#camera-speed-value');
+  const volumeInput = root.querySelector('#music-volume');
+  const volumeValue = root.querySelector('#music-volume-value');
   const bindList = root.querySelector('#keybind-list');
 
   let page = 'main';
@@ -35,6 +37,21 @@ export function createMenu({ settings, controls, onLeave, onDevReset, onSwarm, o
     settings.cameraSpeed = Number(speedInput.value);
     controls.setCameraSpeed(settings.cameraSpeed);
     showSpeed();
+  });
+
+  volumeInput.min = MUSIC_VOLUME.min;
+  volumeInput.max = MUSIC_VOLUME.max;
+  volumeInput.step = MUSIC_VOLUME.step;
+
+  function showVolume() {
+    volumeValue.textContent = `${Math.round(settings.musicVolume * 100)}%`;
+    volumeInput.value = settings.musicVolume;
+  }
+
+  volumeInput.addEventListener('input', () => {
+    settings.musicVolume = Number(volumeInput.value);
+    music?.setVolume(settings.musicVolume);
+    showVolume();
   });
 
   // --- keybind rows, built from the action list ---------------------------
@@ -75,6 +92,7 @@ export function createMenu({ settings, controls, onLeave, onDevReset, onSwarm, o
     for (const [name, element] of Object.entries(pages)) element.hidden = name !== page;
     showBindings();
     showSpeed();
+    showVolume();
   }
 
   function open() {
@@ -96,6 +114,7 @@ export function createMenu({ settings, controls, onLeave, onDevReset, onSwarm, o
   root.querySelector('#menu-defaults').addEventListener('click', () => {
     settings.reset();
     controls.setCameraSpeed(settings.cameraSpeed);
+    music?.setVolume(settings.musicVolume);
     show(page);
   });
   // DEV RESET puts the run back to 0; the menu closes itself on the way, so
