@@ -848,10 +848,10 @@ function devReset() {
   menu.close();
 }
 
-// The controls card names whatever the keys are bound to now, so rebinding
+// The corner hints name whatever the keys are bound to now, so rebinding
 // something does not leave the help lying about it.
 function showBindingsInHelp() {
-  for (const slot of document.querySelectorAll('[data-help]')) {
+  for (const slot of document.querySelectorAll('#help [data-help]')) {
     slot.textContent = keyLabel(settings.bindings[slot.dataset.help]);
   }
 }
@@ -1794,16 +1794,14 @@ window.addEventListener('keydown', (event) => {
   document.body.classList.toggle('cutaway-off', !cutaway.toggle());
 });
 
-// F1: the controls card, in the bottom left. Hidden by default - only the
-// small pill naming the key is on screen until it is asked for. Capture
+// F1: the controls list in the bottom left, hidden until asked for. Capture
 // phase and preventDefault, or a browser opens its own help page on F1.
-const helpCard = document.getElementById('help');
+const helpList = document.getElementById('help');
 window.addEventListener('keydown', (event) => {
   if (menu.isOpen()) return;
   if (settings.actionFor(event.key) !== 'toggleHelp') return;
   event.preventDefault();
-  const open = document.body.classList.toggle('help-open');
-  helpCard.setAttribute('aria-hidden', String(!open));
+  helpList.hidden = !helpList.hidden;
 }, true);
 
 // M: the music off, or back on.

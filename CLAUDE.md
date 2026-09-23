@@ -194,16 +194,11 @@ with one inhabitant who walks around and works on what is there.
   that brings it home.
 - **Which mode the camera is in is the one thing the arrows cannot say for
   themselves**, so `body.free-camera` lights the `#help` line that names the
-  key while it is on (`onFreeCamera` in `main.js` is the hook), and puts
-  FREE CAMERA on the `#help-hint` pill - the card is shut by default, and the
-  pill is what is on screen then. That is not a
+  key while it is on (`onFreeCamera` in `main.js` is the hook). That is not a
   toast: it is a line already on screen for as long as the mode lasts, not a
   notice that appears and goes.
-- **The controls card is hidden until F1.** `#help` is a starfield pane in
-  the bottom left that `toggleHelp` (F1, rebindable in `settings.js`) opens
-  and shuts via `body.help-open`; by default only the small `#help-hint`
-  pill naming the key shows. Its keycaps are filled from the bindings by
-  `showBindingsInHelp`, which fills every `[data-help]` on the page.
+- **The controls list is hidden until F1.** `#help` starts `hidden` and
+  `toggleHelp` (F1, rebindable in `settings.js`) shows and hides it.
 - **The selected agent is never lost behind the scenery.** `src/cutaway.js`
   takes away whatever is between the camera and them once they are FULLY out
   of sight, and nothing beyond them is touched. G toggles it (`toggleCutaway`
