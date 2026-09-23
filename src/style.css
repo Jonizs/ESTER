@@ -2530,3 +2530,282 @@ body.free-camera .hint-free b { color: var(--accent); }
    key - the same as the free camera's line, not a notice that comes and goes. */
 #help .cutaway-state::after { content: '(on)'; color: var(--accent); }
 body.cutaway-off #help .cutaway-state::after { content: '(off)'; color: var(--dim); }
+
+
+/* --- a station's screen: a chest's store, a mill's hopper ------------------
+   The same pane as every other screen - nebula wash, stars, ice-blue edge -
+   with the station's own slots on top and what is held underneath. */
+
+#station {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 3vh 3vw;
+  user-select: none;
+}
+
+#station[hidden],
+#station [hidden] { display: none !important; }
+
+#station .scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 40%, rgba(26, 16, 60, 0.58), rgba(3, 2, 10, 0.9));
+  backdrop-filter: blur(5px);
+}
+
+#station .shell {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 94vw);
+  max-height: 88vh;
+  border-radius: 20px;
+  background-color: rgba(7, 6, 20, 0.96);
+  background-image:
+    var(--nebula),
+    linear-gradient(180deg, rgba(24, 20, 56, 0.96), rgba(7, 6, 20, 0.98));
+  border: 1px solid var(--edge-lit);
+  box-shadow:
+    0 40px 120px rgba(0, 0, 0, 0.75),
+    0 0 60px rgba(120, 90, 220, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: panel-in 0.16s ease-out;
+}
+
+#station .station-head,
+#station .station-body { position: relative; z-index: 1; }
+
+#station .station-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 26px 16px;
+  border-bottom: 1px solid rgba(150, 180, 255, 0.12);
+}
+
+#station .station-head h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+#station .station-head p {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+#station #station-close {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: rgba(150, 180, 255, 0.05);
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+#station #station-close:hover {
+  border-color: var(--edge-lit);
+  background: rgba(138, 216, 255, 0.14);
+  color: var(--ink);
+}
+
+#station kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--edge);
+  font-size: 10.5px;
+}
+
+#station .station-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  padding: 20px 26px 24px;
+  overflow: hidden;
+}
+
+#station h3 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+#station .grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: min(330px, 100%);
+  margin: 0 auto;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--edge-lit);
+  background: linear-gradient(180deg, rgba(150, 180, 255, 0.08), rgba(150, 180, 255, 0.02));
+  box-shadow: inset 0 0 30px rgba(138, 216, 255, 0.07);
+}
+
+/* One slot, wherever it is: the grid, the hopper, the stock row. */
+#station .slot {
+  position: relative;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid rgba(150, 180, 255, 0.16);
+  background: rgba(4, 3, 14, 0.42);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+#station .slot:hover {
+  border-color: var(--edge-lit);
+  background: rgba(138, 216, 255, 0.1);
+}
+
+#station .slot.full {
+  border-color: color-mix(in srgb, var(--tint, var(--accent)) 45%, transparent);
+  background:
+    radial-gradient(120% 120% at 50% 15%,
+      color-mix(in srgb, var(--tint, var(--accent)) 16%, transparent), transparent 70%),
+    rgba(4, 3, 14, 0.42);
+}
+
+#station .slot.ghost .slot-icon { opacity: 0.32; filter: grayscale(0.6); }
+#station .slot.dim { opacity: 0.4; cursor: default; }
+
+#station .slot-icon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+#station .slot-icon .icon { width: 64%; height: 64%; }
+
+#station .slot-count {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 7px;
+  background: rgba(6, 5, 18, 0.72);
+  border: 1px solid rgba(233, 241, 255, 0.12);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* What it is, only while the cursor is on it - inside the slot, like the
+   inventory's tiles. */
+#station .slot::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  padding: 3px 2px;
+  border-radius: 7px;
+  background: rgba(6, 5, 18, 0.86);
+  border: 1px solid rgba(233, 241, 255, 0.12);
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+#station .slot:hover::after { opacity: 1; }
+
+#station .tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+#station .tiles .hint { color: var(--dim); font-size: 12.5px; margin: 0; }
+
+/* The mill: wheat in, the arrow filling as it grinds, flour out. */
+#station .mill-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 110px;
+  align-items: center;
+  gap: 18px;
+  width: min(440px, 100%);
+  margin: 0 auto;
+}
+
+#station .mill-arrow {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+
+#station .mill-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(150, 180, 255, 0.12);
+  overflow: hidden;
+}
+
+#station .mill-fill {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #f0d07a, #f4eee0);
+}
+
+#station .mill-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+#station #mill-crank {
+  padding: 9px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--edge-lit);
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.18), rgba(185, 140, 255, 0.1));
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+
+#station #mill-crank:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.3), rgba(185, 140, 255, 0.18));
+  box-shadow: 0 0 22px rgba(138, 216, 255, 0.22);
+}
+
+#station #mill-crank:disabled { opacity: 0.4; cursor: default; }
+
+#station #mill-note { font-size: 12.5px; color: var(--dim); }

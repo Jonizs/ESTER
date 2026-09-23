@@ -275,6 +275,30 @@ export const RECIPES = [
       5: 'plank', 6: 'cog', 7: 'plank',
       9: 'plank', 10: 'plank', 11: 'plank'
     }
+  },
+  {
+    // Eight planks boxed round a rope to tie the lid down with.
+    id: 'chest',
+    label: 'Wooden Chest',
+    item: 'chest',
+    yield: 1,
+    slots: {
+      1: 'plank', 2: 'plank', 3: 'plank',
+      5: 'plank', 6: 'rope', 7: 'plank',
+      9: 'plank', 10: 'plank', 11: 'plank'
+    }
+  },
+  {
+    // A row of cogs between two rows of planks - the gearing, housed.
+    id: 'mill',
+    label: 'Basic Mill',
+    item: 'mill',
+    yield: 1,
+    slots: {
+      1: 'plank', 2: 'plank', 3: 'plank',
+      5: 'cog', 6: 'cog', 7: 'cog',
+      9: 'plank', 10: 'plank', 11: 'plank'
+    }
   }
 ];
 
@@ -688,17 +712,18 @@ export function createCrafting({ inventory, blocked, onOpen }) {
    * Clicking a recipe lays it out on the grid from what is in stock.
    *
    * The whole bench is cleared first - it is a view over the ledger, so
-   * nothing is lost by it - and then every cell of the shape takes one of
-   * its item, in the same corner the red drawing is in, so whatever could
-   * not be found is left showing red exactly where it goes. Nothing is
-   * spent: this only arranges, and the output slot is still where a craft
-   * is locked in.
+   * nothing is lost by it - and then every cell of the shape takes as many
+   * of its item as there are whole sets in stock, in the same corner the
+   * red drawing is in, so whatever could not be found is left showing red
+   * exactly where it goes. Forty wood on a two-wood recipe is twenty in
+   * each cell, ready to be made in one go. Nothing is spent: this only
+   * arranges, and the output slot is still where a craft is locked in.
    *
-   * Shift lays out as many sets as there is stock for, the way shift takes
-   * everything out of the output slot - so a stack of wood goes down ready
-   * to be made into planks in one go.
+   * It used to put down one set and leave the rest to shift; every click
+   * lays out the most now, on request, and `most: false` is only for a
+   * caller that wants the single set.
    */
-  function fillFrom(recipe, { most = false } = {}) {
+  function fillFrom(recipe, { most = true } = {}) {
     cells.fill(null);
     held = null;
 
@@ -957,7 +982,7 @@ export function createCrafting({ inventory, blocked, onOpen }) {
     if (!card) return;
     const again = showcase === card.dataset.recipe && !event.shiftKey;
     showcase = again ? null : card.dataset.recipe;
-    if (!again) fillFrom(RECIPES.find((r) => r.id === showcase), { most: event.shiftKey });
+    if (!again) fillFrom(RECIPES.find((r) => r.id === showcase));
     recipeKey = null;         // so the cards pick up `showing`
     update();
   });

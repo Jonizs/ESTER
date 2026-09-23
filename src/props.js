@@ -135,6 +135,35 @@ export const PROP_KINDS = {
     spray: 10
   },
 
+  /**
+   * A chest: somewhere to keep things that is not the agents' pack. What is
+   * in it lives on the prop as `store` (src/stations.js), so the save keeps
+   * it where it stands. A click opens it, like the repaired bench.
+   */
+  chest: {
+    label: 'chest',
+    placed: true,
+    portable: true,
+    item: 'chest',
+    icon: 'chest',
+    slots: 16
+  },
+
+  /**
+   * A mill: wheat into its hopper, a crank on its side, flour out. It faces a
+   * way only so the crank side can be chosen - it has no water port and
+   * nothing it throws anywhere. `grinds` is what goes in and what comes out.
+   */
+  mill: {
+    label: 'mill',
+    placed: true,
+    portable: true,
+    item: 'mill',
+    icon: 'mill',
+    facing: true,
+    grinds: { from: 'wheat', to: 'flour', perSecond: 2, batch: 10 }
+  },
+
   // The workbench is not harvested - it is repaired once, and then it is a
   // door into the crafting screen rather than a job.
   workbench: {
@@ -841,6 +870,28 @@ export function setCrank(prop, on) {
   prop.mesh.add(crank);
 }
 
+/**
+ * The cog on a machine's crank side: a toothed wheel flat against the +X
+ * wall, where the crank handle goes on. Every machine has the same one.
+ */
+function buildCog() {
+  const cog = new THREE.Group();
+  cog.name = 'cog';
+  const wheel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.3, 0.3), mat(0xc99359));
+  cog.add(wheel);
+  for (let i = 0; i < 4; i++) {
+    const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.42, 0.1), mat(0xa8763f));
+    tooth.rotation.x = (i * Math.PI) / 4;
+    cog.add(tooth);
+  }
+  const axle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), mat(0x5a3a1d));
+  axle.position.x = 0.04;
+  cog.add(axle);
+  cog.position.set(0.43, 0.3, 0);
+  cog.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return cog;
+}
+
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...opts });
 }
@@ -1119,22 +1170,68 @@ function buildProp(kind, salt) {
     band.position.set(0, 0.2, -0.5);
     g.add(band);
 
-    // The cog on the crank side: a wheel with teeth, flat against the wall.
-    const cog = new THREE.Group();
-    cog.name = 'cog';
-    const wheel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.3, 0.3), mat(0xc99359));
-    cog.add(wheel);
-    for (let i = 0; i < 4; i++) {
-      const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.42, 0.1), mat(0xa8763f));
-      tooth.rotation.x = (i * Math.PI) / 4;
-      cog.add(tooth);
+    g.add(buildCog());
+    return g;
+  }
+
+  if (kind === 'chest') {
+    // A box with its lid on and two bands round it, smaller than a cell so
+    // it does not read as another isle block.
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.42, 0.56), mat(0xa8763f));
+    body.position.y = 0.21;
+    body.castShadow = true;
+    g.add(body);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.14, 0.62), mat(0xc99359));
+    lid.position.y = 0.49;
+    lid.castShadow = true;
+    g.add(lid);
+    for (const x of [-0.25, 0.25]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.58, 0.64), mat(0x6b451f));
+      band.position.set(x, 0.29, 0);
+      g.add(band);
     }
-    const axle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), mat(0x5a3a1d));
-    axle.position.x = 0.04;
-    cog.add(axle);
-    cog.position.set(0.43, 0.3, 0);
-    cog.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    g.add(cog);
+    const clasp = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.05), mat(0xd3b167));
+    clasp.position.set(0, 0.4, 0.31);
+    g.add(clasp);
+    return g;
+  }
+
+  if (kind === 'mill') {
+    // Built facing +Z with the crank side on +X, the same as the sprinkler.
+    // A wooden housing, two millstones on it - the top one turns while it is
+    // cranked - and a hopper of wheat over them.
+    const housing = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.42, 0.8), mat(0xa8763f));
+    housing.position.y = 0.21;
+    housing.castShadow = true;
+    g.add(housing);
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.7), mat(0x8b929c));
+    bed.position.y = 0.48;
+    bed.castShadow = true;
+    g.add(bed);
+    const runner = new THREE.Group();
+    runner.name = 'runner';
+    runner.position.y = 0.6;
+    const stone = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.12, 0.6), mat(0xaab1bd));
+    stone.castShadow = true;
+    runner.add(stone);
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.13, 0.16), mat(0x5a606b));
+    runner.add(eye);
+    g.add(runner);
+    const hopper = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.34), mat(0xc99359));
+    hopper.position.y = 0.8;
+    hopper.castShadow = true;
+    g.add(hopper);
+    const grain = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.28), mat(0xf0d07a));
+    grain.position.y = 0.9;
+    g.add(grain);
+    // A spout out of the front with a little heap of flour under it.
+    const spout = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.2), mat(0x8a5c30));
+    spout.position.set(0, 0.3, 0.48);
+    g.add(spout);
+    const heap = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, 0.14), mat(0xf4eee0));
+    heap.position.set(0, 0.04, 0.48);
+    g.add(heap);
+    g.add(buildCog());
     return g;
   }
 

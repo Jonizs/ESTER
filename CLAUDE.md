@@ -83,6 +83,8 @@ with one inhabitant who walks around and works on what is there.
   - `src/machines.js` - the water works: pipes joining themselves up, water
     running down them, sprinklers and their crank, and the guide a machine
     draws on the isle while it is placed or turned.
+  - `src/stations.js` - the screen a chest or a mill opens: the chest's 16
+    slots, the mill's wheat-in / flour-out and its CRANK button.
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/save.js` - the run, written down and read back on launch.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
@@ -851,9 +853,10 @@ with one inhabitant who walks around and works on what is there.
   `#craft-missing` under the bench says how many of each, counted against
   the whole ledger rather than cell by cell - a shape can sit anywhere on the
   grid, so comparing against the drawing's corner would call a recipe short
-  the moment it was moved along one. Shift lays out as many sets as there is
-  stock for, the way shift takes everything out of the output. Nothing is
-  spent by any of it; the output slot is still where a craft is locked in.
+  the moment it was moved along one. Every click lays out as many sets as
+  there is stock for - forty wood on a two-wood recipe is twenty in each
+  cell - which used to be shift's job and was made the default on request.
+  Nothing is spent by any of it; the output slot is still where a craft is locked in.
   Clicking the card again puts the drawing away and leaves the grid alone -
   by then it is the player's.
 - **Crafting is not one of them and has no key.** It is its own overlay
@@ -1231,6 +1234,24 @@ with one inhabitant who walks around and works on what is there.
 - **A pipe is laid off the cursor, one cell per click** (`lays` in `ITEMS`),
   on the top of a column with nothing standing there. It is `portable`, so
   the move key and PICK UP take one back up.
+
+- **A chest and a mill open a SCREEN, so they need nobody selected.** A
+  plain click on either opens `src/stations.js`, the way the repaired bench
+  opens crafting; a shift click with a wrench still turns a mill. Unlike the
+  crafting bench, which is only a view, what goes in really leaves the
+  inventory: a chest's `store` (16 slots, 64 to a stack, a tool one to a
+  slot with its wear) and a mill's `grain`/`flour` live on the prop and are
+  saved with it. PICK UP hands all of it back, crank handle included.
+  `stations.isOpen()` is in every blocked list beside `crafting.isOpen()`.
+- **A mill grinds as it is cranked, and only as long as what is in it.**
+  `PROP_KINDS.mill.grinds` is `{ from, to, perSecond: 2, batch: 10 }`: one
+  wheat is one flour, a go is up to ten wheat at two a second, so ten is
+  five seconds and four is two. `grindMill` in `main.js` is the crank job -
+  the same `tick`-while-standing-at-the-crank as the sprinkler - and it is
+  given from the CRANK button on the mill's screen, whose note says why it
+  is greyed out (no crank, no wheat, nobody selected) instead of a toast.
+  A mill faces a way only so its crank side can be chosen; its guide shows
+  the crank side and nothing else, since it has no water port.
 
 ## Commands
 

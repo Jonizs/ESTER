@@ -264,6 +264,49 @@
       <div id="craft-held" hidden></div>
     </div>
 
+    <!-- A station's own screen - a chest's store or a mill's hopper - opened
+         by clicking it on the isle, through src/stations.js. -->
+    <div id="station" hidden>
+      <div class="scrim"></div>
+      <div class="shell starfield">
+        <header class="station-head">
+          <div>
+            <h2 class="station-title"></h2>
+            <p class="station-hint"></p>
+          </div>
+          <button type="button" id="station-close"><span>Close</span><kbd>Esc</kbd></button>
+        </header>
+        <div class="station-body">
+          <section class="chest-view">
+            <h3>Stored</h3>
+            <div id="chest-grid" class="grid4"></div>
+          </section>
+          <section class="mill-view" hidden>
+            <h3>Millstones</h3>
+            <div class="mill-row">
+              <div id="mill-in" class="slot"><div class="slot-icon"></div><div class="slot-count"></div></div>
+              <div class="mill-arrow">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 12h15M13 6l6 6-6 6"/>
+                </svg>
+                <div class="mill-bar"><div class="mill-fill"></div></div>
+              </div>
+              <div id="mill-out" class="slot"><div class="slot-icon"></div><div class="slot-count"></div></div>
+            </div>
+            <div class="mill-actions">
+              <button type="button" id="mill-crank">CRANK</button>
+              <span id="mill-note"></span>
+            </div>
+          </section>
+          <section class="station-stock">
+            <h3>Inventory</h3>
+            <div id="station-stock" class="tiles"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <!-- Moving a placed station: four screen-relative nudges round a drag
          handle, driven by src/placement.js. Hidden unless a move is on. -->
     <div id="mover" hidden>

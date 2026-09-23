@@ -118,7 +118,14 @@ export const ITEMS = {
   flintWrench: {
     label: 'Flint Wrench', tint: '#9fb4e0', uses: 120, serves: ['flintWrench'], wields: true, wrench: true
   },
-  sprinkler: { label: 'Basic Sprinkler', tint: '#7fc8f0', plants: 'sprinkler' }
+  sprinkler: { label: 'Basic Sprinkler', tint: '#7fc8f0', plants: 'sprinkler' },
+
+  // --- keeping and grinding -------------------------------------------------
+  // A chest stands on the isle and holds 16 slots of whatever is put in it.
+  chest: { label: 'Wooden Chest', tint: '#d9a866', plants: 'chest' },
+  // A mill grinds wheat into flour, one for one, while its crank is turned.
+  mill: { label: 'Basic Mill', tint: '#c8c0b0', plants: 'mill' },
+  flour: { label: 'Flour', tint: '#f4eee0' }
 };
 
 /** Whether an item is worn down by use rather than spent outright. */

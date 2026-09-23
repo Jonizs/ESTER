@@ -31,6 +31,7 @@ import { createStarfields } from './starfield.js';
 import { autoFullscreen } from './fullscreen.js';
 import { createMusic } from './music.js';
 import { createMachines, crankCell, modeLabel } from './machines.js';
+import { createStations, emptyStore, emptyInto } from './stations.js';
 
 const canvas = document.getElementById('viewport');
 
@@ -631,6 +632,61 @@ function crankMachine(agent, prop, queue = false) {
 }
 
 /**
+ * Whether a mill can be ground right now, and if not, why - the mill's
+ * screen shows it under the CRANK button rather than in a passing notice.
+ */
+function millState(prop) {
+  if (!prop.crank) return { ok: false, why: 'Put a crank handle on its crank side first.' };
+  if (!((prop.grain ?? 0) > 0)) return { ok: false, why: 'Put wheat in to grind.' };
+  const agent = selectedAgent();
+  if (!agent) return { ok: false, why: 'Select an agent to turn the crank.' };
+  if (agent.task?.mill === prop) return { ok: false, why: `${agent.name} is grinding.` };
+  const batch = Math.min(PROP_KINDS.mill.grinds.batch, prop.grain);
+  return { ok: true, why: `${batch} wheat, ${batch / PROP_KINDS.mill.grinds.perSecond}s of cranking` };
+}
+
+/**
+ * Turn a mill's crank: stand at the crank side and grind, one wheat into one
+ * flour at a time. A go is up to `batch` (10) wheat at `perSecond` (2), so a
+ * full hopper is five seconds and four wheat is two - the job is only as
+ * long as what is in it. Like the sprinkler, the work happens all the way
+ * through and only while the agent is actually at the crank.
+ */
+function grindMill(agent, prop, queue = false) {
+  if (!millState(prop).ok) return false;
+  const { perSecond, batch } = PROP_KINDS.mill.grinds;
+  let left = Math.min(batch, prop.grain);
+  let turned = 0;                    // fraction of the next wheat ground
+  const grindOne = () => {
+    if (left <= 0 || !(prop.grain > 0)) return;
+    left -= 1;
+    prop.grain -= 1;
+    prop.flour = (prop.flour ?? 0) + 1;
+  };
+  const ok = order(agent, crankCell(prop), {
+    seconds: left / perSecond,
+    action: 'Grinding wheat',
+    face: prop,
+    tick: (dt) => {
+      if (prop.gone || !prop.crank) return;
+      const at = crankCell(prop);
+      if (Math.round(agent.x) !== at.x || Math.round(agent.z) !== at.z) return;
+      machines.turn(prop);
+      turned += dt * perSecond;
+      while (turned >= 1 - 1e-6 && left > 0) { turned -= 1; grindOne(); }
+      prop.grindProgress = left > 0 ? Math.min(1, turned) : 0;
+    },
+    // Whatever the last frame fell a hair short of is finished here.
+    then: () => {
+      if (!prop.gone && prop.crank && turned > 0.5) grindOne();
+      prop.grindProgress = 0;
+    }
+  }, queue);
+  if (ok && agent.task) agent.task.mill = prop;
+  return ok;
+}
+
+/**
  * The crops and the catchers, ticked once a frame.
  *
  * A plot only grows while it has water, and drinks as it does - run out and
@@ -717,7 +773,7 @@ const panels = createPanels({
   agents,
   inventory,
   progression,
-  blocked: () => menu.isOpen() || crafting.isOpen() || wield.isOpen() || placement.isActive(),
+  blocked: () => menu.isOpen() || crafting.isOpen() || stations.isOpen() || wield.isOpen() || placement.isActive(),
   onSelect: (agent) => selectOnly(agent),
   onPlantItem: (item) => beginPlanting(item),
   onCarryItem: (item) => beginCarrying(item),
@@ -736,7 +792,7 @@ const wield = createWield({
   agents,
   inventory,
   blocked: () => menu.isOpen() || placement.isActive(),
-  onOpen: () => { panels.close(); crafting.close(); },
+  onOpen: () => { panels.close(); crafting.close(); stations.close(); },
   onEquip: (agent, item) => equipTool(agent, item)
 });
 
@@ -746,7 +802,17 @@ const wield = createWield({
 const crafting = createCrafting({
   inventory,
   blocked: () => menu.isOpen() || placement.isActive(),
-  onOpen: () => panels.close()
+  onOpen: () => { panels.close(); stations.close(); }
+});
+
+// A chest's store and a mill's hopper: opened by clicking the station, like
+// the repaired bench. Built before the menu for the same reason: Esc.
+const stations = createStations({
+  inventory,
+  blocked: () => menu.isOpen() || placement.isActive(),
+  onOpen: () => { panels.close(); crafting.close(); },
+  onCrank: (prop) => { const agent = selectedAgent(); if (agent) grindMill(agent, prop); },
+  crankState: (prop) => millState(prop)
 });
 
 // Moving a station owns Esc while it is up, so like the panels it is built
@@ -767,6 +833,7 @@ const placement = createPlacement({
   onBegin: (prop) => {
     panels.close();
     crafting.close();
+    stations.close();
     setHovered(prop);           // keep it outlined for the whole move
   },
   onEnd: () => {
@@ -797,6 +864,11 @@ const placement = createPlacement({
     inventory.add(PROP_KINDS[prop.kind].item, 1);
     // A crank handle comes back off it rather than vanishing with it.
     if (prop.crank) inventory.add('crankHandle', 1);
+    // And whatever was kept in it: a chest's store, a mill's wheat and flour.
+    if (prop.store) emptyInto(prop.store, inventory);
+    if (prop.grain > 0) inventory.add(PROP_KINDS.mill.grinds.from, prop.grain);
+    if (prop.flour > 0) inventory.add(PROP_KINDS.mill.grinds.to, prop.flour);
+    if (stations.prop === prop) stations.close();
     removeProp(prop, propsGroup, props);
     syncBlocked(props, blocked);
   }
@@ -840,6 +912,8 @@ function beginPlanting(item) {
   if (PROP_KINDS[kind].grows) { extra.growth = 0; extra.growSeconds = rollGrowSeconds(); }
   if (PROP_KINDS[kind].water) extra.water = PROP_KINDS[kind].water.start;
   if (PROP_KINDS[kind].facing) extra.facing = 0;
+  if (PROP_KINDS[kind].slots) extra.store = emptyStore();
+  if (PROP_KINDS[kind].grinds) { extra.grain = 0; extra.flour = 0; }
 
   const prop = spawnProp(kind, cell, { surface, group: propsGroup, props, extra });
   castFromFront(prop.mesh);
@@ -948,6 +1022,7 @@ function devReset() {
   controls.reset();
   panels.close();
   crafting.close();
+  stations.close();
   menu.close();
 }
 
@@ -1018,7 +1093,7 @@ autoFullscreen();
 // doing two things. The camera lets go of whatever is held while it is stood
 // down, so a key still down when a panel opened does not fly on behind it.
 controls.keyboardBlocked = () => (
-  menu.isOpen() || panels.isOpen() || crafting.isOpen() ||
+  menu.isOpen() || panels.isOpen() || crafting.isOpen() || stations.isOpen() ||
   wield.isOpen() || placement.isActive()
 );
 // A box already being dragged out keeps the camera still even if the right
@@ -1045,7 +1120,7 @@ controls.pointerBlocked = (event) => {
 const selectBox = createSelectBox({
   canvas,
   blocked: () => (
-    menu.isOpen() || crafting.isOpen() || panels.isOpen() ||
+    menu.isOpen() || crafting.isOpen() || stations.isOpen() || panels.isOpen() ||
     placement.isActive() || controls.isDragging()
   ),
   onBox: (rect, how) => applyBox(rect, how)
@@ -1069,7 +1144,7 @@ const pointer = new THREE.Vector2();
 let press = null;
 
 canvas.addEventListener('pointerdown', (e) => {
-  if (menu.isOpen() || crafting.isOpen() || placement.isActive()) return;
+  if (menu.isOpen() || crafting.isOpen() || stations.isOpen() || placement.isActive()) return;
   press = { x: e.clientX, y: e.clientY, t: performance.now(), button: e.button };
 });
 
@@ -1195,9 +1270,16 @@ function handleClick(event) {
         // of the pipe nearest the click, or a quarter turn of the machine.
         // Without it a sprinkler is filled from a bucket or cranked, and a
         // pipe is nothing to click on at all.
+        // A chest opens, the way the repaired bench does: a screen, not an
+        // order, so nobody has to be selected.
+        if (prop && !prop.gone && prop.kind === 'chest') { stations.open(prop); return; }
+
         if (prop && !prop.gone && (prop.kind === 'pipe' || PROP_KINDS[prop.kind]?.facing)) {
           const agent = selectedAgent();
           const q = queueing(event);
+          // A plain click on a mill opens its hopper - a screen again, so
+          // with or without anyone selected. Its crank is turned from there.
+          if (prop.kind === 'mill' && !tilling(event)) { stations.open(prop); return; }
           if (!agent) return;
           if (tilling(event)) {
             if (prop.kind === 'pipe') wrenchPipe(agent, prop, machines.pipeEndAt(prop, hit.point), q);
@@ -1773,8 +1855,15 @@ function describeProp(prop, end = null) {
     if (end) what.note = `${propName(end.tank)} end: ${modeLabel(end.mode)} \u00b7 shift-click to change`;
   }
 
+  // A chest says how full it is; a mill what is in it and what has come out.
+  if (prop.kind === 'chest') {
+    const used = (prop.store ?? []).filter(Boolean).length;
+    what.note = `${used} / ${kind.slots} slots used`;
+  }
+  if (prop.kind === 'mill') what.note = `${prop.grain ?? 0} wheat \u00b7 ${prop.flour ?? 0} flour`;
+
   // A machine with nothing to turn it by says so.
-  if (kind?.facing && !prop.crank) what.note = `${what.note} \u00b7 no crank`;
+  if (kind?.facing && !prop.crank) what.note = `${what.note ?? ''} \u00b7 no crank`.replace(/^ \u00b7 /, '');
 
   // Bare turned ground that the seeds on the cursor could go into says so.
   if (canSow(prop)) what.note = `${what.note ?? ''} \u00b7 click to sow`.trim();
@@ -1879,7 +1968,7 @@ function plotOnBlock(block) {
 function refreshHover() {
   // A move keeps its own station lit, whatever the cursor is over.
   if (placement.isActive()) { setHovered(placement.prop); return; }
-  if (!pointerAt || menu.isOpen() || panels.isOpen() || crafting.isOpen()) {
+  if (!pointerAt || menu.isOpen() || panels.isOpen() || crafting.isOpen() || stations.isOpen()) {
     setHovered(null);
     return;
   }
@@ -1928,7 +2017,7 @@ function updateLookAt() {
     highlight.showBox(propBox(placement.prop));
     return;
   }
-  if (!pointerAt || menu.isOpen() || panels.isOpen() || crafting.isOpen() || wield.isOpen()) {
+  if (!pointerAt || menu.isOpen() || panels.isOpen() || crafting.isOpen() || stations.isOpen() || wield.isOpen()) {
     lookAt.hide();
     highlight.hide();
     return;
@@ -2042,7 +2131,7 @@ canvas.addEventListener('pointerleave', () => {
 // G: the see-through camera on or off. A key rather than a setting in a
 // menu, because whether it is wanted depends on what is being looked at.
 window.addEventListener('keydown', (event) => {
-  if (menu.isOpen() || panels.isOpen() || crafting.isOpen()) return;
+  if (menu.isOpen() || panels.isOpen() || crafting.isOpen() || stations.isOpen()) return;
   if (settings.actionFor(event.key) !== 'toggleCutaway') return;
   event.preventDefault();
   document.body.classList.toggle('cutaway-off', !cutaway.toggle());
@@ -2070,7 +2159,7 @@ window.addEventListener('keydown', (event) => {
 // Like every other order it needs a selection first - it is a thing being
 // done to an agent, not a screen being opened.
 window.addEventListener('keydown', (event) => {
-  if (menu.isOpen() || placement.isActive() || panels.isOpen() || crafting.isOpen()) return;
+  if (menu.isOpen() || placement.isActive() || panels.isOpen() || crafting.isOpen() || stations.isOpen()) return;
   if (settings.actionFor(event.key) !== 'wieldTool') return;
   event.preventDefault();
   const agent = selectedAgent();
@@ -2268,6 +2357,7 @@ function frame() {
   cutaway.update(selectedAgent(), delta);
   updateLookAt();
   crafting.update();
+  stations.update();
 
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
@@ -2282,7 +2372,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
+window.ESTER = { stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
   attachCrank, canAttach, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
   busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };

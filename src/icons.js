@@ -667,7 +667,59 @@ export const MATERIAL_ART = {
     + '<path d="M2.2 9.6c1.2-3.2 4.2-5.6 8-6.4" fill="none" stroke="#6fc4ee" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="0.1 2.2"/>'
     + '<path d="M1.6 5.2c.8 1 1.2 1.7 1.2 2.2a1.2 1.2 0 01-2.4 0c0-.5.4-1.2 1.2-2.2z'
     + 'M6.2 1.2c.8 1 1.2 1.7 1.2 2.2a1.2 1.2 0 01-2.4 0c0-.5.4-1.2 1.2-2.2z"'
-    + ' fill="#6fc4ee" stroke="#15496e" stroke-width="0.9" stroke-linejoin="round"/>'
+    + ' fill="#6fc4ee" stroke="#15496e" stroke-width="0.9" stroke-linejoin="round"/>',
+
+  // A wooden chest in three-quarter view: the lid a shade lighter than the
+  // body, two dark bands over both, and the rope-bound clasp in front.
+  chest:
+      '<path d="M2.8 11.6h14v8.8h-14z" fill="#a8763f"/>'
+    + '<path d="M16.8 11.6l4.4-3.4v8.8l-4.4 3.4z" fill="#8a5c30"/>'
+      // the lid, a slab over the top
+    + '<path d="M2.2 8.4h15.2v3.6H2.2z" fill="#c99359"/>'
+    + '<path d="M2.2 8.4l4.6-3.6h15l-4.4 3.6z" fill="#e0b070"/>'
+    + '<path d="M17.4 8.4l4.4-3.6v3.6l-4.4 3.6z" fill="#a8763f"/>'
+      // the bands, over lid and body both
+    + '<path d="M5.6 8.4h1.8v12H5.6zM12.2 8.4H14v12h-1.8z" fill="#6b451f"/>'
+    + '<path d="M6.5 8.4l4.5-3.6M13.1 8.4l4.5-3.6" fill="none" stroke="#6b451f" stroke-width="1.8"/>'
+    + '<path d="M2.8 11.6h14v8.8h-14zM16.8 20.4l4.4-3.4V8.2M2.2 8.4h15.2v3.6H2.2zM2.2 8.4l4.6-3.6h15l-4.4 3.6M17.4 12l4.4-3.6V4.8"'
+    + ' fill="none" stroke="#3d2411" stroke-width="1.2" stroke-linejoin="round"/>'
+      // the clasp
+    + '<rect x="8.5" y="10.6" width="2.6" height="3" rx="0.6" fill="#d3b167" stroke="#3d2c10" stroke-width="1"/>',
+
+  // A mill: a wooden housing with two grey millstones stacked on it and a
+  // hopper of wheat on top, the cog on its side where the crank goes.
+  mill:
+      // the housing
+      '<path d="M3.4 14.2h12.4v7H3.4z" fill="#a8763f"/>'
+    + '<path d="M15.8 14.2l3.6-2.8v7l-3.6 2.8z" fill="#8a5c30"/>'
+    + '<path d="M3.4 14.2h12.4v7H3.4zM15.8 21.2l3.6-2.8v-7"'
+    + ' fill="none" stroke="#3d2411" stroke-width="1.2" stroke-linejoin="round"/>'
+      // the two stones
+    + '<ellipse cx="11.2" cy="13.2" rx="8.4" ry="2.9" fill="#6f767f" stroke="#2b313c" stroke-width="1.15"/>'
+    + '<ellipse cx="11.2" cy="11.8" rx="8.4" ry="2.9" fill="#8b929c" stroke="#2b313c" stroke-width="1.15"/>'
+    + '<ellipse cx="11.2" cy="9.4" rx="7.2" ry="2.5" fill="#8b929c" stroke="#2b313c" stroke-width="1.15"/>'
+    + '<ellipse cx="11.2" cy="8.2" rx="7.2" ry="2.5" fill="#aab1bd" stroke="#2b313c" stroke-width="1.15"/>'
+      // the hopper, with the wheat in it
+    + '<path d="M8 2.6h6.4l-1.6 4.8h-3.2z" fill="#c99359" stroke="#3d2411" stroke-width="1.1" stroke-linejoin="round"/>'
+    + '<path d="M8.4 3.2h5.6" fill="none" stroke="#f0d07a" stroke-width="1.3" stroke-linecap="round"/>'
+      // the cog on its side
+    + `<path d="${gearPath(19.6, 16.4, 2.5, 1.8, 6)}" fill="#c99359" stroke="#3d2411" stroke-width="0.9" stroke-linejoin="round"/>`
+    + '<circle cx="19.6" cy="16.4" r="0.65" fill="#3d2411"/>',
+
+  // Flour: a sack of it, cloth pale and tied at the neck, with a little
+  // spilled at its foot - the white is what says flour and not grain.
+  flour:
+      '<path d="M7.4 7.6c-2.6 2-4 5.4-4 8.4 0 3.2 2 5.2 4.6 5.4h8c2.6-.2 4.6-2.2 4.6-5.4 0-3-1.4-6.4-4-8.4z"'
+    + ' fill="#e8dfcc" stroke="#5a4a2e" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M14.6 9c1.6 1.8 2.6 4.4 2.6 6.8 0 2-.8 3.6-2.2 4.4" fill="none" stroke="#c9bb9c" stroke-width="1.4" stroke-linecap="round"/>'
+      // the neck, gathered and tied
+    + '<path d="M8.2 7.6L7 3.2h10l-1.2 4.4z" fill="#f4eee0" stroke="#5a4a2e" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M7.4 7.4h9.2" fill="none" stroke="#b98347" stroke-width="1.8" stroke-linecap="round"/>'
+      // a mark of wheat on the front
+    + '<path d="M12 18.4v-6M12 13.4l-1.4-1.2M12 13.4l1.4-1.2M12 15.6l-1.4-1.2M12 15.6l1.4-1.2"'
+    + ' fill="none" stroke="#c9a94e" stroke-width="1" stroke-linecap="round"/>'
+      // a little spilled at its foot
+    + '<ellipse cx="20.2" cy="21" rx="2.4" ry="0.9" fill="#f4eee0" stroke="#5a4a2e" stroke-width="0.9"/>'
 };
 
 /** An `<svg>` holding one of the glyphs above. */

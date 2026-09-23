@@ -137,11 +137,15 @@ export function buildGuide(prop, surface) {
     }
   };
 
-  for (const c of sprayCells(prop)) tile(c, sprayTile, sprayEdge);
+  // Only what this machine actually has: a mill throws no water and takes
+  // none in, so all it shows is where its crank goes.
+  const sprays = !!PROP_KINDS[prop.kind]?.spray;
+  const intake = !!portsOf(prop);
+  if (sprays) for (const c of sprayCells(prop)) tile(c, sprayTile, sprayEdge);
 
   const { crank, back } = sidesOf(prop);
   tile(crankCell(prop), null, crankEdge);
-  tile({ x: prop.x + back.x, z: prop.z + back.z }, inputFill, inputEdge);
+  if (intake) tile({ x: prop.x + back.x, z: prop.z + back.z }, inputFill, inputEdge);
 
   // The two faces of the machine itself: a red frame round the crank side
   // and a blue panel over the intake.
@@ -164,7 +168,7 @@ export function buildGuide(prop, surface) {
     g.add(line);
   };
   face(crank, null, crankEdge);
-  face(back, inputFill, inputEdge);
+  if (intake) face(back, inputFill, inputEdge);
 
   return g;
 }
@@ -344,9 +348,13 @@ export function createMachines({ scene, surface, props, onRebuilt }) {
       if (remaining <= 0 || machine.gone) { spraying.delete(machine); continue; }
       spraying.set(machine, remaining);
 
-      // The crank goes round while it is being worked.
+      // The crank goes round while it is being worked, and a millstone with it.
       const arm = machine.mesh.getObjectByName('crank-arm');
       if (arm) arm.rotation.x -= dt * 7;
+      const runner = machine.mesh.getObjectByName('runner');
+      if (runner) runner.rotation.y += dt * 2.5;
+      // Only a machine that throws water has drops to draw.
+      if (!PROP_KINDS[machine.kind]?.spray) continue;
 
       const { front } = sidesOf(machine);
       const base = machine.mesh.position;
@@ -497,6 +505,11 @@ export function createMachines({ scene, surface, props, onRebuilt }) {
     return true;
   }
 
+  /** Show a machine being worked - its crank going round - for a moment. */
+  function turn(prop) {
+    spraying.set(prop, 0.25);
+  }
+
   /** Put what a saved or freshly built machine carries back on its mesh. */
   function dress(prop) {
     if (PROP_KINDS[prop.kind]?.facing) applyFacing(prop);
@@ -515,7 +528,7 @@ export function createMachines({ scene, surface, props, onRebuilt }) {
 
   return {
     update, links: linksOf, pipeEndAt, endBox, cycleMode, canRotate, rotate, flash,
-    spray, dress, reset, piped,
+    spray, turn, dress, reset, piped,
     get networks() { return networks; }
   };
 }

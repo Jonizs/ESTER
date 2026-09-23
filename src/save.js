@@ -96,6 +96,10 @@ export function createSaves({
         if (prop.facing !== undefined) entry.facing = prop.facing;
         if (prop.crank) entry.crank = true;
         if (prop.modes && Object.keys(prop.modes).length) entry.modes = { ...prop.modes };
+        // What is kept in it: a chest's slots, a mill's wheat and flour.
+        if (prop.store) entry.store = prop.store.map((slot) => (slot ? { ...slot } : null));
+        if (prop.grain !== undefined) entry.grain = prop.grain;
+        if (prop.flour !== undefined) entry.flour = prop.flour;
         return entry;
       })
     };
@@ -167,6 +171,9 @@ export function createSaves({
         if (entry.facing !== undefined) extra.facing = entry.facing;
         if (entry.crank) extra.crank = true;
         if (entry.kind === 'pipe') extra.modes = { ...(entry.modes ?? {}) };
+        if (Array.isArray(entry.store)) extra.store = entry.store.map((slot) => (slot ? { ...slot } : null));
+        if (entry.grain !== undefined) extra.grain = entry.grain;
+        if (entry.flour !== undefined) extra.flour = entry.flour;
         const prop = spawnProp(entry.kind, entry, { surface, group: propsGroup, props, extra });
         onSpawn?.(prop);
         continue;
