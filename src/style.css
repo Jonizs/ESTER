@@ -132,22 +132,124 @@ html, body {
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
 }
 
+/* The controls card. Hidden until the help key (F1 by default) opens it:
+   a small cosmic pane that rises out of the bottom left corner, with the keys
+   as glowing keycaps down the left and what they do beside them. Only the
+   pill in the corner shows by default. */
+#help-hint {
+  position: fixed;
+  bottom: 22px;
+  left: 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(20, 16, 48, 0.72), rgba(7, 6, 20, 0.78));
+  border: 1px solid var(--edge);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dim);
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.8;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#help-hint .free-tag { display: none; color: var(--accent); }
+
+/* Which mode the camera is in is the one thing the arrows do not say for
+   themselves, so the pill says it even while the card is shut - a line on
+   screen for as long as the mode lasts, not a notice. */
+body.free-camera #help-hint .free-tag { display: inline; }
+body.free-camera #help-hint {
+  border-color: var(--edge-lit);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45), 0 0 16px rgba(138, 216, 255, 0.22);
+}
+
+body.help-open #help-hint { opacity: 0; transform: translateY(6px); }
+
 #help {
   bottom: 22px;
   left: 26px;
-  font-size: 12px;
-  line-height: 1.7;
+  z-index: 2;
+  width: min(480px, calc(100vw - 52px));
+  max-height: calc(100vh - 44px);
+  overflow: hidden;
+  padding: 14px 16px 14px;
+  border-radius: 14px;
+  background-image: var(--nebula), linear-gradient(180deg, rgba(19, 16, 46, 0.9), rgba(6, 5, 18, 0.94));
+  border: 1px solid var(--edge-lit);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(138, 216, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(4px);
+  font-size: 11.5px;
+  line-height: 1.45;
   color: var(--dim);
+  text-shadow: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(14px) scale(0.97);
+  transform-origin: bottom left;
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    visibility 0s linear 0.28s;
 }
 
-#help b { color: var(--ink); font-weight: 600; }
+body.help-open #help {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    visibility 0s;
+}
 
-/* Which mode the camera is in is the one thing the arrows do not say for
-   themselves, so the hint that names the key lights up while it is on. It is a
-   line already on screen rather than a notice that appears - there are no
-   toasts, and a mode has to be readable for as long as it lasts. */
-body.free-camera .hint-free,
-body.free-camera .hint-free b { color: var(--accent); }
+#help > :not(.stars) { position: relative; z-index: 1; }
+
+#help .help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--edge);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(138, 216, 255, 0.5);
+}
+
+#help .help-rows { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; }
+#help .row { display: contents; }
+#help .row > * { padding: 2px 0; align-self: baseline; }
+#help .keys { text-align: right; white-space: nowrap; }
+
+/* The keys, as keycaps. */
+#help b, #help-hint b {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 6px;
+  margin: 1px 0;
+  border-radius: 5px;
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.16), rgba(185, 140, 255, 0.1));
+  border: 1px solid rgba(138, 216, 255, 0.32);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 0 8px rgba(138, 216, 255, 0.12);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-transform: none;
+}
+
+body.free-camera #help .hint-free .what { color: var(--accent); }
+body.free-camera #help .hint-free b {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(138, 216, 255, 0.45);
+}
 
 #loading {
   inset: 0;

@@ -72,25 +72,35 @@
          src/selectbox.js; it is hidden whenever nothing is being dragged. -->
     <div id="select-box" hidden></div>
 
-    <div id="help">
-      <div><b>Right drag</b> &mdash; orbit</div>
-      <div><b>Left drag</b> &mdash; box select</div>
-      <div><b>Wheel</b> / <b data-help="zoomIn"></b> <b data-help="zoomOut"></b> &mdash; zoom</div>
-      <div><b>Esc</b> &mdash; menu</div>
-      <div><b data-help="toggleMusic"></b> &mdash; music on / off</div>
-      <div><b data-help="resetView"></b> &mdash; reset view</div>
-      <div class="hint-free"><b data-help="freeCamera"></b> &mdash; free camera: right drag looks around, the arrows fly you</div>
-      <div><b>Click the agent</b> / <b data-help="selectAgent1"></b>&ndash;<b data-help="selectAgent5"></b> &mdash; select one</div>
-      <div><b>Right click</b> &mdash; deselect</div>
-      <div><b>With one selected</b> &mdash; click to send it, or click a tree or rock to work it</div>
-      <div><b>Box over trees and rocks</b> &mdash; the selected agent clears up to three</div>
-      <div><b>Ctrl click</b> &mdash; queue another job behind the one it is on</div>
-      <div><b>Click the workbench</b> &mdash; crafting</div>
-      <div><b data-help="moveStation"></b> &mdash; move whatever the cursor is over</div>
-      <div><b data-help="wieldTool"></b> &mdash; hand the selected agent a tool</div>
-      <div><b data-help="toggleCutaway"></b> &mdash; see-through camera: blocks and props hiding the selected agent vanish <span class="cutaway-state"></span></div>
-      <div><b>Shift click the ground</b> &mdash; work it with what is in hand: hoe tills, shovel and pickaxe dig</div>
-      <div><b data-help="panelOverview"></b> &mdash; overview &nbsp; <b data-help="panelInventory"></b> inventory &nbsp; <b data-help="panelQuests"></b> quests &nbsp; <b data-help="panelStages"></b> stages</div>
+    <!-- The controls card. Hidden until the help key (F1) is pressed; the
+         pill in the corner is all that shows by default, and it lights up
+         while the free camera is on so the mode is never unannounced. -->
+    <div id="help-hint"><b data-help="toggleHelp"></b><span>controls</span><span class="free-tag">free camera</span></div>
+    <div id="help" class="starfield" aria-hidden="true">
+      <div class="help-head"><span>Controls</span><b data-help="toggleHelp"></b></div>
+      <div class="help-rows">
+        <div class="row"><span class="keys"><b>Right drag</b></span><span class="what">orbit</span></div>
+        <div class="row"><span class="keys"><b>Left drag</b></span><span class="what">box select</span></div>
+        <div class="row"><span class="keys"><b>Wheel</b> / <b data-help="zoomIn"></b> <b data-help="zoomOut"></b></span><span class="what">zoom</span></div>
+        <div class="row"><span class="keys"><b>Esc</b></span><span class="what">menu</span></div>
+        <div class="row"><span class="keys"><b data-help="toggleMusic"></b></span><span class="what">music on / off</span></div>
+        <div class="row"><span class="keys"><b data-help="resetView"></b></span><span class="what">reset view</span></div>
+        <div class="row hint-free"><span class="keys"><b data-help="freeCamera"></b></span><span class="what">free camera: right drag looks around, the arrows fly you</span></div>
+        <div class="row"><span class="keys"><b>Click the agent</b> / <b data-help="selectAgent1"></b>&ndash;<b data-help="selectAgent5"></b></span><span class="what">select one</span></div>
+        <div class="row"><span class="keys"><b>Right click</b></span><span class="what">deselect</span></div>
+        <div class="row"><span class="keys"><b>With one selected</b></span><span class="what">click to send it, or click a tree or rock to work it</span></div>
+        <div class="row"><span class="keys"><b>Box over trees and rocks</b></span><span class="what">the selected agent clears up to three</span></div>
+        <div class="row"><span class="keys"><b>Ctrl click</b></span><span class="what">queue another job behind the one it is on</span></div>
+        <div class="row"><span class="keys"><b>Click the workbench</b></span><span class="what">crafting</span></div>
+        <div class="row"><span class="keys"><b data-help="moveStation"></b></span><span class="what">move whatever the cursor is over</span></div>
+        <div class="row"><span class="keys"><b data-help="wieldTool"></b></span><span class="what">hand the selected agent a tool</span></div>
+        <div class="row"><span class="keys"><b data-help="toggleCutaway"></b></span><span class="what">see-through camera: blocks and props hiding the selected agent vanish <span class="cutaway-state"></span></span></div>
+        <div class="row"><span class="keys"><b>Shift click the ground</b></span><span class="what">work it with what is in hand: hoe tills, shovel and pickaxe dig</span></div>
+        <div class="row"><span class="keys"><b data-help="panelOverview"></b></span><span class="what">overview</span></div>
+        <div class="row"><span class="keys"><b data-help="panelInventory"></b></span><span class="what">inventory</span></div>
+        <div class="row"><span class="keys"><b data-help="panelQuests"></b></span><span class="what">quests</span></div>
+        <div class="row"><span class="keys"><b data-help="panelStages"></b></span><span class="what">stages</span></div>
+      </div>
     </div>
 
     <!-- Tab / Q / W / E panels: one screen, four pages. Built out by
