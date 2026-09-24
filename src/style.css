@@ -3022,3 +3022,100 @@ body.cutaway-active #cutaway-badge {
 #station .bowl-view h3 + .kitchen-recipes { margin-bottom: 4px; }
 #station #cook-note + h3,
 #station .bowl-view .mill-actions + h3 { margin-top: 18px; }
+/* --- pickup notes ----------------------------------------------------------
+   A small card in the bottom right for everything gained (src/pickups.js).
+   Newest at the bottom, nearest the corner. They take no clicks. */
+
+#pickups {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pickup {
+  --tint: var(--accent);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 190px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--tint) 55%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--tint) 22%, transparent), transparent 70%),
+    rgba(6, 5, 18, 0.82);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 20px rgba(2, 1, 12, 0.45), 0 0 14px color-mix(in srgb, var(--tint) 25%, transparent);
+  font-size: 12px;
+  color: var(--ink);
+  overflow: hidden;
+  animation: pickup-in 0.32s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+/* A sheen that runs across the card as it lands. */
+.pickup::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.18) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: pickup-sheen 0.7s 0.12s ease-out both;
+}
+
+.pickup.bump { animation: pickup-bump 0.25s ease-out; }
+.pickup.bump .pickup-amount { animation: pickup-count 0.25s ease-out; }
+.pickup.leaving { animation: pickup-out 0.35s ease-in both; }
+
+.pickup-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--tint) 16%, rgba(6, 5, 18, 0.6));
+  color: var(--tint);
+  flex: none;
+}
+
+.pickup-text { flex: 1; white-space: nowrap; }
+.pickup-amount { display: inline-block; color: var(--tint); font-weight: 700; }
+.pickup-name { font-weight: 600; }
+
+.pickup-total {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(233, 241, 255, 0.08);
+  color: var(--dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pickup-in {
+  from { opacity: 0; transform: translateX(40px) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes pickup-out {
+  to { opacity: 0; transform: translateX(30px); }
+}
+
+@keyframes pickup-sheen {
+  to { transform: translateX(100%); }
+}
+
+@keyframes pickup-bump {
+  40% { transform: scale(1.06); }
+}
+
+@keyframes pickup-count {
+  40% { transform: scale(1.35); }
+}

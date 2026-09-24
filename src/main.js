@@ -19,6 +19,7 @@ import { createCrafting } from './crafting.js';
 import { createLookAt, propName } from './lookat.js';
 import { createHighlight, HIGHLIGHT_PLAIN, HIGHLIGHT_WORK, HIGHLIGHT_REFUSED } from './highlight.js';
 import { createCutaway } from './cutaway.js';
+import { createPickups } from './pickups.js';
 import { createWield } from './wield.js';
 import { createPlacement } from './placement.js';
 import { createSelectBox } from './selectbox.js';
@@ -70,6 +71,8 @@ scene.add(person.mesh);
 // run is. Both are lists so more agents can simply be pushed on later.
 const agents = [person];
 const inventory = createInventory();
+// Everything gained pops up in the bottom right.
+const pickups = createPickups(inventory);
 const progression = createProgression();
 
 function startingCell() {
@@ -1218,6 +1221,7 @@ const menu = createMenu({
  */
 function devReset() {
   placement.cancel();
+  pickups.clear();
   // Borrowed agents go first, or they would be left standing on an isle
   // that has just been put back to how it booted.
   for (const agent of [...agents]) if (agent.borrowed !== undefined) sendAgentHome(agent);

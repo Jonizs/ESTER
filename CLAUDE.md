@@ -89,6 +89,7 @@ with one inhabitant who walks around and works on what is there.
     with LIGHT and ADD LOG and, with a cooking stone on it, the stone.
   - `src/kitchen.js` - what the mixing bowl mixes and the cooking stone
     cooks, and the stone's temperatures.
+  - `src/pickups.js` - the bottom-right cards for everything gained.
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/save.js` - the run, written down and read back on launch.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
@@ -403,6 +404,14 @@ with one inhabitant who walks around and works on what is there.
   The loop updates every agent, the label follows whoever is being watched,
   and the stats panel shows `selectedAgent()`. `person` is still the isle's
   own inhabitant - the one the save keeps and the one a reset puts home.
+- **Pickup notes are the one exception to "no toasts", asked for by name.**
+  `src/pickups.js` puts a small card in the bottom right (`#pickups`) for
+  everything that comes in through `inventory.add` - picture, "+3 Wood" and
+  the total held - via `inventory.onGain`. The same item again while its
+  card is up counts onto that card rather than stacking another; at most 5
+  show, each for 3.2s after its last gain. A tool coming home from a hand
+  (`attach`) and a restored save are not gains and say nothing. They are
+  about what was gained and nothing else - nothing else goes there.
 - **There are no toasts.** The line that used to appear at the top of the
   screen was removed on request, along with everything it said. A refused
   click, an empty agent slot and a bench with too little wood are all silent
