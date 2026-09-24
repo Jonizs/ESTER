@@ -1410,9 +1410,9 @@ function handleClick(event) {
       // whatever is already on rather than instead of it. Shift and ctrl
       // together is a whole field tilled in one pass.
       if (tilling(event)) {
-        // Ground seen through the X-ray is not ground anyone can get at:
-        // the brackets go red over it and the click is spent.
-        if (throughCut) return;
+        // A face only the X-ray shows is not one anyone can get at: the
+        // brackets go red over it and the click is spent.
+        if (throughCut && fakeFace(hit)) return;
         const q = queueing(event);
         // A hoe works the top of a column only; a face of a cliff is a
         // shovel's or a pickaxe's.
@@ -2186,8 +2186,9 @@ function updateLookAt() {
   const groundHits = raycaster.intersectObject(island, true);
   const ground = seen(groundHits);
   if (!ground) { lookAt.show(null); highlight.hide(); return; }
-  // Seen only because the cut took the blocks in front of it away.
-  const xray = ground !== groundHits[0];
+  // A face only on screen because the cut took the blocks in front of it
+  // away - and one that is really buried, not just behind the hill.
+  const xray = ground !== groundHits[0] && fakeFace(ground);
 
   lookAt.show(describeGround(ground));
 
@@ -2207,6 +2208,21 @@ function updateLookAt() {
   const armed = armedOn(block);
   highlight.showCell(block.x, block.y, block.z,
     armed ? (xray ? HIGHLIGHT_REFUSED : HIGHLIGHT_WORK) : HIGHLIGHT_PLAIN);
+}
+
+/**
+ * Whether the face a ray landed on is FAKE: the block across it is still
+ * there, so the face is buried and only the X-ray is showing it. Seeing a
+ * block through the cut is not enough to refuse it - one already dug round
+ * has a real face open to the air, and that is a block that can be worked
+ * however it is being looked at.
+ */
+function fakeFace(hit) {
+  const normal = hit.normal ?? hit.face?.normal;
+  if (!normal) return true;
+  const block = blockAt(hit);
+  return island.userData.isSolid(
+    block.x + Math.round(normal.x), block.y + Math.round(normal.y), block.z + Math.round(normal.z));
 }
 
 /** Would a shift click on this cell do anything, for whoever is selected? */

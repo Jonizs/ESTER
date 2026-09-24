@@ -225,10 +225,14 @@ with one inhabitant who walks around and works on what is there.
     dashed ring round the agent as wide on screen as the tube, fading with
     it. `#cutaway-badge` top right is always on screen - the key and ON/OFF
     - and glows while the cut is actually open (`body.cutaway-active`).
-  - Ground seen only THROUGH the cut cannot be worked. If the pointer's ray
-    passed through a block the cut threw away before landing, a shift click
-    is spent and does nothing, and brackets that would have gone green go
-    red (`HIGHLIGHT_REFUSED`) instead. Looking and walking are unaffected.
+  - A FAKE face cannot be worked. If the pointer's ray passed through a
+    block the cut threw away before landing AND the block across the face it
+    landed on is still solid (`fakeFace` in `main.js`) - a buried face only
+    the X-ray shows - a shift click is spent and does nothing, and brackets
+    that would have gone green go red (`HIGHLIGHT_REFUSED`). A face open to
+    the air, one already dug round, is real however it is looked at and
+    works through the cut; refusing everything seen through it was the
+    first version and was wrong. Looking and walking are unaffected.
   - The ISLE loses WHOLE BLOCKS. Only the isle's instanced meshes are
     patched, and the shader tests each block's CENTRE against a tube from
     the eye to the agent's chest, throwing the entire block away if it is in
