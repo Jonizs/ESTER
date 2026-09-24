@@ -33,6 +33,9 @@ const KEY = 'ester:save';
 //    writes went from `{ wood: 3 }` to `{ held, tools }`.
 // 3: agents carry a tool, and props gained water and what is sown in them.
 //
+// Still 3 with the isle's dug ground (`island`), for the same reason: an
+// older save simply has none of it and the isle stays as generated.
+//
 // Still 3 with the water works: a machine's `facing`, its `crank` and a
 // pipe's end `modes` are only ever ADDED to an entry, never a change to what
 // was there, so an older save is read whole and simply has none of them.
@@ -60,7 +63,7 @@ function store() {
 }
 
 export function createSaves({
-  surface, propsGroup, props, blocked, person, inventory, progression,
+  surface, propsGroup, props, blocked, person, inventory, progression, island,
   setWorkbenchRepaired, onSpawn, onDrop
 }) {
 
@@ -72,6 +75,10 @@ export function createSaves({
       inventory: inventory.saveState(),
       person: person.saveState(),
       progression: progression.saveState(),
+      // What has been dug out of the isle and put back into it. The isle is
+      // regenerated from its seed on launch, so without this every hole
+      // came back filled while everything else was as it was left.
+      island: island?.saveState(),
       props: props.map((prop) => {
         const entry = { id: prop.id, kind: prop.kind, x: prop.x, z: prop.z };
         if (prop.gone) entry.gone = true;
@@ -142,6 +149,11 @@ export function createSaves({
   function restore() {
     const data = read();
     if (!data) return false;
+
+    // The ground first: a spawned prop is stood on whatever `surface` says
+    // when it is put back, and a plot sinks the top block of its column, so
+    // both need the holes to be there already.
+    island?.loadState(data.island);
 
     // Anything the last run put on the isle goes first: what the save holds
     // is the whole list, so growing it rather than replacing it would double

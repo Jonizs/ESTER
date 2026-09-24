@@ -1030,6 +1030,11 @@ function devReset() {
   for (const agent of [...agents]) if (agent.borrowed !== undefined) sendAgentHome(agent);
   clearTargets();
 
+  // Every hole filled back in first, so a station walked back home below is
+  // stood on the ground as it booted. A plot's dent is untouched by this and
+  // is let up by `dropPlot` in the loop.
+  island.userData.reset();
+
   for (const prop of [...props]) {
     setPropHighlight(prop, false);
     // Anything the run itself put on the isle - a planted sapling, or the
@@ -1092,6 +1097,7 @@ const saves = createSaves({
   person,
   inventory,
   progression,
+  island: island.userData,
   setWorkbenchRepaired: (prop, repaired) => {
     setWorkbenchState(prop, repaired);
     castFromFront(prop.mesh);

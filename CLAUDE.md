@@ -1159,6 +1159,14 @@ with one inhabitant who walks around and works on what is there.
   `save.js` only serialises what they hand it and does the prop surgery
   itself. Anything that gains run state needs all three, or it quietly fails
   to survive a restart - the same trap as forgetting a `reset`.
+- **The isle is saved too, as what differs from its seed.** The isle is
+  regenerated on every launch, so for a long time every hole dug came back
+  filled after an update while everything standing on it survived.
+  `island.userData.saveState` writes each dug column's top and each block put
+  back as a different layer; `loadState` digs them out again at the very
+  start of `restore()` - before any prop, since a spawned prop is stood on
+  `surface` and a plot sinks its column's top block. `reset` fills every hole
+  back for DEV RESET.
 - **Write a prop's state back only to a kind that has that state.** The
   restore wrote `repaired` onto every generated prop it found, and a tree's
   `repaired` is `undefined` while `!!entry.repaired` is `false` - so

@@ -193,7 +193,10 @@ export function createIsland() {
       blocks.set(key(cell.x, cell.y, cell.z), {
         mesh,
         index: i,
-        layer: hidden ? name.slice(0, -CORE_SUFFIX.length) : name
+        layer: hidden ? name.slice(0, -CORE_SUFFIX.length) : name,
+        // What it was generated as, so a reset can paint a refilled block
+        // back and a save only has to write down what differs.
+        born: hidden ? name.slice(0, -CORE_SUFFIX.length) : name
       });
 
       // Per-block shade variation so flat faces do not read as one slab.
@@ -377,6 +380,70 @@ export function createIsland() {
     found.mesh.instanceMatrix.needsUpdate = true;
     found.mesh.computeBoundingSphere();
 
+    paint(x, y, z, LAYERS[layer] ? layer : 'dirt');
+
+    column.top = y;
+    surface.set(`${x},${z}`, y);
+    group.userData.blockCount += 1;
+    return true;
+  };
+
+  /**
+   * The isle as the run has left it, for the save.
+   *
+   * The isle itself is regenerated from its seed on every launch, so without
+   * this every hole a shovel dug was quietly filled back in by an update
+   * while everything standing on the isle came back exactly where it was.
+   * Only what differs from how it was generated is written: each column's
+   * top where it has been dug down, and each block put back as something
+   * other than what it was.
+   */
+  const bornTop = new Map([...columns].map(([k, column]) => [k, column.top]));
+
+  group.userData.saveState = () => {
+    const dug = [];
+    for (const [k, column] of columns) {
+      if (column.top !== bornTop.get(k)) dug.push([column.x, column.z, column.top]);
+    }
+    const layers = [];
+    for (const [k, found] of blocks) {
+      if (found.layer === found.born) continue;
+      const [x, y, z] = k.split(',').map(Number);
+      // A refilled block dug out again is simply gone; whatever fills it
+      // next paints it afresh.
+      if (y > columns.get(`${x},${z}`).top) continue;
+      layers.push([x, y, z, found.layer]);
+    }
+    return { dug, layers };
+  };
+
+  /** Put a column back to the saved height and repaint what was put back. */
+  group.userData.loadState = (state) => {
+    for (const [x, z, top] of state?.dug ?? []) {
+      const column = columns.get(`${x},${z}`);
+      if (!column) continue;
+      while (column.top > top && group.userData.digBlock(x, z)) { /* down */ }
+    }
+    for (const [x, y, z, layer] of state?.layers ?? []) {
+      if (!LAYERS[layer] || !blocks.has(key(x, y, z))) continue;
+      paint(x, y, z, layer);
+    }
+  };
+
+  /** Every hole filled and every block its own colour again, as generated. */
+  group.userData.reset = () => {
+    for (const [k, column] of columns) {
+      while (column.top < bornTop.get(k) && group.userData.fillBlock(column.x, column.z)) { /* up */ }
+    }
+    for (const [k, found] of blocks) {
+      if (found.layer === found.born) continue;
+      const [x, y, z] = k.split(',').map(Number);
+      paint(x, y, z, found.born);
+    }
+  };
+
+  function paint(x, y, z, layer) {
+    const found = blocks.get(key(x, y, z));
     const spec = LAYERS[layer] ?? LAYERS.dirt;
     if (found.mesh.instanceColor) {
       const shade = 0.90 + 0.10 * rand(Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791), SEED);
@@ -384,12 +451,7 @@ export function createIsland() {
       found.mesh.instanceColor.needsUpdate = true;
     }
     found.layer = layer;
-
-    column.top = y;
-    surface.set(`${x},${z}`, y);
-    group.userData.blockCount += 1;
-    return true;
-  };
+  }
 
   return group;
 }
