@@ -172,7 +172,15 @@ export function createInventory() {
     return at;
   }
 
+  // Told about everything that comes in through `add` - the pickup notes in
+  // the bottom right. A carried tool coming home (`attach`) and a restored
+  // save are not new, so they do not go through here.
+  const gainListeners = [];
+
   return {
+    /** Call `fn(item, amount)` whenever something is gained. */
+    onGain(fn) { gainListeners.push(fn); },
+
     /** Number held, zero if none have ever been picked up. */
     count(item) {
       if (isSingular(item)) return kits.get(item)?.length ?? 0;
@@ -180,14 +188,15 @@ export function createInventory() {
     },
 
     add(item, amount = 1) {
-      if (!ITEMS[item]) return;
+      if (!ITEMS[item] || !(amount > 0)) return;
       if (isSingular(item)) {
         const list = kits.get(item) ?? [];
         for (let i = 0; i < amount; i++) list.push(freshCharge(item));
         kits.set(item, list);
-        return;
+      } else {
+        counts.set(item, this.count(item) + amount);
       }
-      counts.set(item, this.count(item) + amount);
+      for (const fn of gainListeners) fn(item, amount);
     },
 
     /** Drop everything, for a fresh run. */
