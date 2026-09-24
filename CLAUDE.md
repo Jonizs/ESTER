@@ -643,7 +643,8 @@ with one inhabitant who walks around and works on what is there.
   and `fillBlock` clears the hole it fills. `canDig` wants the block open to
   the air on some face (`isExposed`), and only checks for props and agents
   standing on it when it is the top block. A hoe still works only the top of
-  a column. Dug blocks are not in the save - they never have been.
+  a column. The holes are saved (`holes` in the isle's save) and DEV RESET
+  puts them back before it fills the columns up.
 - **`ITEMS[tool].digs` is which layers a tool takes out and what each
   leaves.** A shovel has the soft ground (`grass`, `moss`, `dirt` -> dirt), a
   pickaxe has the rock (`stone` -> stone) and the broken stone somebody put

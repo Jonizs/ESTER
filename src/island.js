@@ -437,10 +437,17 @@ export function createIsland() {
       const [x, y, z] = k.split(',').map(Number);
       // A refilled block dug out again is simply gone; whatever fills it
       // next paints it afresh.
-      if (y > columns.get(`${x},${z}`).top) continue;
+      if (y > columns.get(`${x},${z}`).top || holes.has(k)) continue;
       layers.push([x, y, z, found.layer]);
     }
-    return { dug, layers };
+    // Blocks dug out of the side of a column, under blocks still standing.
+    // One the top has since come down past is simply above the column now.
+    const sides = [];
+    for (const k of holes) {
+      const [x, y, z] = k.split(',').map(Number);
+      if (y < columns.get(`${x},${z}`).top) sides.push([x, y, z]);
+    }
+    return { dug, layers, holes: sides };
   };
 
   /** Put a column back to the saved height and repaint what was put back. */
@@ -454,10 +461,24 @@ export function createIsland() {
       if (!LAYERS[layer] || !blocks.has(key(x, y, z))) continue;
       paint(x, y, z, layer);
     }
+    for (const [x, y, z] of state?.holes ?? []) group.userData.digBlock(x, z, y);
   };
 
   /** Every hole filled and every block its own colour again, as generated. */
   group.userData.reset = () => {
+    // The holes in the sides of columns first: `fillBlock` only ever puts a
+    // block back on TOP of a column, and these are under blocks still there.
+    for (const k of holes) {
+      const [x, y, z] = k.split(',').map(Number);
+      const found = blocks.get(k);
+      if (!found || y > columns.get(`${x},${z}`).top) continue;
+      found.mesh.setMatrixAt(found.index, new THREE.Matrix4()
+        .makeTranslation(x * BLOCK, y * BLOCK, z * BLOCK));
+      found.mesh.instanceMatrix.needsUpdate = true;
+      found.mesh.computeBoundingSphere();
+      group.userData.blockCount += 1;
+    }
+    holes.clear();
     for (const [k, column] of columns) {
       while (column.top < bornTop.get(k) && group.userData.fillBlock(column.x, column.z)) { /* up */ }
     }
