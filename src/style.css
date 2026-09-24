@@ -2931,3 +2931,94 @@ body.cutaway-active #cutaway-badge {
 }
 
 #station .station-button:disabled { opacity: 0.4; cursor: default; }
+
+/* --- the kitchen: the mixing bowl, and the cooking stone on a fire -------- */
+
+#station .bowl-view .mill-row { grid-template-columns: 190px 1fr 100px; }
+
+#station .bowl-in {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+#station .cook-view { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(150, 180, 255, 0.12); }
+#station .cook-view .mill-row { margin-top: 12px; }
+
+#station .temp-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 14px;
+}
+
+#station #cook-temp {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+}
+
+#station #cook-temp.hot { color: #ffb070; }
+
+#station .temp-bar { position: relative; }
+
+#station .temp-fill {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #6fa8d8, #ffb030 52%, #ff5a2a);
+}
+
+/* Where it starts to cook: 250 of 480. */
+#station .temp-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: calc(250 / 480 * 100%);
+  width: 2px;
+  background: rgba(233, 241, 255, 0.6);
+}
+
+#station .cook-fill,
+#station .bowl-fill {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #f0dfb4, #e8b060);
+}
+
+#station #cook-note { display: block; margin-top: 10px; font-size: 12.5px; color: var(--dim); }
+
+/* The read-only recipe rows: what goes in, what comes out. */
+#station .kitchen-recipes { display: grid; gap: 8px; }
+
+#station .kitchen-recipe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(150, 180, 255, 0.14);
+  background: rgba(4, 3, 14, 0.36);
+  font-size: 12.5px;
+}
+
+#station .kitchen-recipe .part { display: inline-flex; align-items: center; gap: 6px; }
+#station .kitchen-recipe .part b { font-weight: 600; }
+#station .kitchen-recipe i { font-style: normal; color: var(--accent); font-weight: 700; }
+#station .kitchen-recipe em { flex-basis: 100%; font-style: normal; color: var(--dim); font-size: 11.5px; }
+
+#station .station-body { overflow-y: auto; }
+
+/* Two buttons on one inventory tile - a cup's EQUIP and DRINK - sit side by
+   side along the bottom rather than on top of each other. */
+#panels .tile:has(.tile-action + .tile-action) .tile-action { font-size: 9px; letter-spacing: 0.08em; padding: 5px 2px; }
+#panels .tile:has(.tile-action + .tile-action) .tile-action:first-of-type { right: calc(50% + 2px); }
+#panels .tile-action + .tile-action { left: calc(50% + 2px); }
+#panels .tile-action:disabled { opacity: 0.4; cursor: default; }
+
+/* Room between a station's working part and its recipe list below it. */
+#station .cook-view h3 + .kitchen-recipes,
+#station .bowl-view h3 + .kitchen-recipes { margin-bottom: 4px; }
+#station #cook-note + h3,
+#station .bowl-view .mill-actions + h3 { margin-top: 18px; }

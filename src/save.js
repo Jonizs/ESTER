@@ -108,6 +108,10 @@ export function createSaves({
         if (prop.grain !== undefined) entry.grain = prop.grain;
         if (prop.flour !== undefined) entry.flour = prop.flour;
         if (prop.burning !== undefined) entry.burning = prop.burning;
+        // The kitchen: a cooking stone on a fire, what is in a mixing bowl.
+        if (prop.cooker) entry.cooker = JSON.parse(JSON.stringify(prop.cooker));
+        if (prop.mixIn) entry.mixIn = { ...prop.mixIn };
+        if (prop.mixOut) entry.mixOut = { ...prop.mixOut };
         return entry;
       })
     };
@@ -188,6 +192,9 @@ export function createSaves({
         if (entry.grain !== undefined) extra.grain = entry.grain;
         if (entry.flour !== undefined) extra.flour = entry.flour;
         if (entry.burning !== undefined) extra.burning = entry.burning;
+        if (entry.cooker) extra.cooker = entry.cooker;
+        if (entry.mixIn) extra.mixIn = { ...entry.mixIn };
+        if (entry.mixOut) extra.mixOut = { ...entry.mixOut };
         const prop = spawnProp(entry.kind, entry, { surface, group: propsGroup, props, extra });
         onSpawn?.(prop);
         continue;

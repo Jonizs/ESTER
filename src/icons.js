@@ -751,7 +751,67 @@ export const MATERIAL_ART = {
     + '<path d="M4 8.6l1.4-3" fill="none" stroke="#c3ccdd" stroke-width="1" stroke-linecap="round"/>'
       // the sparks
     + '<path d="M11.8 11.2l1.6-1.4M13.2 12.4l2.2-.6M10.6 12.6l.4 1.2M14.6 9.6l1-.8" fill="none" stroke="#ffc36e" stroke-width="1.3" stroke-linecap="round"/>'
-    + '<circle cx="16.4" cy="8.4" r="0.8" fill="#ffd660"/>'
+    + '<circle cx="16.4" cy="8.4" r="0.8" fill="#ffd660"/>',
+
+  // A cup: a short wooden beaker bound round with rope, water at the brim.
+  cup:
+      '<path d="M5.6 6.4h12.8l-1.4 13.2a1.6 1.6 0 01-1.6 1.4H8.6A1.6 1.6 0 017 19.6z" fill="#b07a45"/>'
+    + '<path d="M9.4 6.8l-.4 13.6M12 6.8v13.6M14.6 6.8l.4 13.6" fill="none" stroke="#8a5c30" stroke-width="0.9"/>'
+    + '<path d="M5.6 6.4h12.8l-1.4 13.2a1.6 1.6 0 01-1.6 1.4H8.6A1.6 1.6 0 017 19.6z" fill="none" stroke="#2c1a0e" stroke-width="1.35" stroke-linejoin="round"/>'
+      // the rope binding round the middle
+    + '<path d="M6.5 13.4h11" fill="none" stroke="#3d2c10" stroke-width="2.6"/>'
+    + '<path d="M6.5 13.4h11" fill="none" stroke="#d3b167" stroke-width="1.4"/>'
+      // the rim, and the water in it
+    + '<ellipse cx="12" cy="6.4" rx="6.4" ry="1.9" fill="#6b451f" stroke="#2c1a0e" stroke-width="1.2"/>'
+    + '<ellipse cx="12" cy="6.6" rx="4.9" ry="1.15" fill="#3f9fd8"/>'
+    + '<path d="M9.6 6.4c.8-.4 2-.5 3-.3" fill="none" stroke="#9fdcff" stroke-width="0.8" stroke-linecap="round"/>',
+
+  // A mixing bowl: a wide wooden bowl, dough in it, a paddle standing up out
+  // of it - the paddle is what says "mix" rather than "eat from".
+  mixingBowl:
+      // the paddle, behind the near rim
+      '<path d="M14.6 2.4l1.8.6-2.8 9.4-1.8-.6z" fill="#e0b070" stroke="#3d2411" stroke-width="1" stroke-linejoin="round"/>'
+    + '<path d="M2.8 11.2h18.4c-.4 5.2-4.2 8.8-9.2 8.8s-8.8-3.6-9.2-8.8z" fill="#a8763f"/>'
+    + '<path d="M4.8 14.4c1.6 2.8 4 4.2 7.2 4.2" fill="none" stroke="#c99359" stroke-width="1.1" stroke-linecap="round"/>'
+    + '<path d="M2.8 11.2h18.4c-.4 5.2-4.2 8.8-9.2 8.8s-8.8-3.6-9.2-8.8z" fill="none" stroke="#2c1a0e" stroke-width="1.3" stroke-linejoin="round"/>'
+      // the rim and the dough in it
+    + '<ellipse cx="12" cy="11.2" rx="9.2" ry="2.4" fill="#6b451f" stroke="#2c1a0e" stroke-width="1.2"/>'
+    + '<ellipse cx="12" cy="11.4" rx="7.2" ry="1.5" fill="#f0dfb4"/>'
+      // a foot under it
+    + '<path d="M8.4 20.4h7.2l.6 1.6H7.8z" fill="#8a5c30" stroke="#2c1a0e" stroke-width="1" stroke-linejoin="round"/>',
+
+  // A cooking stone: a flat grey slab seen three-quarter on, its top glowing
+  // hot at the centre - a stone, but one that has been on a fire.
+  cookingStone:
+      '<path d="M2.6 12.2L12 7.4l9.4 4.8v3.2L12 20.2l-9.4-4.8z" fill="#6f767f"/>'
+    + '<path d="M12 17v3.2l9.4-4.8v-3.2z" fill="#5a606b"/>'
+    + '<path d="M2.6 12.2L12 7.4l9.4 4.8L12 17z" fill="#9aa0ad"/>'
+    + '<path d="M7.4 12.2L12 9.9l4.6 2.3L12 14.5z" fill="#e8814a" opacity="0.85"/>'
+    + '<path d="M9.6 12.2L12 11l2.4 1.2L12 13.4z" fill="#ffd660"/>'
+    + '<path d="M2.6 12.2L12 7.4l9.4 4.8v3.2L12 20.2l-9.4-4.8zM2.6 12.2L12 17l9.4-4.8M12 17v3.2"'
+    + ' fill="none" stroke="#2b313c" stroke-width="1.25" stroke-linejoin="round"/>'
+      // a wisp of heat off it
+    + '<path d="M10.4 6c-.8-1 .8-1.8 0-3M13.8 6c-.8-1 .8-1.8 0-3" fill="none" stroke="#ffb070" stroke-width="1" stroke-linecap="round"/>',
+
+  // Plain bread dough: a pale round ball, floured, with a fold in it.
+  breadDough:
+      '<path d="M3.4 16.2c0-4.8 3.8-8.4 8.6-8.4s8.6 3.6 8.6 8.4c0 2.4-3.8 3.8-8.6 3.8s-8.6-1.4-8.6-3.8z"'
+    + ' fill="#f0dfb4" stroke="#6b5116" stroke-width="1.25" stroke-linejoin="round"/>'
+    + '<path d="M6.4 12.6c1.8-2 3.8-2.8 6.4-2.6" fill="none" stroke="#fff6de" stroke-width="1.6" stroke-linecap="round"/>'
+    + '<path d="M8.6 16.4c2 .8 4.8.8 7-.4" fill="none" stroke="#c9ad6e" stroke-width="1.1" stroke-linecap="round"/>'
+      // a dusting of flour
+    + '<circle cx="15.6" cy="11.8" r="0.6" fill="#ffffff"/><circle cx="10.2" cy="14" r="0.5" fill="#ffffff"/>'
+    + '<circle cx="17.2" cy="14.6" r="0.5" fill="#ffffff"/>',
+
+  // A bread loaf: a golden-brown bake, domed, with the slashes across its top
+  // - the slashes are what make it bread and not a stone.
+  bread:
+      '<path d="M2.6 16.4c0-5 4.2-8.8 9.4-8.8s9.4 3.8 9.4 8.8v1.4c0 1.2-1 2.2-2.2 2.2H4.8c-1.2 0-2.2-1-2.2-2.2z" fill="#c98a3c"/>'
+    + '<path d="M4.4 13.4c1.4-3 4.2-4.6 7.6-4.6 2.6 0 4.8 1 6.4 2.6" fill="none" stroke="#e8b060" stroke-width="2" stroke-linecap="round"/>'
+    + '<path d="M2.6 16.4c0-5 4.2-8.8 9.4-8.8s9.4 3.8 9.4 8.8v1.4c0 1.2-1 2.2-2.2 2.2H4.8c-1.2 0-2.2-1-2.2-2.2z" fill="none" stroke="#5a3410" stroke-width="1.3" stroke-linejoin="round"/>'
+      // the slashes, pale where the crust opened
+    + '<path d="M7 12.6l2.2 2.4M11 11.2l2.2 2.4M15 11.6l2 2.2" fill="none" stroke="#f3d69a" stroke-width="1.4" stroke-linecap="round"/>'
+    + '<path d="M3 17.6h18" fill="none" stroke="#8a5a22" stroke-width="1" />'
 };
 
 /** An `<svg>` holding one of the glyphs above. */

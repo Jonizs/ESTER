@@ -6,7 +6,7 @@ import {
   createProps, setPropHighlight, setPropOutline, setWorkbenchState,
   canMove, canPlace, placeProp, footprintCells, syncBlocked,
   spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds, setWaterLevel,
-  setCropStage, cropStageOf, buildOutline, tagProp, setCrank, setFireLit,
+  setCropStage, cropStageOf, buildOutline, tagProp, setCrank, setFireLit, setCookStone,
   GROUND_OFFSET, FARMLAND_SINK, FARMLAND_SOIL, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
@@ -32,6 +32,7 @@ import { autoFullscreen } from './fullscreen.js';
 import { createMusic } from './music.js';
 import { createMachines, crankCell, modeLabel } from './machines.js';
 import { createStations, emptyStore, emptyInto } from './stations.js';
+import { STONE, mixFor, cookFor, cookSeconds } from './kitchen.js';
 
 const canvas = document.getElementById('viewport');
 
@@ -526,23 +527,77 @@ function workFarmland(agent, plot, queue = false, shift = false) {
 }
 
 /** A click on a water source with a bucket in hand: fill it up. */
+/**
+ * A click on a water source with a vessel in hand: fill it up.
+ *
+ * A bucket fills only itself. A cup `fillsStack`: the one in hand fills
+ * first and then every other cup in the inventory with it, emptiest first,
+ * as far as the source has water for - "fill them all up at once".
+ */
 function fillBucket(agent, source, queue = false) {
-  const bucket = holding(agent, (t) => t.holds === 'water');
-  if (!bucket || agent.tool.left >= bucket.capacity) return false;
+  const vessel = holding(agent, (t) => t.holds === 'water');
+  if (!vessel) return false;
+  const item = agent.tool.item;
+  const room = () => (vessel.capacity - agent.tool.left) + (vessel.fillsStack ? inventory.room(item) : 0);
+  if (room() <= 0) return false;
   if ((source.water ?? 0) <= 0) return false;
 
   return order(agent, source, {
     seconds: FILL_SECONDS,
-    action: 'Filling the bucket',
+    action: `Filling the ${vessel.label.toLowerCase().replace(/^wooden /, '')}${vessel.fillsStack ? 's' : ''}`,
     adjacent: true,
     then: () => {
-      if (agent.tool?.item !== 'bucket') return;
-      const room = bucket.capacity - agent.tool.left;
-      const drawn = Math.min(room, source.water ?? 0);
+      if (agent.tool?.item !== item) return;
+      const drawn = Math.min(vessel.capacity - agent.tool.left, source.water ?? 0);
       source.water -= drawn;
       agent.tool.left += drawn;
+      if (vessel.fillsStack) source.water -= inventory.fillAll(item, source.water);
     }
   }, queue);
+}
+
+/**
+ * Drinking and eating, from the DRINK and EAT buttons on the inventory's
+ * tiles. The selected agent does it - or the isle's own inhabitant when
+ * nobody is selected, since there is only ever the one to feed.
+ *
+ * A cup drinks 100ml out of the fullest cup in the inventory (then the one
+ * in hand), and every 100ml is `drink.water` points. A loaf is `eat.food`.
+ */
+function consumer() {
+  return selectedAgent() ?? agents[0] ?? null;
+}
+
+function canConsume(item) {
+  const spec = ITEMS[item];
+  if (!consumer()) return false;
+  if (spec?.drink) {
+    const held = consumer().tool?.item === item ? consumer().tool.left : 0;
+    return inventory.held(item) > 0 || held > 0;
+  }
+  if (spec?.eat) return inventory.count(item) > 0;
+  return false;
+}
+
+function consume(item) {
+  const spec = ITEMS[item];
+  const agent = consumer();
+  if (!agent || !canConsume(item)) return false;
+  if (spec.drink) {
+    let ml = inventory.drain(item, spec.drink.ml);
+    if (ml <= 0 && agent.tool?.item === item) {
+      ml = Math.min(spec.drink.ml, agent.tool.left);
+      agent.tool.left -= ml;
+    }
+    agent.stats.water = Math.min(100, agent.stats.water + (ml / 100) * spec.drink.water);
+    return ml > 0;
+  }
+  if (spec.eat) {
+    if (!inventory.take(item, 1)) return false;
+    agent.stats.food = Math.min(100, agent.stats.food + spec.eat.food);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -553,6 +608,8 @@ function fillBucket(agent, source, queue = false) {
 function waterFarmland(agent, plot, queue = false) {
   const bucket = holding(agent, (t) => t.holds === 'water');
   if (!bucket || agent.tool.left <= 0) return false;
+  // Whatever vessel is in hand - a bucket or a cup - is the one poured.
+  const vesselItem = agent.tool.item;
   const max = PROP_KINDS[plot.kind]?.water?.max;
   if (!max || (plot.water ?? 0) >= max) return false;
 
@@ -561,7 +618,7 @@ function waterFarmland(agent, plot, queue = false) {
     adjacent: true,
     action: plot.kind === 'farmland' ? 'Watering the ground' : 'Filling the sprinkler',
     then: () => {
-      if (plot.gone || agent.tool?.item !== 'bucket') return;
+      if (plot.gone || agent.tool?.item !== vesselItem) return;
       const room = max - (plot.water ?? 0);
       const poured = Math.min(room, agent.tool.left);
       plot.water = (plot.water ?? 0) + poured;
@@ -711,6 +768,7 @@ function updateFires(dt) {
     if (prop.burning > 0) prop.burning = Math.max(0, prop.burning - dt);
     const lit = prop.burning > 0;
     setFireLit(prop, lit);
+    if (prop.cooker) cook(prop, lit, dt);
     if (!lit) continue;
     const flame = prop.mesh.getObjectByName('flame');
     flame?.children.forEach((tongue, i) => {
@@ -718,6 +776,101 @@ function updateFires(dt) {
       tongue.scale.x = tongue.scale.z = 0.9 + 0.1 * Math.sin(fireClock * (7 + i * 2) + i);
     });
   }
+}
+
+/**
+ * A cooking stone on a fire: heating while it burns (5C a second, to 480C),
+ * cooling once it is out (2C a second, back to 20C), and cooking whatever is
+ * on it one batch at a time while it is at 250C or over. Hotter is faster -
+ * `cookSeconds` in src/kitchen.js - and progress is kept, not lost, if it
+ * drops below 250 part way through.
+ */
+function cook(prop, lit, dt) {
+  const c = prop.cooker;
+  c.temp = lit
+    ? Math.min(STONE.max, c.temp + STONE.heatPerSecond * dt)
+    : Math.max(STONE.cold, c.temp - STONE.coolPerSecond * dt);
+
+  const recipe = c.input?.count > 0 ? cookFor(c.input.item) : null;
+  const room = !c.output?.count || c.output.item === recipe?.out.item;
+  if (recipe && room && c.temp >= STONE.cooks) {
+    c.progress = (c.progress ?? 0) + dt / cookSeconds(recipe, c.temp);
+    if (c.progress >= 1) {
+      c.progress = 0;
+      c.input.count -= 1;
+      if (c.input.count <= 0) c.input = null;
+      c.output = { item: recipe.out.item, count: (c.output?.count ?? 0) + recipe.out.count };
+    }
+  }
+  // The stone is built the first time it is drawn - on attaching, or on a
+  // restored run - and new meshes need what every prop mesh gets.
+  if (setCookStone(prop, c)) {
+    castFromFront(prop.mesh);
+    tagProp(prop);
+    buildOutline(prop);
+    if (hovered === prop) setPropOutline(prop, true);
+  }
+}
+
+/** A bowl shows its batter once anything is in it or has come out of it. */
+function updateBowls() {
+  for (const prop of props) {
+    if (prop.gone || prop.kind !== 'mixingBowl') continue;
+    const batter = prop.mesh.getObjectByName('batter');
+    if (!batter) continue;
+    batter.visible = Object.values(prop.mixIn ?? {}).some((n) => n > 0) || prop.mixOut?.count > 0;
+  }
+}
+
+/**
+ * Whether a mixing bowl can be worked right now, and if not, why - shown
+ * under its CRANK button, the same as the mill's.
+ */
+function bowlState(prop) {
+  if (!prop.crank) return { ok: false, why: 'Put a crank handle on its crank side first.' };
+  const recipe = mixFor(prop.mixIn);
+  if (!recipe) return { ok: false, why: 'Put in what a recipe below asks for.' };
+  if (prop.mixOut?.count > 0 && prop.mixOut.item !== recipe.out.item) {
+    return { ok: false, why: 'Take out what is already mixed first.' };
+  }
+  const agent = selectedAgent();
+  if (!agent) return { ok: false, why: 'Select an agent to turn the crank.' };
+  if (agent.task?.mill === prop) return { ok: false, why: `${agent.name} is mixing.` };
+  return { ok: true, why: `${ITEMS[recipe.out.item].label}, ${recipe.seconds}s of cranking` };
+}
+
+/**
+ * Turn a mixing bowl's crank: stand at the crank side and work one batch of
+ * whatever recipe the bowl holds enough for. The inputs are only spent once
+ * the batch is done, and only while the agent is actually at the crank does
+ * it count - the same rule the mill and the sprinkler keep.
+ */
+function mixBowl(agent, prop, queue = false) {
+  if (!bowlState(prop).ok) return false;
+  const recipe = mixFor(prop.mixIn);
+  let worked = 0;
+  const ok = order(agent, crankCell(prop), {
+    seconds: recipe.seconds,
+    action: 'Mixing',
+    face: prop,
+    tick: (dt) => {
+      if (prop.gone || !prop.crank) return;
+      const at = crankCell(prop);
+      if (Math.round(agent.x) !== at.x || Math.round(agent.z) !== at.z) return;
+      machines.turn(prop);
+      worked += dt;
+      prop.mixProgress = Math.min(1, worked / recipe.seconds);
+    },
+    then: () => {
+      prop.mixProgress = 0;
+      // Worked the whole time, and the bowl still holds what it takes.
+      if (prop.gone || worked < recipe.seconds - 0.05 || mixFor(prop.mixIn) !== recipe) return;
+      for (const [item, n] of Object.entries(recipe.in)) prop.mixIn[item] -= n;
+      prop.mixOut = { item: recipe.out.item, count: (prop.mixOut?.count ?? 0) + recipe.out.count };
+    }
+  }, queue);
+  if (ok && agent.task) agent.task.mill = prop;
+  return ok;
 }
 
 /**
@@ -817,7 +970,9 @@ const panels = createPanels({
   onHand: (agent, row) => describeHand(agent, row),
   onWieldAgent: (agent) => wield.chooseTool(agent),
   onUnequip: (agent) => equipTool(agent, null),
-  onEquipItem: (item) => wield.chooseAgent(item)
+  onEquipItem: (item) => wield.chooseAgent(item),
+  onConsume: (item) => consume(item),
+  canConsume: (item) => canConsume(item)
 });
 
 // Handing a tool over. Built before the menu for the same reason the panels
@@ -845,8 +1000,14 @@ const stations = createStations({
   inventory,
   blocked: () => menu.isOpen() || placement.isActive(),
   onOpen: () => { panels.close(); crafting.close(); },
-  onCrank: (prop) => { const agent = selectedAgent(); if (agent) grindMill(agent, prop); },
-  crankState: (prop) => millState(prop)
+  // The mill's crank and the mixing bowl's go through the same button.
+  onCrank: (prop) => {
+    const agent = selectedAgent();
+    if (!agent) return;
+    if (prop.kind === 'mixingBowl') mixBowl(agent, prop);
+    else grindMill(agent, prop);
+  },
+  crankState: (prop) => (prop.kind === 'mixingBowl' ? bowlState(prop) : millState(prop))
 });
 
 // Moving a station owns Esc while it is up, so like the panels it is built
@@ -911,6 +1072,21 @@ function takeBack(prop) {
   if (prop.store) emptyInto(prop.store, inventory);
   if (prop.grain > 0) inventory.add(PROP_KINDS.mill.grinds.from, prop.grain);
   if (prop.flour > 0) inventory.add(PROP_KINDS.mill.grinds.to, prop.flour);
+  // A cooking stone comes off the fire with whatever was on it.
+  if (prop.cooker) {
+    inventory.add('cookingStone', 1);
+    for (const stack of [prop.cooker.input, prop.cooker.output]) {
+      if (stack?.count > 0) inventory.add(stack.item, stack.count);
+    }
+  }
+  // A bowl's contents back out; its water back into the cups, as far as
+  // they have room.
+  for (const [item, n] of Object.entries(prop.mixIn ?? {})) {
+    if (n <= 0) continue;
+    if (item === 'water') inventory.fillAll('cup', n);
+    else inventory.add(item, n);
+  }
+  if (prop.mixOut?.count > 0) inventory.add(prop.mixOut.item, prop.mixOut.count);
   if (stations.prop === prop) stations.close();
   if (hovered === prop) setHovered(null);
   removeProp(prop, propsGroup, props);
@@ -969,6 +1145,7 @@ function beginPlanting(item) {
   if (PROP_KINDS[kind].slots) extra.store = emptyStore();
   if (PROP_KINDS[kind].grinds) { extra.grain = 0; extra.flour = 0; }
   if (PROP_KINDS[kind].burns) extra.burning = 0;          // laid, not lit
+  if (PROP_KINDS[kind].mixes) { extra.mixIn = {}; extra.mixOut = null; }
 
   const prop = spawnProp(kind, cell, { surface, group: propsGroup, props, extra });
   castFromFront(prop.mesh);
@@ -1346,7 +1523,7 @@ function handleClick(event) {
           if (q && !tilling(event) && canWrenchUp(prop)) { takeBack(prop); lookedAt = 0; return; }
           // A plain click on a mill opens its hopper - a screen again, so
           // with or without anyone selected. Its crank is turned from there.
-          if (prop.kind === 'mill' && !tilling(event)) { stations.open(prop); return; }
+          if ((prop.kind === 'mill' || prop.kind === 'mixingBowl') && !tilling(event)) { stations.open(prop); return; }
           if (!agent) return;
           if (tilling(event)) {
             if (prop.kind === 'pipe') wrenchPipe(agent, prop, machines.pipeEndAt(prop, hit.point), q);
@@ -1875,15 +2052,28 @@ function layPipe(block) {
 }
 
 /** Whether the crank handle on the cursor could go onto this machine. */
+/**
+ * Whether what is on the cursor could go onto this: a crank handle onto a
+ * machine with no crank, a cooking stone onto a campfire with none.
+ */
 function canAttach(prop) {
-  if (!carrying || ITEMS[carrying].attaches !== 'crank') return false;
-  return !!prop && !prop.gone && !!PROP_KINDS[prop.kind]?.facing && !prop.crank;
+  if (!carrying || !prop || prop.gone) return false;
+  const what = ITEMS[carrying].attaches;
+  if (what === 'crank') return !!PROP_KINDS[prop.kind]?.facing && !prop.crank;
+  if (what === 'cookingStone') return prop.kind === 'campfire' && !prop.cooker;
+  return false;
 }
 
 function attachCrank(prop) {
   if (!canAttach(prop)) return false;
+  const what = ITEMS[carrying].attaches;
   if (!inventory.take(carrying, 1)) return false;
-  setCrank(prop, true);
+  if (what === 'cookingStone') {
+    prop.cooker = { temp: STONE.cold, input: null, output: null, progress: 0 };
+    setCookStone(prop, prop.cooker);
+  } else {
+    setCrank(prop, true);
+  }
   castFromFront(prop.mesh);
   tagProp(prop);
   buildOutline(prop);
@@ -1967,6 +2157,13 @@ function describeProp(prop, end = null) {
     const max = kind.burns.light + kind.burns.maxLogs * kind.burns.perLog;
     what.note = s > 0 ? `Burning \u00b7 ${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')} left` : 'Out';
     if (s > 0) what.bar = { value: s, max, colour: '#ff9f55' };
+    if (prop.cooker) what.note = `${what.note} \u00b7 stone ${Math.round(prop.cooker.temp)}\u00b0C`;
+  }
+  if (prop.kind === 'mixingBowl') {
+    const parts = Object.entries(prop.mixIn ?? {}).filter(([, n]) => n > 0)
+      .map(([item, n]) => (item === 'water' ? `${n} ml water` : `${n} ${ITEMS[item].label.toLowerCase()}`));
+    what.note = parts.length ? parts.join(' \u00b7 ') : 'empty';
+    if (prop.mixOut?.count > 0) what.note += ` \u00b7 ${prop.mixOut.count} ${ITEMS[prop.mixOut.item].label.toLowerCase()} ready`;
   }
 
   // A machine with nothing to turn it by says so.
@@ -2486,6 +2683,7 @@ function frame() {
   updateGround(delta);
   machines.update(delta);
   updateFires(delta);
+  updateBowls();
   // After the camera has moved this frame, so the tube is aimed from where
   // the eye actually is.
   cutaway.update(selectedAgent(), delta);
@@ -2507,7 +2705,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { updateFires, takeBack, canWrenchUp, stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
+window.ESTER = { consume, canConsume, mixBowl, bowlState, cook, updateFires, takeBack, canWrenchUp, stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
   attachCrank, canAttach, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
   busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };

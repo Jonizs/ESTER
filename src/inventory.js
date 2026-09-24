@@ -133,7 +133,28 @@ export const ITEMS = {
   // What lights it: flint struck on stone. Two strikes and it is worn out.
   // It is a tool for the ledger's sake - worn one use at a time, most worn
   // first - but nobody carries it: the campfire's LIGHT button uses one.
-  flintStriker: { label: 'Flint Striker', tint: '#ffc36e', uses: 2, serves: ['flintStriker'] }
+  flintStriker: { label: 'Flint Striker', tint: '#ffc36e', uses: 2, serves: ['flintStriker'] },
+
+  // --- the kitchen ----------------------------------------------------------
+  /**
+   * A cup is a small vessel, kept one by one like the bucket. Held in an
+   * agent's hand it fills from water the way a bucket does - and fills every
+   * other cup in the inventory with it, as far as the source goes
+   * (`fillsStack`). `drink` is what its DRINK button does: `ml` from the
+   * fullest cup, and `water` points on the agent's bar for every 100ml.
+   */
+  cup: {
+    label: 'Cup', tint: '#c9e6ff', capacity: 100, wields: true, holds: 'water',
+    fillsStack: true, drink: { ml: 100, water: 20 }
+  },
+  // Placed like a station; mixes what is put in it while its crank turns.
+  mixingBowl: { label: 'Mixing Bowl', tint: '#d9a866', plants: 'mixingBowl' },
+  // Goes on top of a campfire off the cursor, the way a crank goes on a
+  // machine, and cooks what is put on it once it is hot enough.
+  cookingStone: { label: 'Cooking Stone', tint: '#b8bfcc', attaches: 'cookingStone' },
+  breadDough: { label: 'Plain Bread Dough', tint: '#f0dfb4' },
+  // `eat` is what its EAT button does: points on the agent's food bar.
+  bread: { label: 'Bread Loaf', tint: '#e8b060', eat: { food: 25 } }
 };
 
 /** Whether an item is worn down by use rather than spent outright. */
@@ -250,6 +271,51 @@ export function createInventory() {
       list.push(Math.max(0, Math.min(held.left, fullCharge(held.item))));
       kits.set(held.item, list);
       return true;
+    },
+
+    /**
+     * Pour up to `ml` into the vessels of a kind, emptiest first, topping
+     * each up to what it holds. Returns how much actually went in - what a
+     * source has to give up for it.
+     */
+    fillAll(item, ml) {
+      const list = kits.get(item);
+      if (!list?.length || !isVessel(item)) return 0;
+      const cap = fullCharge(item);
+      let left = ml;
+      list.sort((a, b) => a - b);
+      for (let i = 0; i < list.length && left > 0; i++) {
+        const n = Math.min(cap - list[i], left);
+        list[i] += n;
+        left -= n;
+      }
+      return ml - left;
+    },
+
+    /** How much room is left in all the vessels of a kind together. */
+    room(item) {
+      if (!isVessel(item)) return 0;
+      const cap = fullCharge(item);
+      return (kits.get(item) ?? []).reduce((n, v) => n + (cap - v), 0);
+    },
+
+    /** How much is in all the vessels of a kind together. */
+    held(item) {
+      return isVessel(item) ? (kits.get(item) ?? []).reduce((n, v) => n + v, 0) : 0;
+    },
+
+    /**
+     * Take up to `ml` out of the FULLEST vessel of a kind - one cup drunk or
+     * poured, not a sip off every cup. Returns how much came out.
+     */
+    drain(item, ml) {
+      const list = kits.get(item);
+      if (!list?.length || !isVessel(item)) return 0;
+      let at = 0;
+      for (let i = 1; i < list.length; i++) if (list[i] > list[at]) at = i;
+      const n = Math.min(ml, list[at]);
+      list[at] -= n;
+      return n;
     },
 
     /** How worn the next one to be used is: `{ left, max }`, or null. */

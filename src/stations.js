@@ -1,6 +1,7 @@
 import { itemIcon } from './icons.js';
 import { ITEMS, isSingular } from './inventory.js';
 import { PROP_KINDS } from './props.js';
+import { MIX_RECIPES, COOK_RECIPES, MIX_INPUTS, STONE, mixFor, cookFor, cookSeconds } from './kitchen.js';
 
 /**
  * The screens a station on the isle opens: a chest's store and a mill's
@@ -38,6 +39,8 @@ export function emptyInto(store, inventory) {
 }
 
 export function createStations({ inventory, blocked, onOpen, onCrank, crankState, onFire }) {
+  // `onCrank` and `crankState` answer for whichever crank the screen is on -
+  // the mill's or the mixing bowl's; main.js tells them apart by kind.
   const root = document.getElementById('station');
   const title = root.querySelector('.station-title');
   const hint = root.querySelector('.station-hint');
@@ -57,6 +60,19 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
   const lightButton = root.querySelector('#fire-light');
   const logButton = root.querySelector('#fire-log');
   const fireNote = root.querySelector('#fire-note');
+  const cookView = root.querySelector('.cook-view');
+  const cookTemp = root.querySelector('#cook-temp');
+  const tempFill = root.querySelector('.temp-fill');
+  const cookIn = root.querySelector('#cook-in');
+  const cookOut = root.querySelector('#cook-out');
+  const cookFill = root.querySelector('.cook-fill');
+  const cookNote = root.querySelector('#cook-note');
+  const bowlView = root.querySelector('.bowl-view');
+  const bowlInEl = root.querySelector('#bowl-in');
+  const bowlOut = root.querySelector('#bowl-out');
+  const bowlFill = root.querySelector('.bowl-fill');
+  const bowlButton = root.querySelector('#bowl-crank');
+  const bowlNote = root.querySelector('#bowl-note');
 
   let prop = null;            // the station whose screen is up
   let stockKey = null;        // what the stock row was last built from
@@ -229,6 +245,112 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
     update();
   });
 
+  // --- recipe lists (read-only) ---------------------------------------------
+  // "Put this in, get that out" - nothing here can be clicked to craft; it is
+  // there so the player knows what to feed the thing.
+
+  const part = (item, text) => `<span class="part">${itemIcon(item, 26)}<b>${text}</b></span>`;
+  const inPart = (item, n) => (item === 'water'
+    ? part('cup', `${n / 100 === 1 ? '1 cup' : `${n / 100} cups`} of water`)
+    : part(item, `${n} ${ITEMS[item]?.label ?? item}`));
+
+  root.querySelector('#bowl-recipes').innerHTML = MIX_RECIPES.map((r) => `<div class="kitchen-recipe">
+      ${Object.entries(r.in).map(([item, n]) => inPart(item, n)).join('<i>+</i>')}
+      <i>\u2192</i>${part(r.out.item, `${r.out.count} ${ITEMS[r.out.item].label}`)}</div>`).join('');
+  root.querySelector('#cook-recipes').innerHTML = COOK_RECIPES.map((r) => `<div class="kitchen-recipe">
+      ${part(r.from, `1 ${ITEMS[r.from].label}`)}<i>\u2192</i>${part(r.out.item, `${r.out.count} ${ITEMS[r.out.item].label}`)}
+      <em>${r.seconds}s at ${STONE.cooks}\u00b0C, ${r.seconds * (1 - STONE.bestCut)}s at ${STONE.max}\u00b0C</em></div>`).join('');
+
+  // --- the mixing bowl -------------------------------------------------------
+
+  /** The bowl's slots, one per thing that can go in it, built once. */
+  const bowlSlots = new Map();
+  for (const item of MIX_INPUTS) {
+    const el = makeSlot();
+    el.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      takeFromBowl(item);
+      update();
+    });
+    bowlSlots.set(item, el);
+    bowlInEl.append(el);
+  }
+
+  /** Something from the inventory into the bowl: all of it, or one. */
+  function putInBowl(item, one) {
+    const mix = (prop.mixIn ??= {});
+    if (item === 'cup') {
+      // A cup is poured, not put in: 100ml out of the fullest one, and the
+      // cup stays behind empty.
+      const ml = inventory.drain('cup', 100);
+      if (ml > 0) mix.water = (mix.water ?? 0) + ml;
+      return;
+    }
+    if (!MIX_INPUTS.has(item)) return;
+    const n = one ? 1 : inventory.count(item);
+    if (n <= 0 || !inventory.take(item, n)) return;
+    mix[item] = (mix[item] ?? 0) + n;
+  }
+
+  /** Something back out of the bowl. Water goes back into the cups. */
+  function takeFromBowl(item) {
+    const mix = prop.mixIn ?? {};
+    const n = mix[item] ?? 0;
+    if (n <= 0) return;
+    if (item === 'water') inventory.fillAll('cup', n);   // what does not fit is spilt
+    else inventory.add(item, n);
+    mix[item] = 0;
+  }
+
+  bowlOut.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    const out = prop?.mixOut;
+    if (!out?.count) return;
+    const n = event.button === 2 ? 1 : out.count;
+    inventory.add(out.item, n);
+    out.count -= n;
+    if (out.count <= 0) prop.mixOut = null;
+    update();
+  });
+
+  bowlButton.addEventListener('click', () => {
+    if (prop) onCrank?.(prop);
+    update();
+  });
+
+  // --- the cooking stone -----------------------------------------------------
+
+  /** An ingredient onto the stone: all of it, or one. One kind at a time. */
+  function putOnStone(item, one) {
+    const cooker = prop.cooker;
+    if (!cooker || !cookFor(item)) return;
+    if (cooker.input?.count > 0 && cooker.input.item !== item) return;
+    const n = one ? 1 : inventory.count(item);
+    if (n <= 0 || !inventory.take(item, n)) return;
+    cooker.input = { item, count: (cooker.input?.count ?? 0) + n };
+  }
+
+  cookIn.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    const input = prop?.cooker?.input;
+    if (!input?.count) return;
+    inventory.add(input.item, input.count);
+    prop.cooker.input = null;
+    prop.cooker.progress = 0;
+    update();
+  });
+
+  cookOut.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    const out = prop?.cooker?.output;
+    if (!out?.count) return;
+    const n = event.button === 2 ? 1 : out.count;
+    inventory.add(out.item, n);
+    out.count -= n;
+    if (out.count <= 0) prop.cooker.output = null;
+    update();
+  });
+
   // --- the stock row ---------------------------------------------------------
 
   function drawStock() {
@@ -246,7 +368,9 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
           const one = event.button === 2;
           if (prop?.kind === 'chest') putIn(entry.item, one);
           else if (prop?.kind === 'mill' && entry.item === 'wheat') fillHopper(one);
+          else if (prop?.kind === 'campfire' && prop.cooker && cookFor(entry.item)) putOnStone(entry.item, one);
           else if (prop?.kind === 'campfire' && entry.item === burns.log) logButton.click();
+          else if (prop?.kind === 'mixingBowl') putInBowl(entry.item, one);
           update();
         });
         stockEl.append(el);
@@ -263,7 +387,9 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
       drawSlot(el, item, inventory.count(item));
       // In the mill, only wheat is anything to click on; at a fire, only wood.
       el.classList.toggle('dim',
-        (prop?.kind === 'mill' && item !== 'wheat') || (prop?.kind === 'campfire' && item !== burns.log));
+        (prop?.kind === 'mill' && item !== 'wheat') ||
+        (prop?.kind === 'campfire' && item !== burns.log && !(prop.cooker && cookFor(item))) ||
+        (prop?.kind === 'mixingBowl' && item !== 'cup' && !MIX_INPUTS.has(item)));
     }
   }
 
@@ -283,6 +409,25 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
       lightButton.disabled = !state.canLight;
       logButton.disabled = !state.canLog;
       fireNote.textContent = state.why;
+      drawCooker();
+    } else if (prop.kind === 'mixingBowl') {
+      const mix = prop.mixIn ?? {};
+      for (const [item, el] of bowlSlots) {
+        const n = mix[item] ?? 0;
+        // Water is shown as the cup it came out of, and counted in ml.
+        drawSlot(el, item === 'water' ? 'cup' : item, n, {
+          ghost: n <= 0,
+          label: item === 'water' ? `Water \u00b7 ${n} ml` : ITEMS[item]?.label
+        });
+        if (item === 'water' && n > 0) el.querySelector('.slot-count').textContent = `${n}ml`;
+      }
+      const out = prop.mixOut;
+      const next = mixFor(mix)?.out.item ?? MIX_RECIPES[0].out.item;
+      drawSlot(bowlOut, out?.item ?? next, out?.count ?? 0, { ghost: !out?.count });
+      bowlFill.style.width = `${Math.round((prop.mixProgress ?? 0) * 100)}%`;
+      const state = crankState?.(prop) ?? { ok: false, why: '' };
+      bowlButton.disabled = !state.ok;
+      bowlNote.textContent = state.why;
     } else {
       const grain = prop.grain ?? 0;
       const flour = prop.flour ?? 0;
@@ -299,6 +444,29 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
     drawStock();
   }
 
+  /** The cooking stone's part of a campfire's screen, when it has one. */
+  function drawCooker() {
+    const cooker = prop.cooker;
+    cookView.hidden = !cooker;
+    if (!cooker) return;
+    const t = Math.round(cooker.temp);
+    const hot = t >= STONE.cooks;
+    cookTemp.textContent = `${t}\u00b0C \u00b7 ${hot ? 'hot enough to cook' : `cooks at ${STONE.cooks}\u00b0C`}`;
+    cookTemp.classList.toggle('hot', hot);
+    tempFill.style.width = `${Math.max(0, Math.min(100, (t / STONE.max) * 100))}%`;
+
+    const input = cooker.input?.count > 0 ? cooker.input : null;
+    const recipe = input ? cookFor(input.item) : null;
+    drawSlot(cookIn, input?.item ?? COOK_RECIPES[0].from, input?.count ?? 0, { ghost: !input });
+    const out = cooker.output?.count > 0 ? cooker.output : null;
+    drawSlot(cookOut, out?.item ?? recipe?.out.item ?? COOK_RECIPES[0].out.item, out?.count ?? 0, { ghost: !out });
+    cookFill.style.width = `${Math.round((cooker.progress ?? 0) * 100)}%`;
+
+    if (!input) cookNote.textContent = 'Put something on the stone from what is held below.';
+    else if (!hot) cookNote.textContent = (prop.burning ?? 0) > 0 ? 'Heating up...' : 'The fire is out - it will not get hot enough.';
+    else cookNote.textContent = `Cooking - ${Math.ceil(cookSeconds(recipe, cooker.temp))}s a batch at this heat.`;
+  }
+
   // --- opening and closing ---------------------------------------------------
 
   function open(next) {
@@ -306,15 +474,17 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
     onOpen?.();
     prop = next;
     const kind = prop.kind;
-    title.textContent = { chest: 'Wooden Chest', mill: 'Basic Mill', campfire: 'Campfire' }[kind];
+    title.textContent = { chest: 'Wooden Chest', mill: 'Basic Mill', campfire: 'Campfire', mixingBowl: 'Mixing Bowl' }[kind];
     hint.textContent = {
       chest: 'Click a slot to take the stack back out, right click for one. Click what is held below to put it in.',
       mill: 'Wheat goes in on the left. Turning the crank grinds it into flour, one for one - two a second, ten at a go.',
-      campfire: `A flint striker lights it for ${burns.light / 60} minutes. Every log adds ${burns.perLog / 60} more, up to ${burns.maxLogs}. Once it is out it wants lighting again.`
+      campfire: `A flint striker lights it for ${burns.light / 60} minutes. Every log adds ${burns.perLog / 60} more, up to ${burns.maxLogs}. Once it is out it wants lighting again.`,
+      mixingBowl: 'Click what is held below to put it in - a cup is poured, 100 ml at a time. Turn the crank to mix what the recipes ask for.'
     }[kind];
     chestView.hidden = kind !== 'chest';
     millView.hidden = kind !== 'mill';
     fireView.hidden = kind !== 'campfire';
+    bowlView.hidden = kind !== 'mixingBowl';
     stockKey = null;
     root.hidden = false;
     update();

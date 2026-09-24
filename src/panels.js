@@ -66,7 +66,7 @@ function meterColour(value) {
 
 const title = (word) => word[0].toUpperCase() + word.slice(1);
 
-export function createPanels({ settings, agents, inventory, progression, blocked, onSelect, onPlantItem, onCarryItem, onEquipItem, onHand, onWieldAgent, onUnequip }) {
+export function createPanels({ settings, agents, inventory, progression, blocked, onSelect, onPlantItem, onCarryItem, onEquipItem, onHand, onWieldAgent, onUnequip, onConsume, canConsume }) {
   const root = document.getElementById('panels');
   const pages = new Map();
   const tabButtons = new Map();
@@ -204,6 +204,21 @@ export function createPanels({ settings, agents, inventory, progression, blocked
           });
           tile.append(equip);
         }
+
+        // Something to drink or eat has a button that does it, for the
+        // selected agent. Whether there is anything to drink is checked every
+        // frame below, so an empty cup's DRINK greys out rather than lying.
+        if (spec.drink || spec.eat) {
+          const use = document.createElement('button');
+          use.type = 'button';
+          use.className = 'tile-action consume';
+          use.textContent = spec.drink ? 'Drink' : 'Eat';
+          use.addEventListener('click', (event) => {
+            event.stopPropagation();
+            onConsume?.(entry.item);
+          });
+          tile.append(use);
+        }
         inventoryTiles.append(tile);
       }
     }
@@ -212,6 +227,8 @@ export function createPanels({ settings, agents, inventory, progression, blocked
     for (const entry of entries) {
       total += entry.count;
       inventoryTiles.querySelector(`[data-item="${entry.item}"] .tile-count`).textContent = entry.count;
+      const use = inventoryTiles.querySelector(`[data-item="${entry.item}"] .consume`);
+      if (use) use.disabled = !(canConsume?.(entry.item) ?? true);
     }
     inventoryCount.textContent = total;
   }

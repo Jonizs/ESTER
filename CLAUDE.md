@@ -83,9 +83,12 @@ with one inhabitant who walks around and works on what is there.
   - `src/machines.js` - the water works: pipes joining themselves up, water
     running down them, sprinklers and their crank, and the guide a machine
     draws on the isle while it is placed or turned.
-  - `src/stations.js` - the screen a chest, a mill or a campfire opens: the
-    chest's 16 slots, the mill's wheat-in / flour-out and its CRANK button,
-    the fire's time left with LIGHT and ADD LOG.
+  - `src/stations.js` - the screen a chest, a mill, a mixing bowl or a
+    campfire opens: the chest's 16 slots, the mill's wheat-in / flour-out and
+    its CRANK button, the bowl's contents and CRANK, the fire's time left
+    with LIGHT and ADD LOG and, with a cooking stone on it, the stone.
+  - `src/kitchen.js` - what the mixing bowl mixes and the cooking stone
+    cooks, and the stone's temperatures.
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/save.js` - the run, written down and read back on launch.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
@@ -1309,6 +1312,33 @@ with one inhabitant who walks around and works on what is there.
   0.55 - at 1.6 the tone mapping clipped them to one pale cream and the fire
   read as a lamp - and they flicker while lit, which is the one idle motion
   allowed, because a fire that does not move does not read as one.
+
+- **Cups fill as a stack, and are drunk one at a time.** A cup is a vessel
+  like the bucket (`capacity` 100) with `fillsStack`: held in a hand and
+  clicked on water, `fillBucket` fills the one in hand and then every cup in
+  the inventory, emptiest first, as far as the source goes
+  (`inventory.fillAll`). DRINK on the cup's tile takes 100ml from the
+  FULLEST cup (`inventory.drain`), then the one in hand, and gives 20 water
+  per 100ml; EAT on a loaf gives 25 food. Both are for the selected agent,
+  or the isle's own inhabitant when nobody is selected, and the buttons
+  grey out (`canConsume`) when there is nothing to have. A tile with two
+  buttons puts them side by side.
+- **The mixing bowl and the cooking stone list recipes they cannot craft.**
+  `MIX_RECIPES` and `COOK_RECIPES` in `src/kitchen.js` are shown read-only
+  on their screens as "this in, that out"; what is put in is what gets
+  worked. The bowl holds `mixIn` (an item -> count map; `water` is ml,
+  poured from the fullest cup 100ml a click, and poured back into the cups
+  if taken out) and `mixOut`, and its crank job (`mixBowl`) spends the
+  inputs only when the batch is done. It shares the mill's CRANK wiring:
+  `onCrank`/`crankState` in `createStations` answer by kind.
+- **A cooking stone goes ON a campfire, off the cursor** (`attaches:
+  'cookingStone'`), and lives on it as `prop.cooker` - `{ temp, input,
+  output, progress }`, saved with it and handed back with the fire. It heats
+  5C a second while the fire burns (to 480C) and cools 2C a second once it
+  is out (to 20C). Nothing cooks under 250C; at 250 a recipe takes its full
+  time and every degree over takes a share off, half at 480
+  (`cookSeconds`). Progress is kept, not lost, if it cools mid-batch. The
+  slab glows red with the heat, and `cook()` in `main.js` is the tick.
 
 ## Commands
 

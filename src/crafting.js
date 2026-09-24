@@ -320,6 +320,39 @@ export const RECIPES = [
     item: 'flintStriker',
     yield: 1,
     slots: { 1: 'flint', 2: 'stone', 3: 'flint' }
+  },
+  {
+    // A rope bound round with four sticks.
+    id: 'cup',
+    label: 'Cup',
+    item: 'cup',
+    yield: 1,
+    slots: {
+      2: 'stick',
+      5: 'stick', 6: 'rope', 7: 'stick',
+      10: 'stick'
+    }
+  },
+  {
+    // Ten logs in a U - the bowl, seen from the side.
+    id: 'mixingBowl',
+    label: 'Mixing Bowl',
+    item: 'mixingBowl',
+    yield: 1,
+    slots: {
+      1: 'wood', 4: 'wood',
+      5: 'wood', 8: 'wood',
+      9: 'wood', 12: 'wood',
+      13: 'wood', 14: 'wood', 15: 'wood', 16: 'wood'
+    }
+  },
+  {
+    // Four stones laid in a row, a flat slab to go over a fire.
+    id: 'cookingStone',
+    label: 'Cooking Stone',
+    item: 'cookingStone',
+    yield: 1,
+    slots: { 1: 'stone', 2: 'stone', 3: 'stone', 4: 'stone' }
   }
 ];
 

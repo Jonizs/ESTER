@@ -185,6 +185,23 @@ export const PROP_KINDS = {
     burns: { light: 180, perLog: 120, maxLogs: 10, striker: 'flintStriker', log: 'wood' }
   },
 
+  /**
+   * A mixing bowl: things go in, the crank goes round, something comes out.
+   * It faces a way only so its crank side can be chosen, like the mill.
+   * What is in it is `mixIn` (an item -> count map, water in ml) and what
+   * has come out is `mixOut`; the recipes are in src/kitchen.js.
+   */
+  mixingBowl: {
+    label: 'mixing bowl',
+    placed: true,
+    portable: true,
+    mechanical: true,
+    item: 'mixingBowl',
+    icon: 'mixingBowl',
+    facing: true,
+    mixes: true
+  },
+
   // The workbench is not harvested - it is repaired once, and then it is a
   // door into the crafting screen rather than a job.
   workbench: {
@@ -913,6 +930,53 @@ function buildCog() {
   return cog;
 }
 
+/**
+ * Put a cooking stone on a campfire, or take it off - and show how hot it is
+ * and whether there is anything on it. The slab glows red as it heats past
+ * the point where it cooks.
+ */
+export function setCookStone(prop, cooker) {
+  let stone = prop.mesh.getObjectByName('cookstone');
+  if (!cooker) {
+    if (stone) prop.mesh.remove(stone);
+    return false;
+  }
+  let built = false;
+  if (!stone) {
+    stone = new THREE.Group();
+    stone.name = 'cookstone';
+    const slab = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.07, 0.7),
+      mat(0x8b929c, { emissive: 0x000000, emissiveIntensity: 1 })
+    );
+    slab.name = 'slab';
+    slab.position.y = 0.5;
+    slab.castShadow = true;
+    stone.add(slab);
+    // Four stones propping it up out of the flames.
+    for (const [x, z] of [[-0.28, -0.28], [0.28, -0.28], [-0.28, 0.28], [0.28, 0.28]]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.48, 0.1), mat(0x6f767f));
+      leg.position.set(x, 0.24, z);
+      leg.castShadow = true;
+      stone.add(leg);
+    }
+    const food = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.22), mat(0xf0dfb4));
+    food.name = 'food';
+    food.position.y = 0.585;
+    stone.add(food);
+    prop.mesh.add(stone);
+    built = true;
+  }
+  const hot = Math.max(0, Math.min(1, (cooker.temp - 150) / 330));
+  const slab = stone.getObjectByName('slab');
+  slab.material.emissive.setRGB(0.55 * hot, 0.1 * hot, 0.02 * hot);
+  const food = stone.getObjectByName('food');
+  const on = cooker.input?.count > 0 ? cooker.input.item : cooker.output?.count > 0 ? cooker.output.item : null;
+  food.visible = !!on;
+  if (on) food.material.color.setHex(on === 'bread' ? 0xc98a3c : 0xf0dfb4);
+  return built;
+}
+
 /** Show a campfire's flames, or put them out. */
 export function setFireLit(prop, lit) {
   const flame = prop.mesh.getObjectByName('flame');
@@ -1238,6 +1302,46 @@ function buildProp(kind, salt) {
     }
     flame.visible = false;
     g.add(flame);
+    return g;
+  }
+
+  if (kind === 'mixingBowl') {
+    // A wooden bowl on a low stand, the paddle standing in it - the paddle is
+    // the `runner`, so it goes round with the crank the way a millstone does.
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.22, 0.62), mat(0x8a5c30));
+    stand.position.y = 0.11;
+    stand.castShadow = true;
+    g.add(stand);
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.08, 0.72), mat(0xa8763f));
+    floor.position.y = 0.26;
+    floor.castShadow = true;
+    g.add(floor);
+    for (const [dx, dz, w, d] of [[0, 0.36, 0.8, 0.08], [0, -0.36, 0.8, 0.08],
+                                  [0.36, 0, 0.08, 0.8], [-0.36, 0, 0.08, 0.8]]) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 0.28, d), mat(0xc99359));
+      wall.position.set(dx, 0.4, dz);
+      wall.castShadow = true;
+      g.add(wall);
+    }
+    // What is in it, shown as a pale layer once there is anything.
+    const batter = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.06, 0.62), mat(0xf0dfb4));
+    batter.name = 'batter';
+    batter.position.y = 0.33;
+    batter.visible = false;
+    g.add(batter);
+    const paddle = new THREE.Group();
+    paddle.name = 'runner';
+    paddle.position.y = 0.3;
+    const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), mat(0xe0b070));
+    shaft.position.set(0.1, 0.25, 0);
+    shaft.rotation.z = -0.25;
+    shaft.castShadow = true;
+    paddle.add(shaft);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.04), mat(0xe0b070));
+    blade.position.set(0.04, 0.05, 0);
+    paddle.add(blade);
+    g.add(paddle);
+    g.add(buildCog());
     return g;
   }
 

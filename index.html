@@ -323,6 +323,48 @@
                 <span id="fire-note"></span>
               </div>
             </div>
+            <!-- Only with a cooking stone on the fire. -->
+            <div class="cook-view" hidden>
+              <h3>Cooking stone</h3>
+              <div class="temp-row">
+                <span id="cook-temp"></span>
+                <div class="mill-bar temp-bar"><div class="temp-mark"></div><div class="temp-fill"></div></div>
+              </div>
+              <div class="mill-row">
+                <div id="cook-in" class="slot"><div class="slot-icon"></div><div class="slot-count"></div></div>
+                <div class="mill-arrow">
+                  <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 12h15M13 6l6 6-6 6"/>
+                </svg>
+                  <div class="mill-bar"><div class="cook-fill"></div></div>
+                </div>
+                <div id="cook-out" class="slot"><div class="slot-icon"></div><div class="slot-count"></div></div>
+              </div>
+              <span id="cook-note"></span>
+              <h3>Recipes</h3>
+              <div id="cook-recipes" class="kitchen-recipes"></div>
+            </div>
+          </section>
+          <section class="bowl-view" hidden>
+            <h3>In the bowl</h3>
+            <div class="mill-row">
+              <div id="bowl-in" class="bowl-in"></div>
+              <div class="mill-arrow">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 12h15M13 6l6 6-6 6"/>
+                </svg>
+                <div class="mill-bar"><div class="bowl-fill"></div></div>
+              </div>
+              <div id="bowl-out" class="slot"><div class="slot-icon"></div><div class="slot-count"></div></div>
+            </div>
+            <div class="mill-actions">
+              <button type="button" id="bowl-crank" class="station-button">CRANK</button>
+              <span id="bowl-note"></span>
+            </div>
+            <h3>Recipes</h3>
+            <div id="bowl-recipes" class="kitchen-recipes"></div>
           </section>
           <section class="station-stock">
             <h3>Inventory</h3>
