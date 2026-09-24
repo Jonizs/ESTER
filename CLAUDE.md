@@ -251,6 +251,16 @@ with one inhabitant who walks around and works on what is there.
     them (`SHORT_OF` 0). It used to stop almost a block short to spare their
     ground, which left the blocks right in front of them standing and
     covering them; the one block they stand on is spared on its own now.
+  - The GROUND round the agent is kept: a block wholly under the line from
+    the eye to their FEET hides no part of them, so within `FLOOR_KEPT`
+    (3.3) of them it stays however far inside the tube it is (`cutUnder` in
+    the shader, `underFeetLine` for `hides`). Without it, looking down into
+    a pit cut the pit floor out in front of them, and the cells they could
+    walk to read as empty holes. "Under" is measured at the line's LOWEST
+    across the block's width, or a sloping line passes over a block's middle
+    and through its far corner. It is only round the agent: kept near the
+    eye too, it left the cut's buried cross-section as a dark wall filling
+    the bottom of the screen.
   - Only the ONE block the agent stands on is kept (`uCutKeep`, read off the
     heightmap, not their height, which bobs mid-hop). An earlier rule kept
     everything at or below their feet and was taken out on request: it left
