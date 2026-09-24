@@ -2809,3 +2809,52 @@ body.cutaway-off #help .cutaway-state::after { content: '(off)'; color: var(--di
 #station #mill-crank:disabled { opacity: 0.4; cursor: default; }
 
 #station #mill-note { font-size: 12.5px; color: var(--dim); }
+
+
+/* The campfire: the fire's own picture, how long it has left, and the two
+   things to do to it. */
+#station .fire-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: 20px;
+  width: min(440px, 100%);
+  margin: 0 auto;
+}
+
+#station #fire-time {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+#station .fire-fill {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #ff7a1a, #ffd660);
+}
+
+#station .fire-actions { justify-content: flex-start; margin-top: 14px; }
+#station #fire-note { display: block; margin-top: 10px; font-size: 12.5px; color: var(--dim); }
+
+#station .station-button {
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--edge-lit);
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.18), rgba(185, 140, 255, 0.1));
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+
+#station .station-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(138, 216, 255, 0.3), rgba(185, 140, 255, 0.18));
+  box-shadow: 0 0 22px rgba(138, 216, 255, 0.22);
+}
+
+#station .station-button:disabled { opacity: 0.4; cursor: default; }

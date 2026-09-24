@@ -1,5 +1,6 @@
 import { itemIcon } from './icons.js';
 import { ITEMS, isSingular } from './inventory.js';
+import { PROP_KINDS } from './props.js';
 
 /**
  * The screens a station on the isle opens: a chest's store and a mill's
@@ -36,7 +37,7 @@ export function emptyInto(store, inventory) {
   }
 }
 
-export function createStations({ inventory, blocked, onOpen, onCrank, crankState }) {
+export function createStations({ inventory, blocked, onOpen, onCrank, crankState, onFire }) {
   const root = document.getElementById('station');
   const title = root.querySelector('.station-title');
   const hint = root.querySelector('.station-hint');
@@ -49,6 +50,13 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
   const millFill = root.querySelector('.mill-fill');
   const crankButton = root.querySelector('#mill-crank');
   const millNote = root.querySelector('#mill-note');
+  const fireView = root.querySelector('.fire-view');
+  const fireState = root.querySelector('#fire-state');
+  const fireTime = root.querySelector('#fire-time');
+  const fireFill = root.querySelector('.fire-fill');
+  const lightButton = root.querySelector('#fire-light');
+  const logButton = root.querySelector('#fire-log');
+  const fireNote = root.querySelector('#fire-note');
 
   let prop = null;            // the station whose screen is up
   let stockKey = null;        // what the stock row was last built from
@@ -184,6 +192,43 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
     update();
   });
 
+  // --- the campfire ----------------------------------------------------------
+
+  const burns = PROP_KINDS.campfire.burns;
+  // The most a fire can have left: its lighting and ten logs on top.
+  const maxBurn = burns.light + burns.maxLogs * burns.perLog;
+
+  const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  /** Whether it can be lit now, and whether a log can go on, with why not. */
+  function fireState_() {
+    const lit = (prop.burning ?? 0) > 0;
+    const strikers = inventory.count(burns.striker);
+    const logs = inventory.count(burns.log);
+    const room = lit && prop.burning + burns.perLog <= maxBurn + 1e-6;
+    let why = '';
+    if (!lit) why = strikers > 0 ? 'Strike it with a flint striker to light it.' : 'Needs a flint striker to light.';
+    else if (!room) why = `It is stacked as high as it goes - ${burns.maxLogs} logs.`;
+    else if (logs <= 0) why = 'No wood to put on.';
+    else why = `Each log adds ${burns.perLog / 60} minutes.`;
+    return { lit, canLight: !lit && strikers > 0, canLog: room && logs > 0, why };
+  }
+
+  lightButton.addEventListener('click', () => {
+    if (!prop || !fireState_().canLight) return;
+    if (!inventory.useTool(burns.striker)) return;
+    prop.burning = burns.light;
+    onFire?.(prop);
+    update();
+  });
+
+  logButton.addEventListener('click', () => {
+    if (!prop || !fireState_().canLog) return;
+    if (!inventory.take(burns.log, 1)) return;
+    prop.burning = Math.min(maxBurn, prop.burning + burns.perLog);
+    update();
+  });
+
   // --- the stock row ---------------------------------------------------------
 
   function drawStock() {
@@ -201,6 +246,7 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
           const one = event.button === 2;
           if (prop?.kind === 'chest') putIn(entry.item, one);
           else if (prop?.kind === 'mill' && entry.item === 'wheat') fillHopper(one);
+          else if (prop?.kind === 'campfire' && entry.item === burns.log) logButton.click();
           update();
         });
         stockEl.append(el);
@@ -215,8 +261,9 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
     for (const el of stockEl.querySelectorAll('.slot')) {
       const item = el.dataset.item;
       drawSlot(el, item, inventory.count(item));
-      // In the mill, only wheat is anything to click on.
-      el.classList.toggle('dim', prop?.kind === 'mill' && item !== 'wheat');
+      // In the mill, only wheat is anything to click on; at a fire, only wood.
+      el.classList.toggle('dim',
+        (prop?.kind === 'mill' && item !== 'wheat') || (prop?.kind === 'campfire' && item !== burns.log));
     }
   }
 
@@ -228,6 +275,14 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
 
     if (prop.kind === 'chest') {
       prop.store.forEach((slot, i) => drawSlot(chestSlots[i], slot?.item ?? null, slot?.count ?? 0));
+    } else if (prop.kind === 'campfire') {
+      const state = fireState_();
+      drawSlot(fireState, 'campfire', 0, { ghost: !state.lit, label: state.lit ? 'Burning' : 'Out' });
+      fireTime.textContent = state.lit ? `Burning \u00b7 ${clock(prop.burning)} left` : 'Out';
+      fireFill.style.width = `${Math.min(100, ((prop.burning ?? 0) / maxBurn) * 100)}%`;
+      lightButton.disabled = !state.canLight;
+      logButton.disabled = !state.canLog;
+      fireNote.textContent = state.why;
     } else {
       const grain = prop.grain ?? 0;
       const flour = prop.flour ?? 0;
@@ -250,13 +305,16 @@ export function createStations({ inventory, blocked, onOpen, onCrank, crankState
     if (!next) return;
     onOpen?.();
     prop = next;
-    const chest = prop.kind === 'chest';
-    title.textContent = chest ? 'Wooden Chest' : 'Basic Mill';
-    hint.textContent = chest
-      ? 'Click a slot to take the stack back out, right click for one. Click what is held below to put it in.'
-      : 'Wheat goes in on the left. Turning the crank grinds it into flour, one for one - two a second, ten at a go.';
-    chestView.hidden = !chest;
-    millView.hidden = chest;
+    const kind = prop.kind;
+    title.textContent = { chest: 'Wooden Chest', mill: 'Basic Mill', campfire: 'Campfire' }[kind];
+    hint.textContent = {
+      chest: 'Click a slot to take the stack back out, right click for one. Click what is held below to put it in.',
+      mill: 'Wheat goes in on the left. Turning the crank grinds it into flour, one for one - two a second, ten at a go.',
+      campfire: `A flint striker lights it for ${burns.light / 60} minutes. Every log adds ${burns.perLog / 60} more, up to ${burns.maxLogs}. Once it is out it wants lighting again.`
+    }[kind];
+    chestView.hidden = kind !== 'chest';
+    millView.hidden = kind !== 'mill';
+    fireView.hidden = kind !== 'campfire';
     stockKey = null;
     root.hidden = false;
     update();

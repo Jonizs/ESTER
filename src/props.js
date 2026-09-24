@@ -170,6 +170,21 @@ export const PROP_KINDS = {
     grinds: { from: 'wheat', to: 'flour', perSecond: 2, batch: 10 }
   },
 
+  /**
+   * A campfire. It is lit from its own screen with a flint striker and burns
+   * for three minutes; every log put on adds two more, up to ten logs' worth
+   * on top of the lighting. When it runs out it is out, and wants a striker
+   * again. `burning` on the prop is the seconds left, saved with it.
+   */
+  campfire: {
+    label: 'campfire',
+    placed: true,
+    portable: true,
+    item: 'campfire',
+    icon: 'campfire',
+    burns: { light: 180, perLog: 120, maxLogs: 10, striker: 'flintStriker', log: 'wood' }
+  },
+
   // The workbench is not harvested - it is repaired once, and then it is a
   // door into the crafting screen rather than a job.
   workbench: {
@@ -898,6 +913,12 @@ function buildCog() {
   return cog;
 }
 
+/** Show a campfire's flames, or put them out. */
+export function setFireLit(prop, lit) {
+  const flame = prop.mesh.getObjectByName('flame');
+  if (flame) flame.visible = !!lit;
+}
+
 function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...opts });
 }
@@ -1177,6 +1198,46 @@ function buildProp(kind, salt) {
     g.add(band);
 
     g.add(buildCog());
+    return g;
+  }
+
+  if (kind === 'campfire') {
+    // A ring of stones, two logs crossed in it, and the flames - a named
+    // group so `setFireLit` can show and hide them and the loop flicker them.
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const stone = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.13, 0.16), mat(i % 2 ? 0x8b929c : 0x9aa0ad));
+      stone.position.set(Math.cos(a) * 0.36, 0.065, Math.sin(a) * 0.36);
+      stone.rotation.y = -a;
+      stone.castShadow = true;
+      g.add(stone);
+    }
+    for (const turn of [0.4, -0.4]) {
+      const log = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.12, 0.12), mat(0x6b4a2f));
+      log.position.y = 0.08;
+      log.rotation.y = turn;
+      log.castShadow = true;
+      g.add(log);
+    }
+    const ash = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.3), mat(0x3a3530));
+    ash.position.y = 0.02;
+    g.add(ash);
+
+    const flame = new THREE.Group();
+    flame.name = 'flame';
+    // Glowing, but not so hard the tone mapping clips them to cream - at
+    // 1.6 every tongue came out the same pale yellow and read as a lamp.
+    for (const [x, z, h, c] of [[0, 0, 0.42, 0xe8540c], [0.07, 0.05, 0.3, 0xf08a1c], [-0.06, -0.04, 0.26, 0xf5b83a]]) {
+      const tongue = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, h, 0.14),
+        new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 1 })
+      );
+      tongue.geometry.translate(0, h / 2, 0);
+      tongue.position.set(x, 0.12, z);
+      flame.add(tongue);
+    }
+    flame.visible = false;
+    g.add(flame);
     return g;
   }
 

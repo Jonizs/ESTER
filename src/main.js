@@ -6,7 +6,7 @@ import {
   createProps, setPropHighlight, setPropOutline, setWorkbenchState,
   canMove, canPlace, placeProp, footprintCells, syncBlocked,
   spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds, setWaterLevel,
-  setCropStage, cropStageOf, buildOutline, tagProp, setCrank,
+  setCropStage, cropStageOf, buildOutline, tagProp, setCrank, setFireLit,
   GROUND_OFFSET, FARMLAND_SINK, FARMLAND_SOIL, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
@@ -687,6 +687,29 @@ function grindMill(agent, prop, queue = false) {
 }
 
 /**
+ * Campfires burning down, off the frame delta like everything else that
+ * happens in the world. Out is out: at zero it wants a striker again. The
+ * flames flicker while it burns - a fire is the one thing that should move.
+ */
+let fireClock = 0;
+
+function updateFires(dt) {
+  fireClock += dt;
+  for (const prop of props) {
+    if (prop.gone || prop.kind !== 'campfire') continue;
+    if (prop.burning > 0) prop.burning = Math.max(0, prop.burning - dt);
+    const lit = prop.burning > 0;
+    setFireLit(prop, lit);
+    if (!lit) continue;
+    const flame = prop.mesh.getObjectByName('flame');
+    flame?.children.forEach((tongue, i) => {
+      tongue.scale.y = 0.8 + 0.25 * Math.sin(fireClock * (9 + i * 3) + i * 2);
+      tongue.scale.x = tongue.scale.z = 0.9 + 0.1 * Math.sin(fireClock * (7 + i * 2) + i);
+    });
+  }
+}
+
+/**
  * The crops and the catchers, ticked once a frame.
  *
  * A plot only grows while it has water, and drinks as it does - run out and
@@ -934,6 +957,7 @@ function beginPlanting(item) {
   if (PROP_KINDS[kind].facing) extra.facing = 0;
   if (PROP_KINDS[kind].slots) extra.store = emptyStore();
   if (PROP_KINDS[kind].grinds) { extra.grain = 0; extra.flour = 0; }
+  if (PROP_KINDS[kind].burns) extra.burning = 0;          // laid, not lit
 
   const prop = spawnProp(kind, cell, { surface, group: propsGroup, props, extra });
   castFromFront(prop.mesh);
@@ -1292,7 +1316,7 @@ function handleClick(event) {
         // pipe is nothing to click on at all.
         // A chest opens, the way the repaired bench does: a screen, not an
         // order, so nobody has to be selected.
-        if (prop && !prop.gone && prop.kind === 'chest') { stations.open(prop); return; }
+        if (prop && !prop.gone && (prop.kind === 'chest' || prop.kind === 'campfire')) { stations.open(prop); return; }
 
         if (prop && !prop.gone && (prop.kind === 'pipe' || PROP_KINDS[prop.kind]?.facing)) {
           const agent = selectedAgent();
@@ -1884,6 +1908,12 @@ function describeProp(prop, end = null) {
     what.note = `${used} / ${kind.slots} slots used`;
   }
   if (prop.kind === 'mill') what.note = `${prop.grain ?? 0} wheat \u00b7 ${prop.flour ?? 0} flour`;
+  if (prop.kind === 'campfire') {
+    const s = prop.burning ?? 0;
+    const max = kind.burns.light + kind.burns.maxLogs * kind.burns.perLog;
+    what.note = s > 0 ? `Burning \u00b7 ${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')} left` : 'Out';
+    if (s > 0) what.bar = { value: s, max, colour: '#ff9f55' };
+  }
 
   // A machine with nothing to turn it by says so.
   if (kind?.facing && !prop.crank) what.note = `${what.note ?? ''} \u00b7 no crank`.replace(/^ \u00b7 /, '');
@@ -2393,6 +2423,7 @@ function frame() {
   panels.update();
   updateGround(delta);
   machines.update(delta);
+  updateFires(delta);
   // After the camera has moved this frame, so the tube is aimed from where
   // the eye actually is.
   cutaway.update(selectedAgent(), delta);
@@ -2413,7 +2444,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { takeBack, canWrenchUp, stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
+window.ESTER = { updateFires, takeBack, canWrenchUp, stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
   attachCrank, canAttach, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
   busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };

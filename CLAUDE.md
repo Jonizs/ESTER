@@ -83,8 +83,9 @@ with one inhabitant who walks around and works on what is there.
   - `src/machines.js` - the water works: pipes joining themselves up, water
     running down them, sprinklers and their crank, and the guide a machine
     draws on the isle while it is placed or turned.
-  - `src/stations.js` - the screen a chest or a mill opens: the chest's 16
-    slots, the mill's wheat-in / flour-out and its CRANK button.
+  - `src/stations.js` - the screen a chest, a mill or a campfire opens: the
+    chest's 16 slots, the mill's wheat-in / flour-out and its CRANK button,
+    the fire's time left with LIGHT and ADD LOG.
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/save.js` - the run, written down and read back on launch.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
@@ -1261,6 +1262,19 @@ with one inhabitant who walks around and works on what is there.
   is greyed out (no crank, no wheat, nobody selected) instead of a toast.
   A mill faces a way only so its crank side can be chosen; its guide shows
   the crank side and nothing else, since it has no water port.
+
+- **A campfire is lit from its screen, not by an agent.** A plain click
+  opens it (a screen, so nobody need be selected). LIGHT uses one use of a
+  flint striker out of the inventory - a `uses: 2` tool nobody wields, worn
+  most-worn-first like every other - and sets `prop.burning` to three
+  minutes. ADD LOG (or clicking wood in the stock row) takes one wood and
+  adds two, up to `maxLogs` (10) on top of the lighting, 23 minutes at most.
+  `updateFires` in `main.js` burns it down off the frame delta and at zero it
+  is simply out: nothing re-lights it but another striker. `PROP_KINDS
+  .campfire.burns` holds every number. The flames are emissive boxes kept at
+  0.55 - at 1.6 the tone mapping clipped them to one pale cream and the fire
+  read as a lamp - and they flicker while lit, which is the one idle motion
+  allowed, because a fire that does not move does not read as one.
 
 ## Commands
 

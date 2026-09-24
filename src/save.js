@@ -100,6 +100,7 @@ export function createSaves({
         if (prop.store) entry.store = prop.store.map((slot) => (slot ? { ...slot } : null));
         if (prop.grain !== undefined) entry.grain = prop.grain;
         if (prop.flour !== undefined) entry.flour = prop.flour;
+        if (prop.burning !== undefined) entry.burning = prop.burning;
         return entry;
       })
     };
@@ -174,6 +175,7 @@ export function createSaves({
         if (Array.isArray(entry.store)) extra.store = entry.store.map((slot) => (slot ? { ...slot } : null));
         if (entry.grain !== undefined) extra.grain = entry.grain;
         if (entry.flour !== undefined) extra.flour = entry.flour;
+        if (entry.burning !== undefined) extra.burning = entry.burning;
         const prop = spawnProp(entry.kind, entry, { surface, group: propsGroup, props, extra });
         onSpawn?.(prop);
         continue;

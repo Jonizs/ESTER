@@ -719,7 +719,39 @@ export const MATERIAL_ART = {
     + '<path d="M12 18.4v-6M12 13.4l-1.4-1.2M12 13.4l1.4-1.2M12 15.6l-1.4-1.2M12 15.6l1.4-1.2"'
     + ' fill="none" stroke="#c9a94e" stroke-width="1" stroke-linecap="round"/>'
       // a little spilled at its foot
-    + '<ellipse cx="20.2" cy="21" rx="2.4" ry="0.9" fill="#f4eee0" stroke="#5a4a2e" stroke-width="0.9"/>'
+    + '<ellipse cx="20.2" cy="21" rx="2.4" ry="0.9" fill="#f4eee0" stroke="#5a4a2e" stroke-width="0.9"/>',
+
+  // A campfire: two logs crossed at the foot, a ring of stones either side,
+  // and the flame standing up out of the middle - the flame is what says
+  // fire rather than a pile of wood.
+  campfire:
+      // the flame, drawn first so the logs cross in front of its foot
+      '<path d="M12 2.2c2.8 3 4.6 5.6 4.6 8.6a4.6 4.6 0 01-9.2 0c0-1.6.6-3 1.6-4.2.2 1.4.8 2.4 1.8 2.8-.4-2.6.2-5 1.2-7.2z"'
+    + ' fill="#ff7a1a" stroke="#7a2a06" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M12 7.6c1.4 1.4 2.2 2.8 2.2 4.2a2.2 2.2 0 01-4.4 0c0-1.4.8-2.8 2.2-4.2z" fill="#ffd660"/>'
+      // the logs, crossed
+    + '<path d="M3.6 18.8l15.2-5 1 2.8-15.2 5z" fill="#8a5c30" stroke="#2c1a0e" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<path d="M20.4 18.8L5.2 13.8l-1 2.8 15.2 5z" fill="#a8763f" stroke="#2c1a0e" stroke-width="1.15" stroke-linejoin="round"/>'
+    + '<ellipse cx="19.9" cy="20.2" rx="0.9" ry="1.3" fill="#e0b070" stroke="#2c1a0e" stroke-width="0.9"/>'
+      // stones at the ends
+    + '<path d="M1.2 21.6l.4-2.2 2-.6 1.2 1.6-.6 1.4z" fill="#9aa0ad" stroke="#2b313c" stroke-width="0.9" stroke-linejoin="round"/>'
+    + '<path d="M19.6 13.4l.6-1.8 1.8-.2.8 1.6-1 1.2z" fill="#8b929c" stroke="#2b313c" stroke-width="0.9" stroke-linejoin="round"/>',
+
+  // A flint striker: a knapped flint and the stone it is struck on, with
+  // sparks flying between them.
+  flintStriker:
+      // the stone, low and to the right
+      '<path d="M10.4 20.6l-.8-4.2 3-3.4 5.4-.4 3.4 3.8-1.2 4.2z" fill="#8b929c" stroke="#2b313c" stroke-width="1.2" stroke-linejoin="round"/>'
+    + '<path d="M12.6 13l5.4-.4 3.4 3.8-5 .6z" fill="#aab1bd"/>'
+    + '<path d="M10.4 20.6l-.8-4.2 3-3.4 5.4-.4 3.4 3.8-1.2 4.2z" fill="none" stroke="#2b313c" stroke-width="1.2" stroke-linejoin="round"/>'
+      // the flint, up and to the left, angled down at it
+    + '<path d="M2.6 8.2l4.4-5.4 4.6 2.4-1.2 5.8-5.2 1z" fill="#5a6478"/>'
+    + '<path d="M2.6 8.2l4.4-5.4 4.6 2.4-5.6 2.8z" fill="#8794ad"/>'
+    + '<path d="M2.6 8.2l4.4-5.4 4.6 2.4-1.2 5.8-5.2 1z" fill="none" stroke="#151a27" stroke-width="1.3" stroke-linejoin="round"/>'
+    + '<path d="M4 8.6l1.4-3" fill="none" stroke="#c3ccdd" stroke-width="1" stroke-linecap="round"/>'
+      // the sparks
+    + '<path d="M11.8 11.2l1.6-1.4M13.2 12.4l2.2-.6M10.6 12.6l.4 1.2M14.6 9.6l1-.8" fill="none" stroke="#ffc36e" stroke-width="1.3" stroke-linecap="round"/>'
+    + '<circle cx="16.4" cy="8.4" r="0.8" fill="#ffd660"/>'
 };
 
 /** An `<svg>` holding one of the glyphs above. */

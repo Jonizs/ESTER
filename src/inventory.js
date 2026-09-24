@@ -125,7 +125,15 @@ export const ITEMS = {
   chest: { label: 'Wooden Chest', tint: '#d9a866', plants: 'chest' },
   // A mill grinds wheat into flour, one for one, while its crank is turned.
   mill: { label: 'Basic Mill', tint: '#c8c0b0', plants: 'mill' },
-  flour: { label: 'Flour', tint: '#f4eee0' }
+  flour: { label: 'Flour', tint: '#f4eee0' },
+
+  // --- fire -----------------------------------------------------------------
+  // A campfire is laid on the isle like a station and lit from its screen.
+  campfire: { label: 'Campfire', tint: '#ff9f55', plants: 'campfire' },
+  // What lights it: flint struck on stone. Two strikes and it is worn out.
+  // It is a tool for the ledger's sake - worn one use at a time, most worn
+  // first - but nobody carries it: the campfire's LIGHT button uses one.
+  flintStriker: { label: 'Flint Striker', tint: '#ffc36e', uses: 2, serves: ['flintStriker'] }
 };
 
 /** Whether an item is worn down by use rather than spent outright. */

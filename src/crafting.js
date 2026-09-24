@@ -299,6 +299,27 @@ export const RECIPES = [
       5: 'cog', 6: 'cog', 7: 'cog',
       9: 'plank', 10: 'plank', 11: 'plank'
     }
+  },
+  {
+    // Logs laid along the bottom, a bed of fibre on them for tinder, and
+    // sticks leant up round the whole thing.
+    id: 'campfire',
+    label: 'Campfire',
+    item: 'campfire',
+    yield: 1,
+    slots: {
+      6: 'stick', 7: 'stick',
+      9: 'stick', 10: 'fibre', 11: 'fibre', 12: 'stick',
+      13: 'wood', 14: 'wood', 15: 'wood', 16: 'wood'
+    }
+  },
+  {
+    // A flint either side of a stone to strike them on.
+    id: 'flintStriker',
+    label: 'Flint Striker',
+    item: 'flintStriker',
+    yield: 1,
+    slots: { 1: 'flint', 2: 'stone', 3: 'flint' }
   }
 ];
 
