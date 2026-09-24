@@ -34,6 +34,37 @@ const octile = (ax, az, bx, bz) => {
 
 const chebyshev = (ax, az, bx, bz) => Math.max(Math.abs(ax - bx), Math.abs(az - bz));
 
+/**
+ * How far an agent reaches, in blocks up or down from the block at their
+ * feet (the one above the column they stand on). Anything they work - a
+ * block, a prop, a plot - has to be within this of where they stand as well
+ * as beside it, so a face three blocks down a pit wall is not dug from the
+ * rim: they have to go down to it.
+ */
+export const REACH = 2;
+
+/**
+ * Whether someone standing on a column of height `h` can reach `target`.
+ * A target with `y` is that block; one without is whatever stands on its
+ * column - a prop, in the block above the ground.
+ */
+export function withinReach(surface, h, target) {
+  const y = target.y ?? (surface.get(`${target.x},${target.z}`) ?? -Infinity) + 1;
+  return Math.abs(y - (h + 1)) <= REACH;
+}
+
+/** Whether there is anywhere beside `target` to stand and reach it from. */
+export function reachable(surface, target, blocked = EMPTY) {
+  for (const [dx, dz] of NEIGHBOURS) {
+    const x = target.x + dx;
+    const z = target.z + dz;
+    const h = surface.get(`${x},${z}`);
+    if (h === undefined || blocked.has(`${x},${z}`)) continue;
+    if (withinReach(surface, h, target)) return true;
+  }
+  return false;
+}
+
 export function findPath(surface, start, goal, { adjacent = false, blocked = EMPTY } = {}) {
   const targets = Array.isArray(goal) ? goal : [goal];
   if (targets.length === 0) return null;
@@ -62,8 +93,9 @@ export function findPath(surface, start, goal, { adjacent = false, blocked = EMP
 
   // Standing diagonally beside a prop counts as being next to it. With
   // several targets, reaching any one of them is arriving.
+  // And only from somewhere within `REACH` of it, up or down.
   const reached = (x, z) => targets.some((t) => (adjacent
-    ? chebyshev(x, z, t.x, t.z) === 1
+    ? chebyshev(x, z, t.x, t.z) === 1 && withinReach(surface, heightAt(x, z), t)
     : x === t.x && z === t.z));
 
   // The heuristic has to stay optimistic, so it measures to the nearest

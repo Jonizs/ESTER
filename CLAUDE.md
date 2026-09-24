@@ -228,10 +228,16 @@ with one inhabitant who walks around and works on what is there.
     dashed ring round the agent as wide on screen as the tube, fading with
     it. `#cutaway-badge` top right is always on screen - the key and ON/OFF
     - and glows while the cut is actually open (`body.cutaway-active`).
-  - Ground seen only THROUGH the cut cannot be worked. If the pointer's ray
-    passed through a block the cut threw away before landing, a shift click
-    is spent and does nothing, and brackets that would have gone green go
-    red (`HIGHLIGHT_REFUSED`) instead. Looking and walking are unaffected.
+  - A FAKE block cannot be worked. If the pointer's ray passed through a
+    block the cut threw away before landing AND the block it landed on is
+    buried on every side (`fakeBlock` in `main.js`, `isExposed` false) - a
+    block only the X-ray shows - a shift click is spent and does nothing,
+    and brackets that would have gone green go red (`HIGHLIGHT_REFUSED`). A
+    block open to the air anywhere is real, and ANY of its faces works,
+    including one still against the ground and only seen through the cut.
+    Refusing everything seen through the cut was the first version, and
+    judging by the face under the cursor was the second; both were wrong.
+    Looking and walking are unaffected.
   - The ISLE loses WHOLE BLOCKS. Only the isle's instanced meshes are
     patched, and the shader tests each block's CENTRE against a tube from
     the eye to the agent's chest, throwing the entire block away if it is in
@@ -467,6 +473,11 @@ with one inhabitant who walks around and works on what is there.
   while the brackets (cast at the isle alone) sat on the block under the
   cursor. The rings now refuse rays outright as well. Anything else added to
   the scene that is only dressing wants `raycast = () => {}` the same way.
+- **A plain click only walks to the TOP of a column.** The face hit has to
+  point up and belong to the column's top block; a click on the side of a
+  wall, or on the floor of a hole under an overhang, does nothing - it used
+  to send the agent to the top of whichever column the wall belonged to.
+  Shift-work on a wall face is unaffected.
 - **Which block a ray hit is read off the FACE, not the point.** The hit
   point is on the surface, so rounding it is a coin toss at every face.
   `blockAt` in `main.js` steps a hair back along the face's own normal
@@ -662,6 +673,16 @@ with one inhabitant who walks around and works on what is there.
   quiet: swapping a shovel for a hoe mid-walk wore the *hoe* down for the
   shovel's dig, because the job's `then` read whatever was in hand at the
   end.
+- **Reach is 2 blocks, up or down, for everything.** An adjacent job only
+  counts as arrived at from a cell whose feet block (column top + 1) is
+  within `REACH` of the thing worked - `withinReach` in `path.js`, applied
+  inside `findPath`'s `reached`, so every prop job and every `doAt` job
+  obeys it and A* looks for a standing cell that is close enough. A target
+  with `y` is that block; a prop is the block above its column. So a pit
+  one column wide can be dug two deep from the rim and no further - the
+  agent has to get down into it, or dig steps. `canDig` asks `reachable`
+  (any cell beside it within reach) as well, which keeps the green brackets
+  honest without running A* every frame.
 - **Ground work is done from BESIDE the cell, never on top of it.**
   `doAt` takes `adjacent`, and tilling, reaping, putting a plot back and
   watering all pass it. An agent standing on the plot they have just made is

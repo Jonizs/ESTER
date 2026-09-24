@@ -10,7 +10,7 @@ import {
   GROUND_OFFSET, FARMLAND_SINK, FARMLAND_SOIL, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
-import { findPath } from './path.js';
+import { findPath, reachable } from './path.js';
 import { createMarkers } from './markers.js';
 import { createSettings, keyLabel } from './settings.js';
 import { createMenu } from './menu.js';
@@ -428,6 +428,11 @@ function canDig(agent, cell) {
 
   const drop = tool.digs[island.userData.layerAt(cell.x, y, cell.z)];
   if (!drop) return null;
+
+  // Somewhere beside it within reach to stand and swing from - a face deep
+  // down a pit wall is not dug from the rim. The brackets ask this too, so
+  // they stay white over a block nobody could get at.
+  if (!reachable(surface, { x: cell.x, y, z: cell.z }, blocked)) return null;
 
   // Not out from under anything: a prop standing on it would be left in the
   // air, and an agent standing on it would be too. Only the top block is
@@ -1587,9 +1592,9 @@ function handleClick(event) {
       // whatever is already on rather than instead of it. Shift and ctrl
       // together is a whole field tilled in one pass.
       if (tilling(event)) {
-        // Ground seen through the X-ray is not ground anyone can get at:
-        // the brackets go red over it and the click is spent.
-        if (throughCut) return;
+        // A buried block only the X-ray shows is not one anyone can get
+        // at: the brackets go red over it and the click is spent.
+        if (throughCut && fakeBlock(hit)) return;
         const q = queueing(event);
         // A hoe works the top of a column only; a face of a cliff is a
         // shovel's or a pickaxe's.
@@ -1601,6 +1606,12 @@ function handleClick(event) {
       // the queue alone rather than calling the whole thing off and walking
       // there. Walking is never queued: it is what CALLS a queue off.
       if (queueing(event)) return;
+      // Only the TOP of a column is somewhere to walk to. A click on the
+      // side of a wall - or on the floor of a hole dug under an overhang -
+      // is not a place anyone can stand, so it does nothing at all rather
+      // than sending them to whatever column the wall belongs to.
+      const normal = hit.normal ?? hit.face?.normal;
+      if (!normal || normal.y < 0.5 || y !== surface.get(`${x},${z}`)) return;
       if (agent.walkTo({ x, z })) markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
       return;
     }
@@ -2377,8 +2388,9 @@ function updateLookAt() {
   const groundHits = raycaster.intersectObject(island, true);
   const ground = seen(groundHits);
   if (!ground) { lookAt.show(null); highlight.hide(); return; }
-  // Seen only because the cut took the blocks in front of it away.
-  const xray = ground !== groundHits[0];
+  // A block only on screen because the cut took the blocks in front of it
+  // away - and one that is really buried, not just behind the hill.
+  const xray = ground !== groundHits[0] && fakeBlock(ground);
 
   lookAt.show(describeGround(ground));
 
@@ -2398,6 +2410,18 @@ function updateLookAt() {
   const armed = armedOn(block);
   highlight.showCell(block.x, block.y, block.z,
     armed ? (xray ? HIGHLIGHT_REFUSED : HIGHLIGHT_WORK) : HIGHLIGHT_PLAIN);
+}
+
+/**
+ * Whether the block a ray landed on is FAKE: buried on every side, so only
+ * the X-ray is showing it. Which face was hit does not matter - a block that
+ * is open to the air anywhere is real, and a click on any of its faces,
+ * even one still pressed against the ground and only seen through the cut,
+ * works it.
+ */
+function fakeBlock(hit) {
+  const block = blockAt(hit);
+  return !island.userData.isExposed(block.x, block.y, block.z);
 }
 
 /** Would a shift click on this cell do anything, for whoever is selected? */
