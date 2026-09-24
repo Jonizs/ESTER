@@ -10,7 +10,7 @@ import {
   GROUND_OFFSET, FARMLAND_SINK, FARMLAND_SOIL, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
-import { findPath } from './path.js';
+import { findPath, reachable } from './path.js';
 import { createMarkers } from './markers.js';
 import { createSettings, keyLabel } from './settings.js';
 import { createMenu } from './menu.js';
@@ -427,6 +427,11 @@ function canDig(agent, cell) {
 
   const drop = tool.digs[island.userData.layerAt(cell.x, y, cell.z)];
   if (!drop) return null;
+
+  // Somewhere beside it within reach to stand and swing from - a face deep
+  // down a pit wall is not dug from the rim. The brackets ask this too, so
+  // they stay white over a block nobody could get at.
+  if (!reachable(surface, { x: cell.x, y, z: cell.z }, blocked)) return null;
 
   // Not out from under anything: a prop standing on it would be left in the
   // air, and an agent standing on it would be too. Only the top block is
@@ -1410,9 +1415,9 @@ function handleClick(event) {
       // whatever is already on rather than instead of it. Shift and ctrl
       // together is a whole field tilled in one pass.
       if (tilling(event)) {
-        // A face only the X-ray shows is not one anyone can get at: the
-        // brackets go red over it and the click is spent.
-        if (throughCut && fakeFace(hit)) return;
+        // A buried block only the X-ray shows is not one anyone can get
+        // at: the brackets go red over it and the click is spent.
+        if (throughCut && fakeBlock(hit)) return;
         const q = queueing(event);
         // A hoe works the top of a column only; a face of a cliff is a
         // shovel's or a pickaxe's.
@@ -2186,9 +2191,9 @@ function updateLookAt() {
   const groundHits = raycaster.intersectObject(island, true);
   const ground = seen(groundHits);
   if (!ground) { lookAt.show(null); highlight.hide(); return; }
-  // A face only on screen because the cut took the blocks in front of it
+  // A block only on screen because the cut took the blocks in front of it
   // away - and one that is really buried, not just behind the hill.
-  const xray = ground !== groundHits[0] && fakeFace(ground);
+  const xray = ground !== groundHits[0] && fakeBlock(ground);
 
   lookAt.show(describeGround(ground));
 
@@ -2211,18 +2216,15 @@ function updateLookAt() {
 }
 
 /**
- * Whether the face a ray landed on is FAKE: the block across it is still
- * there, so the face is buried and only the X-ray is showing it. Seeing a
- * block through the cut is not enough to refuse it - one already dug round
- * has a real face open to the air, and that is a block that can be worked
- * however it is being looked at.
+ * Whether the block a ray landed on is FAKE: buried on every side, so only
+ * the X-ray is showing it. Which face was hit does not matter - a block that
+ * is open to the air anywhere is real, and a click on any of its faces,
+ * even one still pressed against the ground and only seen through the cut,
+ * works it.
  */
-function fakeFace(hit) {
-  const normal = hit.normal ?? hit.face?.normal;
-  if (!normal) return true;
+function fakeBlock(hit) {
   const block = blockAt(hit);
-  return island.userData.isSolid(
-    block.x + Math.round(normal.x), block.y + Math.round(normal.y), block.z + Math.round(normal.z));
+  return !island.userData.isExposed(block.x, block.y, block.z);
 }
 
 /** Would a shift click on this cell do anything, for whoever is selected? */

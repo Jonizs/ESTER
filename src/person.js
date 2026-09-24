@@ -335,7 +335,9 @@ export class Person {
   _doAt(target, { seconds = 1, action = null, then = null, adjacent = false, tick = null, face = null } = {}) {
     const cells = target.kind
       ? footprintCells(target.kind, target)
-      : [{ x: target.x, z: target.z }];
+      // The block itself, for the reach: the one given, or the top of the
+      // column - a job on a bare cell works its ground.
+      : [{ x: target.x, y: target.y ?? this.surface.get(`${target.x},${target.z}`), z: target.z }];
     if (!this.goTo(cells, { adjacent })) return false;
 
     this.task = {
