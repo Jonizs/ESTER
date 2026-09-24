@@ -72,6 +72,16 @@
          src/selectbox.js; it is hidden whenever nothing is being dragged. -->
     <div id="select-box" hidden></div>
 
+    <!-- The see-through camera's switch, top right, always on screen: which
+         key it is and whether it is on. Lit brighter while it is actually
+         cutting something away. -->
+    <div id="cutaway-badge"><b data-help="toggleCutaway"></b> See-through camera <span class="cutaway-state"></span></div>
+
+    <!-- The x-ray window: a dashed ring round the selected agent while the
+         cut is open, so what is missing from the picture reads as the camera
+         looking through it rather than the isle really having a hole. -->
+    <div id="xray-ring" hidden><span>X-RAY</span></div>
+
     <div id="help" hidden>
       <div><b>Right drag</b> &mdash; orbit</div>
       <div><b>Left drag</b> &mdash; box select</div>

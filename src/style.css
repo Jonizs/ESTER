@@ -2531,6 +2531,79 @@ body.free-camera .hint-free b { color: var(--accent); }
 #help .cutaway-state::after { content: '(on)'; color: var(--accent); }
 body.cutaway-off #help .cutaway-state::after { content: '(off)'; color: var(--dim); }
 
+/* --- the see-through camera ------------------------------------------------
+   Its switch, top right, and the ring it draws round the agent while it is
+   cutting. Neither takes a click. */
+
+#cutaway-badge {
+  position: fixed;
+  top: 14px;
+  right: 18px;
+  z-index: 6;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: rgba(6, 5, 18, 0.74);
+  backdrop-filter: blur(6px);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  pointer-events: none;
+  user-select: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#cutaway-badge b {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid rgba(233, 241, 255, 0.25);
+  color: var(--ink);
+  font-weight: 600;
+  text-align: center;
+}
+
+#cutaway-badge .cutaway-state { font-weight: 700; }
+#cutaway-badge .cutaway-state::after { content: 'ON'; color: var(--accent); }
+body.cutaway-off #cutaway-badge .cutaway-state::after { content: 'OFF'; color: var(--dim); }
+
+/* Actually cutting something away right now. */
+body.cutaway-active #cutaway-badge {
+  border-color: var(--accent);
+  box-shadow: 0 0 16px rgba(122, 215, 255, 0.35);
+  color: var(--ink);
+}
+
+#xray-ring {
+  position: fixed;
+  z-index: 2;
+  border-radius: 50%;
+  border: 2px dashed rgba(122, 215, 255, 0.75);
+  box-shadow: 0 0 22px rgba(122, 215, 255, 0.25), inset 0 0 22px rgba(122, 215, 255, 0.18);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+}
+
+#xray-ring[hidden] { display: none; }
+
+#xray-ring span {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: rgba(6, 5, 18, 0.85);
+  border: 1px solid rgba(122, 215, 255, 0.6);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+}
+
 
 /* --- a station's screen: a chest's store, a mill's hopper ------------------
    The same pane as every other screen - nebula wash, stars, ice-blue edge -

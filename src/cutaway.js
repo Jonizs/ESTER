@@ -44,13 +44,19 @@ const CHEST = 0.9;           // the height on the agent the tube is aimed at
 const OPEN_RATE = 16;        // blocks of radius a second, growing or shrinking
 const LINGER = 0.35;         // seconds it stays open once they are back in view
 const HIDDEN_LAYER = 1;      // a layer nothing renders or picks from
+const RIM = 1.1;             // how far past the cut the rim glaze reaches, in blocks
+const RIM_STRENGTH = 0.32;   // how far the block right at the edge of the cut is washed toward the rim colour
+// The ice-blue accent, in the linear space the lighting is worked in.
+const RIM_COLOUR = new THREE.Color(0x7ad7ff);
 
 export function createCutaway({ island, propsGroup, props, camera }) {
   const uniforms = {
     uCutEye: { value: new THREE.Vector3() },
     uCutAt: { value: new THREE.Vector3() },
     uCutRadius: { value: 0 },
-    uCutKeep: { value: new THREE.Vector3(0, -1e9, 0) }
+    uCutKeep: { value: new THREE.Vector3(0, -1e9, 0) },
+    uCutFull: { value: RADIUS },
+    uCutRim: { value: RIM_COLOUR }
   };
 
   // Off with G. When off nothing is ever cut or hidden, whoever is selected.
@@ -96,18 +102,31 @@ export function createCutaway({ island, propsGroup, props, camera }) {
           uniform vec3 uCutEye;
           uniform vec3 uCutAt;
           uniform float uCutRadius;
-          uniform vec3 uCutKeep;`)
+          uniform vec3 uCutKeep;
+          uniform float uCutFull;
+          uniform vec3 uCutRim;`)
         .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+          float cutGlaze = 0.0;
           if ( uCutRadius > 0.001 ) {
             vec3 cutAxis = uCutAt - uCutEye;
             float cutLen = length( cutAxis );
             vec3 cutDir = cutAxis / cutLen;
             vec3 cutRel = vCutWorld - uCutEye;
             float cutT = dot( cutRel, cutDir );
-            if ( distance( vCutWorld, uCutKeep ) > 0.3
-                 && cutT > 0.0 && cutT < cutLen - ${SHORT_OF.toFixed(2)}
-                 && length( cutRel - cutDir * cutT ) < uCutRadius ) discard;
-          }`);
+            float cutOff = length( cutRel - cutDir * cutT );
+            bool cutAlong = cutT > 0.0 && cutT < cutLen - ${SHORT_OF.toFixed(2)};
+            if ( distance( vCutWorld, uCutKeep ) > 0.3 && cutAlong && cutOff < uCutRadius ) discard;
+            // The blocks left standing round the edge of the hole are glazed
+            // ice blue, strongest right at the edge - so the hole reads as a
+            // window the camera has cut, not as the isle really being open.
+            // The block the agent stands on is left its own colour.
+            if ( cutAlong && cutOff >= uCutRadius && cutOff < uCutRadius + ${RIM.toFixed(2)} ) {
+              cutGlaze = ${RIM_STRENGTH.toFixed(2)} * ( 1.0 - ( cutOff - uCutRadius ) / ${RIM.toFixed(2)} )
+                * clamp( uCutRadius / uCutFull, 0.0, 1.0 );
+            }
+          }`)
+        .replace('#include <opaque_fragment>', `outgoingLight = mix( outgoingLight, uCutRim, cutGlaze );
+          #include <opaque_fragment>`);
     };
     // Every patched material compiles to the same extra code, so they can
     // share programs with each other - just not with unpatched ones.
@@ -159,25 +178,44 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     return ray.intersectObject(propsGroup, true).some((hit) => !hit.object.userData.isHitPad);
   }
 
-  // Head, chest, feet and both shoulders, relative to where they stand.
-  const MARKS = [[0, 1.45, 0], [0, 0.9, 0], [0, 0.2, 0], [0.28, 0.9, 0], [-0.28, 0.9, 0]];
+  // A grid over the agent: three across (left side, middle, right side of
+  // the body as the camera sees it) by six up, feet to the crown of the head
+  // (the head runs 1.06 to 1.42). Relative to where they stand.
+  const ACROSS = [-0.2, 0, 0.2];
+  const UP = [0.12, 0.36, 0.6, 0.84, 1.12, 1.34];
+  // The cut opens once no more than this many of the 18 points can be seen -
+  // a sliver of the head over a ridge is 1 to 3, and only the feet covered
+  // leaves 12. It stays open until more than `SHOW_KEEP` can be seen, so
+  // standing right on the line does not flick it open and shut.
+  const SHOW_OPEN = 4;
+  const SHOW_KEEP = 6;
   const mark = new THREE.Vector3();
   const side = new THREE.Vector3();
 
   /**
-   * Whether the agent is FULLY out of sight - every one of a handful of
-   * points on them, head to feet and shoulder to shoulder, blocked. A cut
-   * that opened the moment a ridge hid their feet took the scenery away
-   * while the agent was still plainly standing there.
+   * Whether the agent is as good as out of sight. It used to wait for every
+   * point on them to be blocked, head to feet, and so a sliver of the crown
+   * showing over a ridge kept the cut shut with the agent all but invisible.
+   * Opening the moment their feet were covered was the other way wrong - the
+   * scenery went while they were plainly in view - so it counts how much of
+   * them can be seen and opens once that is only a scrap.
    */
-  function hidden(agent) {
+  function hidden(agent, open) {
     const base = agent.mesh.position;
-    // "Sideways" is across the line of sight, so the shoulders are the ones
-    // the camera would actually see either side of them.
+    // "Sideways" is across the line of sight, so the sides are the ones the
+    // camera would actually see either side of them.
     side.subVectors(base, eye).setY(0);
     if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
     side.normalize().set(-side.z, 0, side.x);
-    return MARKS.every(([s, y]) => blockedTo(mark.copy(base).addScaledVector(side, s).setY(base.y + y)));
+    const allowed = open ? SHOW_KEEP : SHOW_OPEN;
+    let seen = 0;
+    for (const y of UP) {
+      for (const s of ACROSS) {
+        if (blockedTo(mark.copy(base).addScaledVector(side, s).setY(base.y + y))) continue;
+        if (++seen > allowed) return false;
+      }
+    }
+    return true;
   }
 
   // --- the props in the way -------------------------------------------------
@@ -228,17 +266,56 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     return inWay;
   }
 
+  // A hidden prop leaves a GHOST behind: its edges, faint and ice blue, the
+  // same colour as the glaze round the hole. A tree that simply vanished
+  // looked felled; one drawn as a wire outline reads at once as "still
+  // there, only see-through for now". The ghosts hang off the scene rather
+  // than the props group, so nothing that walks the props ever meets one,
+  // and they refuse rays like every other piece of dressing.
+  const ghostMaterial = new THREE.LineBasicMaterial({
+    color: RIM_COLOUR, transparent: true, opacity: 0.4, depthWrite: false
+  });
+  const ghosts = new Map();
+  const noRay = () => {};
+
+  function ghostOf(prop) {
+    const group = new THREE.Group();
+    prop.mesh.updateWorldMatrix(true, true);
+    prop.mesh.traverse((o) => {
+      if (!o.isMesh || o.userData.isHitPad || o.material?.visible === false) return;
+      const lines = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 30), ghostMaterial);
+      lines.matrixAutoUpdate = false;
+      lines.matrix.copy(o.matrixWorld);
+      lines.raycast = noRay;
+      group.add(lines);
+    });
+    group.raycast = noRay;
+    return group;
+  }
+
+  function dropGhost(prop) {
+    const group = ghosts.get(prop);
+    if (!group) return;
+    group.removeFromParent();
+    group.traverse((o) => o.geometry?.dispose());
+    ghosts.delete(prop);
+  }
+
   /** Hide exactly `wanted`, bringing back anything no longer in it. */
   function hideOnly(wanted) {
     for (const prop of hiddenProps) {
       if (wanted.has(prop)) continue;
       putOn(prop, 0);
       hiddenProps.delete(prop);
+      dropGhost(prop);
     }
     for (const prop of wanted) {
       if (hiddenProps.has(prop)) continue;
       putOn(prop, HIDDEN_LAYER);
       hiddenProps.add(prop);
+      const ghost = ghostOf(prop);
+      (propsGroup.parent ?? propsGroup).add(ghost);
+      ghosts.set(prop, ghost);
     }
   }
 
@@ -261,7 +338,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
       const kx = Math.round(agent.x);
       const kz = Math.round(agent.z);
       uniforms.uCutKeep.value.set(kx, island.userData.surface.get(`${kx},${kz}`) ?? -1e9, kz);
-      if (hidden(agent)) linger = LINGER;
+      if (hidden(agent, radius > 0.001)) linger = LINGER;
       else linger = Math.max(0, linger - dt);
       if (linger > 0) want = RADIUS;
     } else {
@@ -322,6 +399,10 @@ export function createCutaway({ island, propsGroup, props, camera }) {
       return enabled;
     },
     get radius() { return radius; },
+    /** How far open the cut is, 0 to 1 - what the on-screen ring fades with. */
+    get openness() { return radius / RADIUS; },
+    /** The tube's radius when fully open, in blocks. */
+    fullRadius: RADIUS,
     /** The props hidden right now, for anything that needs to know. */
     isHidden: (prop) => hiddenProps.has(prop)
   };

@@ -17,7 +17,7 @@ import { createMenu } from './menu.js';
 import { createPanels } from './panels.js';
 import { createCrafting } from './crafting.js';
 import { createLookAt, propName } from './lookat.js';
-import { createHighlight, HIGHLIGHT_PLAIN, HIGHLIGHT_WORK } from './highlight.js';
+import { createHighlight, HIGHLIGHT_PLAIN, HIGHLIGHT_WORK, HIGHLIGHT_REFUSED } from './highlight.js';
 import { createCutaway } from './cutaway.js';
 import { createWield } from './wield.js';
 import { createPlacement } from './placement.js';
@@ -414,19 +414,30 @@ function canDig(agent, cell) {
   const tool = holding(agent, (t) => t.digs);
   if (!tool) return null;
 
-  const y = surface.get(`${cell.x},${cell.z}`);
-  if (y === undefined) return null;
+  const top = surface.get(`${cell.x},${cell.z}`);
+  if (top === undefined) return null;
+
+  // The block pointed at, not always the top of its column: a face of a
+  // cliff can be dug straight out without clearing everything over it
+  // first. It has to be there, and open to the air somewhere, or it is not
+  // a block anyone can get a tool to.
+  const y = cell.y ?? top;
+  if (!island.userData.isSolid(cell.x, y, cell.z)) return null;
+  if (y !== top && !island.userData.isExposed(cell.x, y, cell.z)) return null;
 
   const drop = tool.digs[island.userData.layerAt(cell.x, y, cell.z)];
   if (!drop) return null;
 
   // Not out from under anything: a prop standing on it would be left in the
-  // air, and an agent standing on it would be too.
-  if (props.some((p) => !p.gone && footprintCells(p.kind, p)
-    .some((c) => c.x === cell.x && c.z === cell.z))) return null;
-  if (agents.some((a) => Math.round(a.x) === cell.x && Math.round(a.z) === cell.z)) return null;
+  // air, and an agent standing on it would be too. Only the top block is
+  // stood on; one out of the side of the column is not.
+  if (y === top) {
+    if (props.some((p) => !p.gone && footprintCells(p.kind, p)
+      .some((c) => c.x === cell.x && c.z === cell.z))) return null;
+    if (agents.some((a) => Math.round(a.x) === cell.x && Math.round(a.z) === cell.z)) return null;
+  }
 
-  return { tool, drop };
+  return { tool, drop, y };
 }
 
 function digGround(agent, cell, queue = false) {
@@ -446,7 +457,7 @@ function digGround(agent, cell, queue = false) {
       const now = canDig(agent, cell);
       if (!now) return;
 
-      if (!island.userData.digBlock(cell.x, cell.z)) return;
+      if (!island.userData.digBlock(cell.x, cell.z, now.y)) return;
       inventory.add(now.drop, 1);
       wearTool(agent, 1);
       // Everything that reads the heightmap has to be told it moved.
@@ -1078,7 +1089,7 @@ function devReset() {
 // The corner hints name whatever the keys are bound to now, so rebinding
 // something does not leave the help lying about it.
 function showBindingsInHelp() {
-  for (const slot of document.querySelectorAll('#help [data-help]')) {
+  for (const slot of document.querySelectorAll('#help [data-help], #cutaway-badge [data-help]')) {
     slot.textContent = keyLabel(settings.bindings[slot.dataset.help]);
   }
 }
@@ -1279,10 +1290,13 @@ function handleClick(event) {
     return;
   }
 
+  // Whether the click has already passed through a block the cut threw
+  // away - anything behind that is only on screen because of the X-ray.
+  let throughCut = false;
   for (const hit of raycaster.intersectObject(scene, true)) {
     // A face the X-ray cut has thrown away is not on screen, so a click
     // goes through it to whatever is - the agent in the hole, most likely.
-    if (cutaway.hidesHit(hit)) continue;
+    if (cutaway.hidesHit(hit)) { throughCut = true; continue; }
     let object = hit.object;
     while (object) {
       // An agent: select that one and show its stats. `userData.person` is
@@ -1378,7 +1392,7 @@ function handleClick(event) {
     // read off the face rather than the point, so clicking the side of a
     // ledge means that block and not the column standing in front of it -
     // the same answer the cursor's own brackets are drawn around.
-    const { x, z } = blockAt(hit);
+    const { x, y, z } = blockAt(hit);
     if (surface.has(`${x},${z}`)) {
       const agent = selectedAgent();
       if (!agent) return;
@@ -1396,8 +1410,14 @@ function handleClick(event) {
       // whatever is already on rather than instead of it. Shift and ctrl
       // together is a whole field tilled in one pass.
       if (tilling(event)) {
+        // Ground seen through the X-ray is not ground anyone can get at:
+        // the brackets go red over it and the click is spent.
+        if (throughCut) return;
         const q = queueing(event);
-        tillGround(agent, { x, z }, q) || digGround(agent, { x, z }, q);
+        // A hoe works the top of a column only; a face of a cliff is a
+        // shovel's or a pickaxe's.
+        const onTop = y === surface.get(`${x},${z}`);
+        (onTop && tillGround(agent, { x, z }, q)) || digGround(agent, { x, y, z }, q);
         return;
       }
       // Ctrl on its own is the queue gesture, so a miss with it held leaves
@@ -1641,6 +1661,34 @@ function updateLabel() {
 
   label.style.left = `${(labelPos.x * 0.5 + 0.5) * window.innerWidth}px`;
   label.style.top = `${(-labelPos.y * 0.5 + 0.5) * window.innerHeight}px`;
+}
+
+// --- the x-ray window ------------------------------------------------------
+
+// A dashed ring round the agent while the see-through camera is cutting, as
+// wide on screen as the tube is at their distance, fading with it. What the
+// camera has taken out of the picture is then plainly the camera looking
+// through, not the isle really standing open.
+const xrayRing = document.getElementById('xray-ring');
+const xrayAt = new THREE.Vector3();
+function updateXrayRing(agent) {
+  const open = agent ? cutaway.openness : 0;
+  document.body.classList.toggle('cutaway-active', open > 0.01);
+  if (open <= 0.01) { xrayRing.hidden = true; return; }
+
+  xrayAt.copy(agent.mesh.position);
+  xrayAt.y += 0.9;
+  const distance = xrayAt.distanceTo(camera.position);
+  xrayAt.project(camera);
+  if (xrayAt.z >= 1) { xrayRing.hidden = true; return; }
+
+  const perBlock = window.innerHeight / (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+  const size = 2 * cutaway.radius * perBlock;
+  xrayRing.hidden = false;
+  xrayRing.style.left = `${(xrayAt.x * 0.5 + 0.5) * window.innerWidth}px`;
+  xrayRing.style.top = `${(-xrayAt.y * 0.5 + 0.5) * window.innerHeight}px`;
+  xrayRing.style.width = xrayRing.style.height = `${size}px`;
+  xrayRing.style.opacity = Math.min(1, open);
 }
 
 // --- hovering a placed station ------------------------------------------
@@ -2129,8 +2177,11 @@ function updateLookAt() {
     return;
   }
 
-  const ground = seen(raycaster.intersectObject(island, true));
+  const groundHits = raycaster.intersectObject(island, true);
+  const ground = seen(groundHits);
   if (!ground) { lookAt.show(null); highlight.hide(); return; }
+  // Seen only because the cut took the blocks in front of it away.
+  const xray = ground !== groundHits[0];
 
   lookAt.show(describeGround(ground));
 
@@ -2145,7 +2196,11 @@ function updateLookAt() {
   const fill = carryTargetAt(block);
   if (fill) { highlight.showCell(fill.x, fill.y, fill.z, HIGHLIGHT_WORK); return; }
 
-  highlight.showCell(block.x, block.y, block.z, armedOn(block) ? HIGHLIGHT_WORK : HIGHLIGHT_PLAIN);
+  // Through the X-ray a block can be looked at but not worked: what would
+  // have lit green lights red, and the click is refused the same way.
+  const armed = armedOn(block);
+  highlight.showCell(block.x, block.y, block.z,
+    armed ? (xray ? HIGHLIGHT_REFUSED : HIGHLIGHT_WORK) : HIGHLIGHT_PLAIN);
 }
 
 /** Would a shift click on this cell do anything, for whoever is selected? */
@@ -2153,7 +2208,8 @@ function armedOn(cell) {
   if (!shiftHeld) return false;
   const agent = selectedAgent();
   if (!agent) return false;
-  return canTill(agent, cell) || !!canDig(agent, cell);
+  const onTop = cell.y === undefined || cell.y === surface.get(`${cell.x},${cell.z}`);
+  return (onTop && canTill(agent, cell)) || !!canDig(agent, cell);
 }
 
 /**
@@ -2433,6 +2489,7 @@ function frame() {
   // After the camera has moved this frame, so the tube is aimed from where
   // the eye actually is.
   cutaway.update(selectedAgent(), delta);
+  updateXrayRing(selectedAgent());
   updateLookAt();
   crafting.update();
   stations.update();

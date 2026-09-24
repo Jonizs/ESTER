@@ -18,6 +18,9 @@ const GROW = 0.02;       // stand the box off the surface so it never z-fights
 
 export const HIGHLIGHT_PLAIN = 0xffffff;
 export const HIGHLIGHT_WORK = 0x9ae66e;
+// Would work here, but is being refused - a block only seen through the
+// see-through camera's cut.
+export const HIGHLIGHT_REFUSED = 0xff5a5a;
 
 export function createHighlight(scene) {
   // 8 corners x 3 arms x 2 ends x 3 floats.
