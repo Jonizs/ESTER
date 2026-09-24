@@ -219,9 +219,22 @@ export function createIsland() {
   // Is this block coordinate inside the isle? Every column is solid from its
   // bottom to its top, so the columns map answers it without a voxel set.
   // The camera uses it to keep itself out of the ground.
+  //
+  // Not quite solid any more: a block dug out of the SIDE of a column - a
+  // face of a cliff, with blocks still standing over it - leaves a hole
+  // below the top, and `holes` is the list of them. The top of a column is
+  // always its highest block that is still there.
+  const holes = new Set();
   group.userData.isSolid = (x, y, z) => {
     const column = columns.get(`${x},${z}`);
-    return !!column && y >= column.bottom && y <= column.top;
+    return !!column && y >= column.bottom && y <= column.top && !holes.has(key(x, y, z));
+  };
+
+  /** Whether any face of this block is open to the air - somewhere to dig at it from. */
+  group.userData.isExposed = (x, y, z) => {
+    const solid = group.userData.isSolid;
+    return !solid(x + 1, y, z) || !solid(x - 1, y, z) || !solid(x, y + 1, z)
+      || !solid(x, y - 1, z) || !solid(x, y, z + 1) || !solid(x, y, z - 1);
   };
 
   /** What a block is made of: 'grass', 'dirt', 'stone', 'bedrock'. */
@@ -314,14 +327,13 @@ export function createIsland() {
     return true;
   };
 
-  group.userData.digBlock = (x, z) => {
+  group.userData.digBlock = (x, z, y = columns.get(`${x},${z}`)?.top) => {
     const column = columns.get(`${x},${z}`);
     if (!column) return null;
-    // Never punch through: a column keeps its last block whatever is done
+    // Never punch through: a column keeps its bottom block whatever is done
     // to it, so the isle can be dug into but not dug away.
-    if (column.top <= column.bottom) return null;
+    if (y <= column.bottom || y > column.top || holes.has(key(x, y, z))) return null;
 
-    const y = column.top;
     const found = blocks.get(key(x, y, z));
     if (!found) return null;
 
@@ -337,12 +349,23 @@ export function createIsland() {
     // still in `blocks`, scaled to nothing, so `fillBlock` has something to
     // put back. There is no instance above the isle's original surface, so
     // a hole can be filled and the isle cannot be built up.
+    group.userData.blockCount -= 1;
+
+    // A block out of the side of a column, with more standing over it: the
+    // column keeps its height and is left with a hole in it.
+    if (y < column.top) {
+      holes.add(key(x, y, z));
+      return found.layer;
+    }
+
+    // Off the top: the column comes down to the next block that is still
+    // there, past any holes dug into its side below.
     column.top = y - 1;
+    while (column.top > column.bottom && holes.has(key(x, column.top, z))) column.top -= 1;
     // Whatever was pressed down here is gone with it, so there is nothing
     // left to let back up.
     sunk.delete(`${x},${z}`);
     surface.set(`${x},${z}`, column.top);
-    group.userData.blockCount -= 1;
     return found.layer;
   };
 
@@ -385,6 +408,9 @@ export function createIsland() {
     }
     found.layer = layer;
 
+    // It may have been a hole in the side of the column once, before the
+    // blocks over it were dug off too.
+    holes.delete(key(x, y, z));
     column.top = y;
     surface.set(`${x},${z}`, y);
     group.userData.blockCount += 1;

@@ -66,7 +66,7 @@ const FRESH_STATS = {
  * `at` is on both of them because that is what "nearest first" measures.
  */
 const propJob = (prop) => ({ prop, target: null, opts: null, at: { x: prop.x, z: prop.z } });
-const cellJob = (target, opts) => ({ prop: null, target, opts, at: { x: target.x, z: target.z } });
+const cellJob = (target, opts) => ({ prop: null, target, opts, at: { x: target.x, y: target.y, z: target.z } });
 
 /** Where a job is and what it is called - a running task answers too. */
 function spotOf(job) {
@@ -75,14 +75,16 @@ function spotOf(job) {
   // A queued job keeps its request in `opts`; a running one has it written
   // onto the task itself. `person.action` is the *displayed* line and is
   // null while they are still walking, so it is deliberately not this.
-  return { x: at.x, z: at.z, action: (job.opts ? job.opts.action : job.action) ?? null };
+  // `y` is only there for a job on one block of a column - digging a face
+  // out of a cliff - so two blocks of the same column are two jobs.
+  return { x: at.x, y: at.y, z: at.z, action: (job.opts ? job.opts.action : job.action) ?? null };
 }
 
 /** The same work in the same place: asking twice should do nothing. */
 function sameSpot(a, b) {
   const p = spotOf(a);
   const q = spotOf(b);
-  return !!p && !!q && p.x === q.x && p.z === q.z && p.action === q.action;
+  return !!p && !!q && p.x === q.x && p.y === q.y && p.z === q.z && p.action === q.action;
 }
 
 export class Person {
@@ -338,7 +340,7 @@ export class Person {
 
     this.task = {
       prop: target.kind ? target : null,
-      at: { x: target.x, z: target.z },
+      at: { x: target.x, y: target.y, z: target.z },
       seconds, elapsed: 0, action, then, tick, face
     };
     this.action = null;        // nothing is said until they get there

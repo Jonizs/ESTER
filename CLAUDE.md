@@ -211,9 +211,24 @@ with one inhabitant who walks around and works on what is there.
   of sight, and nothing beyond them is touched. G toggles it (`toggleCutaway`
   in `settings.js`); off, nothing is ever cut or hidden, and the help line
   says which it is.
-  - It waits for FULLY hidden: head, chest, feet and both shoulders all
-    blocked. Opening the moment a ridge covered their feet took the scenery
-    away while they were still plainly in view.
+  - It waits for AS GOOD AS hidden: a 3 x 6 grid of points over the agent,
+    feet to crown, and it opens once no more than 4 of the 18 can be seen
+    (and stays open until more than 6 can). Opening the moment a ridge
+    covered their feet took the scenery away while they were still plainly
+    in view; waiting for every point to be blocked was the other way wrong -
+    a sliver of the crown over a ridge kept it shut with the agent all but
+    gone.
+  - It says what is fake. The blocks round the edge of the hole are glazed
+    ice blue (`RIM`, strongest at the edge, the agent's own block excepted),
+    a hidden prop leaves a faint ice-blue wire GHOST of itself (hung off the
+    scene, not the props group, and refusing rays), and `#xray-ring` is a
+    dashed ring round the agent as wide on screen as the tube, fading with
+    it. `#cutaway-badge` top right is always on screen - the key and ON/OFF
+    - and glows while the cut is actually open (`body.cutaway-active`).
+  - Ground seen only THROUGH the cut cannot be worked. If the pointer's ray
+    passed through a block the cut threw away before landing, a shift click
+    is spent and does nothing, and brackets that would have gone green go
+    red (`HIGHLIGHT_REFUSED`) instead. Looking and walking are unaffected.
   - The ISLE loses WHOLE BLOCKS. Only the isle's instanced meshes are
     patched, and the shader tests each block's CENTRE against a tube from
     the eye to the agent's chest, throwing the entire block away if it is in
@@ -619,6 +634,16 @@ with one inhabitant who walks around and works on what is there.
   so a wall of it is something to build and never somewhere to store rock.
   Its layer is in `LAYERS` but nothing generates it; the only way one gets
   into the isle is `fillBlock` putting one there.
+- **A dig takes the block POINTED AT, not the top of its column.** A face
+  of a cliff can be dug straight out without clearing everything over it:
+  `digBlock(x, z, y)` takes any block above the column's bottom, and one
+  below the top leaves a hole in the column's side (`holes` in `island.js`,
+  which `isSolid` reads). The top of a column is always its highest block
+  still there, so digging the top off steps down past any holes under it,
+  and `fillBlock` clears the hole it fills. `canDig` wants the block open to
+  the air on some face (`isExposed`), and only checks for props and agents
+  standing on it when it is the top block. A hoe still works only the top of
+  a column. Dug blocks are not in the save - they never have been.
 - **`ITEMS[tool].digs` is which layers a tool takes out and what each
   leaves.** A shovel has the soft ground (`grass`, `moss`, `dirt` -> dirt), a
   pickaxe has the rock (`stone` -> stone) and the broken stone somebody put
