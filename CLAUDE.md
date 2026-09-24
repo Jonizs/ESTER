@@ -464,6 +464,11 @@ with one inhabitant who walks around and works on what is there.
   while the brackets (cast at the isle alone) sat on the block under the
   cursor. The rings now refuse rays outright as well. Anything else added to
   the scene that is only dressing wants `raycast = () => {}` the same way.
+- **A plain click only walks to the TOP of a column.** The face hit has to
+  point up and belong to the column's top block; a click on the side of a
+  wall, or on the floor of a hole under an overhang, does nothing - it used
+  to send the agent to the top of whichever column the wall belonged to.
+  Shift-work on a wall face is unaffected.
 - **Which block a ray hit is read off the FACE, not the point.** The hit
   point is on the surface, so rounding it is a coin toss at every face.
   `blockAt` in `main.js` steps a hair back along the face's own normal

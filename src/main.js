@@ -1424,6 +1424,12 @@ function handleClick(event) {
       // the queue alone rather than calling the whole thing off and walking
       // there. Walking is never queued: it is what CALLS a queue off.
       if (queueing(event)) return;
+      // Only the TOP of a column is somewhere to walk to. A click on the
+      // side of a wall - or on the floor of a hole dug under an overhang -
+      // is not a place anyone can stand, so it does nothing at all rather
+      // than sending them to whatever column the wall belongs to.
+      const normal = hit.normal ?? hit.face?.normal;
+      if (!normal || normal.y < 0.5 || y !== surface.get(`${x},${z}`)) return;
       if (agent.walkTo({ x, z })) markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
       return;
     }
