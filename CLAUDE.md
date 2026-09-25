@@ -994,10 +994,16 @@ with one inhabitant who walks around and works on what is there.
   outlines on hover, because it is still something to interact with; it just
   refuses the move key. `placement.begin` turns down anything `canMove` says
   no to, so callers do not have to check first.
-- **The repaired bench opens from anywhere, and nobody has to walk to it.**
-  It was gated on an agent standing at it for a while and that was removed on
-  request: a click opens crafting wherever the camera is and whoever is
-  selected, the same as pressing Tab. Do not put the walk back.
+- **A station's screen opens only with an agent within 4 blocks of it.**
+  The repaired bench, a chest, a mill, a mixing bowl and a campfire
+  (`opensScreen` in `main.js`) open for a click only while SOME agent is
+  within `SCREEN_REACH` (4) of the nearest cell the station stands on, and
+  within 4 up or down (`inScreenReach`); otherwise the click is spent and
+  the hover outline is red (`OUTLINE_OUT_OF_REACH`) instead of ice blue.
+  `outlineHovered` runs every frame so the colour turns as someone walks in
+  or out of range. Nobody is walked there and nobody has to be selected -
+  it is a range, not an order. (It used to open from anywhere; the range
+  was asked for.)
 - **The workbench starts broken and costs 10 wood.** It is an ordinary prop as
   far as clicking, highlighting and pathing go - `props` carries it - but
   finishing the work repairs it instead of removing it, so it is never
@@ -1344,8 +1350,9 @@ with one inhabitant who walks around and works on what is there.
   brackets go green (and the readout says so) while ctrl is held over one
   it would take - `ctrlHeld` is tracked the way `shiftHeld` is.
 
-- **A chest and a mill open a SCREEN, so they need nobody selected.** A
-  plain click on either opens `src/stations.js`, the way the repaired bench
+- **A chest and a mill open a SCREEN, so they need nobody selected** - only
+  somebody within 4 blocks, as above. A plain click on either opens
+  `src/stations.js`, the way the repaired bench
   opens crafting; a shift click with a wrench still turns a mill. Unlike the
   crafting bench, which is only a view, what goes in really leaves the
   inventory: a chest's `store` (16 slots, 64 to a stack, a tool one to a

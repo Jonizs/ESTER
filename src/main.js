@@ -3,7 +3,7 @@ import { createIsland, ISLAND_RADIUS } from './island.js';
 import { createSpace } from './space.js';
 import { OrbitCamera } from './orbitCamera.js';
 import {
-  createProps, setPropHighlight, setPropOutline, setWorkbenchState,
+  createProps, setPropHighlight, setPropOutline, OUTLINE_OUT_OF_REACH, setWorkbenchState,
   canMove, canPlace, placeProp, footprintCells, syncBlocked,
   spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds, setWaterLevel,
   setCropStage, cropStageOf, buildOutline, tagProp, setCrank, animateFire, setCookStone,
@@ -198,10 +198,10 @@ function finishProp(prop, agent = null) {
  * wood is only spent when the work is finished.
  */
 function useWorkbench(prop) {
-  // Opening the repaired bench is not an order, so it needs no selection and
-  // nobody has to be standing at it - it is the same as pressing Tab.
-  // Repairing it is an order, and does.
-  if (prop.repaired) { crafting.open(); return; }
+  // Opening the repaired bench is not an order, so it needs no selection -
+  // but somebody has to be within `SCREEN_REACH` of it. Repairing it is an
+  // order, and needs the selection.
+  if (prop.repaired) { if (inScreenReach(prop)) crafting.open(); return; }
 
   const agent = selectedAgent();
   if (!agent) return;
@@ -246,7 +246,7 @@ const machines = createMachines({
     castFromFront(prop.mesh);
     tagProp(prop);
     buildOutline(prop);
-    if (hovered === prop) setPropOutline(prop, true);
+    if (hovered === prop) outlineHovered();
   }
 });
 
@@ -880,7 +880,7 @@ function cook(prop, lit, dt) {
     castFromFront(prop.mesh);
     tagProp(prop);
     buildOutline(prop);
-    if (hovered === prop) setPropOutline(prop, true);
+    if (hovered === prop) outlineHovered();
   }
 }
 
@@ -997,7 +997,7 @@ function showCrop(plot, stage) {
   castFromFront(plot.mesh);
   tagProp(plot);
   buildOutline(plot);
-  if (hovered === plot) setPropOutline(plot, true);
+  if (hovered === plot) outlineHovered();
 }
 
 // --- controls --------------------------------------------------------------
@@ -1586,7 +1586,7 @@ function handleClick(event) {
         // pipe is nothing to click on at all.
         // A chest opens, the way the repaired bench does: a screen, not an
         // order, so nobody has to be selected.
-        if (prop && !prop.gone && (prop.kind === 'chest' || prop.kind === 'campfire')) { stations.open(prop); return; }
+        if (prop && !prop.gone && (prop.kind === 'chest' || prop.kind === 'campfire')) { if (inScreenReach(prop)) stations.open(prop); return; }
 
         if (prop && !prop.gone && (prop.kind === 'pipe' || PROP_KINDS[prop.kind]?.facing)) {
           const agent = selectedAgent();
@@ -1596,7 +1596,7 @@ function handleClick(event) {
           if (q && !tilling(event) && canWrenchUp(prop)) { takeBack(prop); lookedAt = 0; return; }
           // A plain click on a mill opens its hopper - a screen again, so
           // with or without anyone selected. Its crank is turned from there.
-          if ((prop.kind === 'mill' || prop.kind === 'mixingBowl') && !tilling(event)) { stations.open(prop); return; }
+          if ((prop.kind === 'mill' || prop.kind === 'mixingBowl') && !tilling(event)) { if (inScreenReach(prop)) stations.open(prop); return; }
           if (!agent) return;
           if (tilling(event)) {
             if (prop.kind === 'pipe') wrenchPipe(agent, prop, machines.pipeEndAt(prop, hit.point), q);
@@ -2156,7 +2156,7 @@ function attachCrank(prop) {
   castFromFront(prop.mesh);
   tagProp(prop);
   buildOutline(prop);
-  if (hovered === prop) setPropOutline(prop, true);
+  if (hovered === prop) outlineHovered();
   spendCarried();
   return true;
 }
@@ -2169,11 +2169,41 @@ function carryTargetAt(block) {
   return null;
 }
 
+/**
+ * A station's screen - the repaired bench, a chest, a mill, a mixing bowl, a
+ * campfire - only opens with an agent (any of them) within `SCREEN_REACH`
+ * blocks of it, measured to the nearest cell it stands on and up or down
+ * alike. Out of reach, its hover outline is red and the click is spent.
+ */
+const SCREEN_REACH = 4;
+
+function opensScreen(prop) {
+  if (!prop || prop.gone) return false;
+  if (prop.kind === 'workbench') return !!prop.repaired;
+  return ['chest', 'campfire', 'mill', 'mixingBowl'].includes(prop.kind);
+}
+
+function inScreenReach(prop) {
+  const cells = footprintCells(prop.kind, prop);
+  const ground = surface.get(`${prop.x},${prop.z}`) ?? 0;
+  return agents.some((agent) => {
+    if (Math.abs((agent.floor ?? ground) - ground) > SCREEN_REACH) return false;
+    return cells.some((c) => Math.hypot(agent.x - c.x, agent.z - c.z) <= SCREEN_REACH);
+  });
+}
+
+/** Light the hovered prop's outline, red when its screen is out of reach. */
+function outlineHovered() {
+  if (!hovered) return;
+  const far = opensScreen(hovered) && !inScreenReach(hovered);
+  setPropOutline(hovered, true, far ? OUTLINE_OUT_OF_REACH : undefined);
+}
+
 function setHovered(prop) {
   if (hovered === prop) return;
   if (hovered) setPropOutline(hovered, false);
   hovered = prop;
-  if (hovered) setPropOutline(hovered, true);
+  outlineHovered();
   canvas.style.cursor = hovered ? 'pointer' : '';
 }
 
@@ -2794,6 +2824,8 @@ function frame() {
   cutaway.update(selectedAgent(), delta);
   updateXrayRing(selectedAgent());
   updateLookAt();
+  // Somebody walking into or out of reach turns a station's outline.
+  outlineHovered();
   analysis.update(aimRay);
   crafting.update();
   stations.update();
@@ -2814,7 +2846,7 @@ console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props
 window.ESTER = { consume, canConsume, mixBowl, bowlState, cook, updateFires, takeBack, canWrenchUp, stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
   attachCrank, canAttach, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
-  busyPlot, cropStageOf, workFarmland, fillBucket, fillCups, chooseFill, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
+  busyPlot, cropStageOf, workFarmland, fillBucket, fillCups, chooseFill, inScreenReach, outlineHovered, setHovered, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 // One prop was the target when there was one agent and one job; a box can
 // light a whole stand at once, so `targets` is the list and `targeted` is
