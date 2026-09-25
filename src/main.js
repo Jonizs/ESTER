@@ -20,6 +20,7 @@ import { createLookAt, propName } from './lookat.js';
 import { createHighlight, HIGHLIGHT_PLAIN, HIGHLIGHT_WORK, HIGHLIGHT_REFUSED } from './highlight.js';
 import { createCutaway } from './cutaway.js';
 import { createPickups } from './pickups.js';
+import { createAnalysis } from './analysis.js';
 import { createWield } from './wield.js';
 import { createPlacement } from './placement.js';
 import { createSelectBox } from './selectbox.js';
@@ -2505,6 +2506,19 @@ window.addEventListener('keydown', (event) => {
   helpList.hidden = !helpList.hidden;
 }, true);
 
+// F2: the analysis panel - why a click at the cursor would or would not walk
+// the selected agent there. Capture phase for the same reason as F1.
+const analysis = createAnalysis({
+  scene, island, surface, props, blocked, raycaster, cutaway, blockAt,
+  selectedAgent, busyPlot, carrying: () => carrying
+});
+window.addEventListener('keydown', (event) => {
+  if (menu.isOpen()) return;
+  if (settings.actionFor(event.key) !== 'toggleAnalysis') return;
+  event.preventDefault();
+  analysis.toggle();
+}, true);
+
 // M: the music off, or back on.
 window.addEventListener('keydown', (event) => {
   if (menu.isOpen()) return;
@@ -2717,6 +2731,7 @@ function frame() {
   cutaway.update(selectedAgent(), delta);
   updateXrayRing(selectedAgent());
   updateLookAt();
+  analysis.update(aimRay);
   crafting.update();
   stations.update();
 

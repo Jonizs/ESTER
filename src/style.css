@@ -3119,3 +3119,34 @@ body.cutaway-active #cutaway-badge {
 @keyframes pickup-count {
   40% { transform: scale(1.35); }
 }
+
+/* --- F2 analysis -------------------------------------------------------------
+   Top right under the see-through badge. A dev readout; takes no clicks. */
+
+#analysis {
+  position: fixed;
+  top: 58px;
+  right: 18px;
+  z-index: 6;
+  width: min(340px, 90vw);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 110, 110, 0.55);
+  background: rgba(6, 5, 18, 0.86);
+  backdrop-filter: blur(6px);
+  font: 12px/1.5 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  color: var(--ink);
+  pointer-events: none;
+  user-select: none;
+}
+
+#analysis[hidden] { display: none; }
+#analysis.walks { border-color: rgba(154, 230, 110, 0.6); }
+
+#analysis .analysis-head { font-weight: 700; letter-spacing: 0.16em; color: var(--dim); font-size: 11px; }
+#analysis .analysis-head span { margin-left: 6px; padding: 0 5px; border: 1px solid rgba(233, 241, 255, 0.25); border-radius: 4px; }
+#analysis .analysis-verdict { margin-top: 4px; font-weight: 700; color: #ff7a7a; }
+#analysis.walks .analysis-verdict { color: #9ae66e; }
+#analysis .analysis-where { margin: 2px 0 6px; color: var(--dim); }
+#analysis .ok { color: #b8e8a0; }
+#analysis .no { color: #ff9a9a; }

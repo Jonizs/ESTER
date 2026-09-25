@@ -23,6 +23,7 @@ export const ACTIONS = [
   { id: 'toggleCutaway', label: 'See-through camera', key: 'g' },
   { id: 'toggleMusic', label: 'Music on / off', key: 'm' },
   { id: 'toggleHelp', label: 'Show controls', key: 'F1' },
+  { id: 'toggleAnalysis', label: 'Analysis mode', key: 'F2' },
   // One slot per agent, in the order the overview lists them. There is only
   // one agent so far; the rest are here so a second one needs no new wiring.
   { id: 'selectAgent1', label: 'Select agent 1', key: '1' },

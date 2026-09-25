@@ -90,6 +90,8 @@ with one inhabitant who walks around and works on what is there.
   - `src/kitchen.js` - what the mixing bowl mixes and the cooking stone
     cooks, and the stone's temperatures.
   - `src/pickups.js` - the bottom-right cards for everything gained.
+  - `src/analysis.js` - F2, the dev panel saying why a click would or would
+    not walk the selected agent to the block under the cursor.
   - `src/progression.js` - quest progress and stage, both placeholders.
   - `src/save.js` - the run, written down and read back on launch.
   - `src/person.js` - the agent: walking, tasks, stats, selection.
@@ -487,6 +489,15 @@ with one inhabitant who walks around and works on what is there.
   wall, or on the floor of a hole under an overhang, does nothing - it used
   to send the agent to the top of whichever column the wall belonged to.
   Shift-work on a wall face is unaffected.
+- **F2 is the analysis panel, and it mirrors `handleClick`.** `src/analysis.js`
+  walks the same hits a plain left click would - cut-away faces skipped,
+  agents and props taking the click, a growing plot passed over - then checks
+  the face is a top face, the block is its column's top, the cell is not
+  `blocked`, the cell has a neighbour within one block, and runs `findPath`
+  from the agent, listing each check with a tick or a cross. It only reads.
+  Change the walk rules in `handleClick` and this has to change with them,
+  or it tells the player the wrong reason. `toggleAnalysis` in
+  `settings.js`; it costs nothing while closed.
 - **Which block a ray hit is read off the FACE, not the point.** The hit
   point is on the surface, so rounding it is a coin toss at every face.
   `blockAt` in `main.js` steps a hair back along the face's own normal
