@@ -41,7 +41,7 @@ export const STONE = {
   cold: 20,
   cooks: 250,           // below this nothing cooks
   max: 480,
-  heatPerSecond: 5,
+  heatPerSecond: 1.25,  // a quarter of the 5 it was, on request: 250C is ~3 min from cold
   coolPerSecond: 2,
   // The most a hot stone can take off a recipe's time, reached at `max`.
   bestCut: 0.5

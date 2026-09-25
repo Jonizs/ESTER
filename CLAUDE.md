@@ -1405,7 +1405,7 @@ with one inhabitant who walks around and works on what is there.
 - **A cooking stone goes ON a campfire, off the cursor** (`attaches:
   'cookingStone'`), and lives on it as `prop.cooker` - `{ temp, input,
   output, progress }`, saved with it and handed back with the fire. It heats
-  5C a second while the fire burns (to 480C) and cools 2C a second once it
+  1.25C a second while the fire burns (a quarter of the 5 it first had) (to 480C) and cools 2C a second once it
   is out (to 20C). Nothing cooks under 250C; at 250 a recipe takes its full
   time and every degree over takes a share off, half at 480
   (`cookSeconds`). Progress is kept, not lost, if it cools mid-batch. The
