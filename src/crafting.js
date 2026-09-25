@@ -334,16 +334,17 @@ export const RECIPES = [
     }
   },
   {
-    // Ten logs in a U - the bowl, seen from the side.
+    // Planks in a shallow U - the bowl, seen from the side. One row less
+    // deep than the water catcher's U, which is the same planks four rows
+    // tall: the same shape twice would be one grid matching two recipes.
     id: 'mixingBowl',
     label: 'Mixing Bowl',
     item: 'mixingBowl',
     yield: 1,
     slots: {
-      1: 'wood', 4: 'wood',
-      5: 'wood', 8: 'wood',
-      9: 'wood', 12: 'wood',
-      13: 'wood', 14: 'wood', 15: 'wood', 16: 'wood'
+      1: 'plank', 4: 'plank',
+      5: 'plank', 8: 'plank',
+      9: 'plank', 10: 'plank', 11: 'plank', 12: 'plank'
     }
   },
   {
