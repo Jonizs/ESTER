@@ -231,15 +231,6 @@ with one inhabitant who walks around and works on what is there.
     dashed ring round the agent as wide on screen as the tube, fading with
     it. `#cutaway-badge` top right is always on screen - the key and ON/OFF
     - and glows while the cut is actually open (`body.cutaway-active`).
-  - Round the agent the cut is a SECTION, not the tube: within `SECTION`
-    (4.5) of them, everything more than a block over the floor they stand on
-    goes, from every angle, and the waist-high layer (floor + 1) is left as
-    glazed stubs (`STUB_GLAZE`) except where the tube says it is in the way;
-    the floor and under never go. The tube alone made what was visible hang
-    on the camera angle - a tunnel mouth beside them was covered, and a hair
-    of camera movement cleared it. Walls as stubs make a floor plan: a
-    tunnel mouth is a gap in them wherever the camera is. The tube and its
-    rim glaze still decide beyond the section. `hides` mirrors it.
   - Wire outlines of the blocks the cut hides, round the agent, were tried
     to tell real from fake and removed on request - they looked bad. Do
     not put them back.

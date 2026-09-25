@@ -44,8 +44,6 @@ const CHEST = 0.9;           // the height on the agent the tube is aimed at
 const OPEN_RATE = 16;        // blocks of radius a second, growing or shrinking
 const LINGER = 0.35;         // seconds it stays open once they are back in view
 const HIDDEN_LAYER = 1;      // a layer nothing renders or picks from
-const SECTION = 4.5;          // how far round the agent the cut is a waist-high section rather than the tube
-const STUB_GLAZE = 0.28;     // how much the stubs the section leaves are washed ice blue
 const RIM = 1.1;             // how far past the cut the rim glaze reaches, in blocks
 const RIM_STRENGTH = 0.32;   // how far the block right at the edge of the cut is washed toward the rim colour
 // The ice-blue accent, in the linear space the lighting is worked in.
@@ -117,30 +115,12 @@ export function createCutaway({ island, propsGroup, props, camera }) {
             float cutT = dot( cutRel, cutDir );
             float cutOff = length( cutRel - cutDir * cutT );
             bool cutAlong = cutT > 0.0 && cutT < cutLen - ${SHORT_OF.toFixed(2)};
-            // Round the agent the cut is a SECTION, the same from every
-            // angle: everything above their waist (two blocks over the floor
-            // they stand on and up) goes, and everything at the waist and
-            // under stays, whatever the tube says - so the walls round them
-            // are left as knee-high stubs and a tunnel mouth is a gap in them
-            // wherever the camera is. The tube only decides further out.
-            float cutOpen = clamp( uCutRadius / uCutFull, 0.0, 1.0 );
-            bool cutNear = length( vCutWorld.xz - uCutKeep.xz ) < ${SECTION.toFixed(2)} * cutOpen;
-            bool cutAbove = vCutWorld.y > uCutKeep.y + 1.5;
-            bool cutStub = vCutWorld.y > uCutKeep.y + 0.5;
-            bool cutTube = cutAlong && cutOff < uCutRadius;
-            // Near them: above the waist always goes; the stub layer goes
-            // only where the tube says it is in the way, or it hides their
-            // legs from a low camera; the ground they walk on never does.
-            bool cutHere = cutNear ? ( cutAbove || ( cutStub && cutTube ) ) : cutTube;
-            if ( distance( vCutWorld, uCutKeep ) > 0.3 && cutHere ) discard;
-            // The stubs the section leaves are glazed, so the cut line reads
-            // as the camera's and not as walls that really stop there.
-            if ( cutNear && vCutWorld.y > uCutKeep.y + 0.5 ) cutGlaze = ${STUB_GLAZE.toFixed(2)} * cutOpen;
+            if ( distance( vCutWorld, uCutKeep ) > 0.3 && cutAlong && cutOff < uCutRadius ) discard;
             // The blocks left standing round the edge of the hole are glazed
             // ice blue, strongest right at the edge - so the hole reads as a
             // window the camera has cut, not as the isle really being open.
             // The block the agent stands on is left its own colour.
-            if ( !cutNear && cutAlong && cutOff >= uCutRadius && cutOff < uCutRadius + ${RIM.toFixed(2)} ) {
+            if ( cutAlong && cutOff >= uCutRadius && cutOff < uCutRadius + ${RIM.toFixed(2)} ) {
               cutGlaze = ${RIM_STRENGTH.toFixed(2)} * ( 1.0 - ( cutOff - uCutRadius ) / ${RIM.toFixed(2)} )
                 * clamp( uCutRadius / uCutFull, 0.0, 1.0 );
             }
@@ -385,13 +365,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
    */
   function hides(point) {
     if (radius <= 0.001) return false;
-    const keep = uniforms.uCutKeep.value;
-    if (point.distanceTo(keep) < 0.3) return false;
-    // The section round the agent, the same as the shader's `cutNear`.
-    if (Math.hypot(point.x - keep.x, point.z - keep.z) < SECTION * Math.min(1, radius / RADIUS)) {
-      if (point.y > keep.y + 1.5) return true;
-      if (point.y <= keep.y + 0.5) return false;
-    }
+    if (point.distanceTo(uniforms.uCutKeep.value) < 0.3) return false;
     const axis = dir.subVectors(uniforms.uCutAt.value, uniforms.uCutEye.value);
     const len = axis.length();
     axis.divideScalar(len);
