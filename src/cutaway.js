@@ -88,17 +88,19 @@ export function createCutaway({ island, propsGroup, props, camera }) {
       // whole block at once. A block pressed down into a plot is still
       // centred on its cell as far as this is concerned, near enough.
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vCutWorld;')
+        .replace('#include <common>', '#include <common>\nvarying vec3 vCutWorld;\nattribute float aCutFloor;\nvarying float vCutFloor;')
         .replace('#include <project_vertex>', `#include <project_vertex>
           vec4 cutAt = vec4( 0.0, 0.0, 0.0, 1.0 );
           #ifdef USE_INSTANCING
             cutAt = instanceMatrix * cutAt;
           #endif
-          vCutWorld = ( modelMatrix * cutAt ).xyz;`);
+          vCutWorld = ( modelMatrix * cutAt ).xyz;
+          vCutFloor = aCutFloor;`);
 
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
           varying vec3 vCutWorld;
+          varying float vCutFloor;
           uniform vec3 uCutEye;
           uniform vec3 uCutAt;
           uniform float uCutRadius;
@@ -115,7 +117,12 @@ export function createCutaway({ island, propsGroup, props, camera }) {
             float cutT = dot( cutRel, cutDir );
             float cutOff = length( cutRel - cutDir * cutT );
             bool cutAlong = cutT > 0.0 && cutT < cutLen - ${SHORT_OF.toFixed(2)};
-            if ( distance( vCutWorld, uCutKeep ) > 0.3 && cutAlong && cutOff < uCutRadius ) discard;
+            // Floors are never cut: a tunnel or cave floor (2) wherever it
+            // is, and the top of a column (1) at the agent's own level or
+            // under it - so the ground they could walk to is always on show.
+            // A hill's top ABOVE them still goes, or it stays in the way.
+            bool cutFloor = vCutFloor > 1.5 || ( vCutFloor > 0.5 && vCutWorld.y <= uCutKeep.y + 1.5 );
+            if ( distance( vCutWorld, uCutKeep ) > 0.3 && !cutFloor && cutAlong && cutOff < uCutRadius ) discard;
             // The blocks left standing round the edge of the hole are glazed
             // ice blue, strongest right at the edge - so the hole reads as a
             // window the camera has cut, not as the isle really being open.
@@ -363,8 +370,10 @@ export function createCutaway({ island, propsGroup, props, camera }) {
    * has to go through it to whatever is actually on screen, or clicking the
    * agent through the hole would walk them into the hill instead.
    */
-  function hides(point) {
+  function hides(point, floor = 0) {
     if (radius <= 0.001) return false;
+    // The shader's `cutFloor`: floors stay.
+    if (floor > 1.5 || (floor > 0.5 && point.y <= uniforms.uCutKeep.value.y + 1.5)) return false;
     if (point.distanceTo(uniforms.uCutKeep.value) < 0.3) return false;
     const axis = dir.subVectors(uniforms.uCutAt.value, uniforms.uCutEye.value);
     const len = axis.length();
@@ -386,7 +395,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     if (!hit.object.isInstancedMesh || hit.instanceId === undefined) return false;
     hit.object.getMatrixAt(hit.instanceId, instance);
     centre.setFromMatrixPosition(instance).applyMatrix4(hit.object.matrixWorld);
-    return hides(centre);
+    return hides(centre, hit.object.geometry.attributes.aCutFloor?.array[hit.instanceId] ?? 0);
   }
 
   return {

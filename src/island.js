@@ -173,7 +173,12 @@ export function createIsland() {
       emissiveIntensity: spec.emissiveIntensity ?? 0
     });
 
-    const mesh = new THREE.InstancedMesh(geometry, material, list.length);
+    // A geometry of its own per mesh, because it carries a per-instance
+    // attribute: `aCutFloor`, which the see-through camera reads to leave
+    // floors standing (see `refreshFloor`).
+    const own = geometry.clone();
+    own.setAttribute('aCutFloor', new THREE.InstancedBufferAttribute(new Float32Array(list.length), 1));
+    const mesh = new THREE.InstancedMesh(own, material, list.length);
     mesh.name = `island-${name}`;
     // Buried blocks skip the shadow *pass* - the surface occludes the light,
     // so rendering them into the shadow map is work for nothing. They do
@@ -467,6 +472,49 @@ export function createIsland() {
     for (const [x, y, z] of state?.holes ?? []) group.userData.digBlock(x, z, y);
   };
 
+  /**
+   * Which blocks are FLOORS, for the see-through camera: `aCutFloor` on each
+   * instance is 1 for the top of a column, 2 for a floor under the top - a
+   * tunnel, a cave - and 0 for anything with no room to stand on it. The
+   * cut never takes a cave floor away, so the ground of a tunnel is always
+   * there to see. Only one column changes when a block comes or goes, so
+   * only the few blocks under it are looked at again.
+   */
+  const HEADROOM = 2;
+  function refreshFloor(x, y, z) {
+    const found = blocks.get(key(x, y, z));
+    if (!found) return;
+    const solid = group.userData.isSolid;
+    let flag = 0;
+    if (solid(x, y, z)) {
+      let clear = true;
+      for (let h = 1; h <= HEADROOM; h++) if (solid(x, y + h, z)) { clear = false; break; }
+      if (clear) flag = y === columns.get(`${x},${z}`)?.top ? 1 : 2;
+    }
+    const attr = found.mesh.geometry.attributes.aCutFloor;
+    if (attr.array[found.index] === flag) return;
+    attr.array[found.index] = flag;
+    attr.needsUpdate = true;
+  }
+  function refreshAround(x, y, z) {
+    for (let d = -HEADROOM - 1; d <= HEADROOM; d++) refreshFloor(x, y + d, z);
+  }
+  for (const column of columns.values()) refreshFloor(column.x, column.top, column.z);
+
+  // Digging and filling both change what is a floor, so both look again.
+  const digRaw = group.userData.digBlock;
+  group.userData.digBlock = (x, z, y = columns.get(`${x},${z}`)?.top) => {
+    const out = digRaw(x, z, y);
+    if (out) refreshAround(x, y, z);
+    return out;
+  };
+  const fillRaw = group.userData.fillBlock;
+  group.userData.fillBlock = (x, z, layer) => {
+    const out = fillRaw(x, z, layer);
+    if (out) refreshAround(x, columns.get(`${x},${z}`).top, z);
+    return out;
+  };
+
   /** Every hole filled and every block its own colour again, as generated. */
   group.userData.reset = () => {
     // The holes in the sides of columns first: `fillBlock` only ever puts a
@@ -481,7 +529,12 @@ export function createIsland() {
       found.mesh.computeBoundingSphere();
       group.userData.blockCount += 1;
     }
+    const restored = [...holes];
     holes.clear();
+    for (const k of restored) {
+      const [x, y, z] = k.split(',').map(Number);
+      refreshAround(x, y, z);
+    }
     for (const [k, column] of columns) {
       while (column.top < bornTop.get(k) && group.userData.fillBlock(column.x, column.z)) { /* up */ }
     }

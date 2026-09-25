@@ -231,6 +231,16 @@ with one inhabitant who walks around and works on what is there.
     dashed ring round the agent as wide on screen as the tube, fading with
     it. `#cutaway-badge` top right is always on screen - the key and ON/OFF
     - and glows while the cut is actually open (`body.cutaway-active`).
+  - FLOORS are never cut. Each isle instance carries `aCutFloor` (every
+    mesh has its own clone of the box geometry for it): 1 for the top of a
+    column, 2 for a floor under the top - a tunnel or cave floor, a block
+    with `HEADROOM` of air over it - and 0 otherwise. `refreshFloor` in
+    `island.js` keeps it right: `digBlock` and `fillBlock` are wrapped to
+    look again at the few blocks under what changed, and a reset refreshes
+    the holes it puts back. The shader's `cutFloor` keeps every cave floor
+    wherever it is and every column top at the agent's level or under it
+    (a hill top ABOVE them still goes, or it stays in the way); `hides`
+    reads the same flag off the hit's instance, so the pointer agrees.
   - A waist-high SECTION round the agent (everything over the waist cut
     within 4.5 blocks, walls left as glazed stubs) was tried to stop the view
     depending on the camera angle, and removed on request - it looked
