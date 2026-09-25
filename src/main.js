@@ -566,6 +566,73 @@ function fillBucket(agent, source, queue = false) {
 }
 
 /**
+ * Cups do not have to be in anyone's hand: a click on a water catcher offers
+ * FILL WATER CUPS (x), and the agent walks over and fills that many out of
+ * the inventory, emptiest first. `CUP_BATCH` is the most in one go. A cup in
+ * their hand counts as one of them and is filled first.
+ */
+const CUP_BATCH = 8;
+
+function cupsToFill(agent, source) {
+  let water = source.water ?? 0;
+  let n = 0;
+  const cap = ITEMS.cup.capacity;
+  if (agent.tool?.item === 'cup' && agent.tool.left < cap && water > 0) {
+    water -= Math.min(cap - agent.tool.left, water);
+    n++;
+  }
+  return n + inventory.fillSome('cup', water, CUP_BATCH - n, true);
+}
+
+function fillCups(agent, source, queue = false) {
+  if (cupsToFill(agent, source) <= 0) return false;
+  return order(agent, source, {
+    seconds: FILL_SECONDS,
+    action: 'Filling the cups',
+    adjacent: true,
+    then: () => {
+      let most = CUP_BATCH;
+      const cap = ITEMS.cup.capacity;
+      if (agent.tool?.item === 'cup' && agent.tool.left < cap && (source.water ?? 0) > 0) {
+        const drawn = Math.min(cap - agent.tool.left, source.water);
+        source.water -= drawn;
+        agent.tool.left += drawn;
+        most--;
+      }
+      source.water -= inventory.fillSome('cup', source.water ?? 0, most);
+    }
+  }, queue);
+}
+
+/** What a click on a water catcher offers the selected agent. */
+function chooseFill(agent, source, queue = false) {
+  const options = [];
+  const cups = cupsToFill(agent, source);
+  if (cups > 0) {
+    options.push({
+      label: `Fill water cup${cups === 1 ? '' : 's'} (${cups})`,
+      tint: ITEMS.cup.tint,
+      art: itemIcon('cup', 40),
+      note: `${Math.round(source.water ?? 0)} ml here`,
+      pick: () => fillCups(agent, source, queue)
+    });
+  }
+  // A bucket still fills the way it always did, from the hand.
+  const vessel = holding(agent, (t) => t.holds === 'water');
+  if (vessel && !vessel.fillsStack && agent.tool.left < vessel.capacity && (source.water ?? 0) > 0) {
+    options.push({
+      label: `Fill ${vessel.label.toLowerCase().replace(/^wooden /, '')}`,
+      tint: vessel.tint,
+      art: itemIcon(agent.tool.item, 40),
+      note: `${Math.round(agent.tool.left)} / ${vessel.capacity} ml`,
+      pick: () => fillBucket(agent, source, queue)
+    });
+  }
+  wield.choose('Water catcher — fill what?', options,
+    (source.water ?? 0) <= 0 ? 'It is dry.' : 'Nothing here to fill.');
+}
+
+/**
  * Drinking and eating, from the DRINK and EAT buttons on the inventory's
  * tiles. The selected agent does it - or the isle's own inhabitant when
  * nobody is selected, since there is only ever the one to feed.
@@ -1542,7 +1609,7 @@ function handleClick(event) {
 
         if (prop && !prop.gone && prop.kind === 'waterCatcher') {
           const agent = selectedAgent();
-          if (agent) fillBucket(agent, prop, queueing(event));
+          if (agent) chooseFill(agent, prop, queueing(event));
           return;
         }
 
@@ -2747,7 +2814,7 @@ console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props
 window.ESTER = { consume, canConsume, mixBowl, bowlState, cook, updateFires, takeBack, canWrenchUp, stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
   attachCrank, canAttach, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
-  busyPlot, cropStageOf, workFarmland, fillBucket, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
+  busyPlot, cropStageOf, workFarmland, fillBucket, fillCups, chooseFill, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
 window.ESTER.debug = createDebug({ renderer, scene, island, props });
 // One prop was the target when there was one agent and one job; a box can
 // light a whole stand at once, so `targets` is the list and `targeted` is

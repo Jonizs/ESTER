@@ -301,6 +301,29 @@ export function createInventory() {
       return ml - left;
     },
 
+    /**
+     * `fillAll` held to at most `most` vessels - the emptiest ones, since
+     * those are the ones worth the trip. `dry` only counts: it answers how
+     * many would get any water at all, and pours nothing. Returns the
+     * millilitres poured, or the count when `dry`.
+     */
+    fillSome(item, ml, most, dry = false) {
+      const list = kits.get(item);
+      if (!list?.length || !isVessel(item) || most <= 0) return 0;
+      const cap = fullCharge(item);
+      list.sort((a, b) => a - b);
+      let left = ml;
+      let filled = 0;
+      for (let i = 0; i < list.length && left > 0 && filled < most; i++) {
+        const n = Math.min(cap - list[i], left);
+        if (n <= 0) continue;
+        if (!dry) list[i] += n;
+        left -= n;
+        filled++;
+      }
+      return dry ? filled : ml - left;
+    },
+
     /** How much room is left in all the vessels of a kind together. */
     room(item) {
       if (!isVessel(item)) return 0;

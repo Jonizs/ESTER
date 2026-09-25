@@ -24,7 +24,7 @@ export function createWield({ agents, inventory, blocked, onEquip, onOpen }) {
     listEl.textContent = '';
   }
 
-  function open(title, options) {
+  function open(title, options, emptyText = 'Nothing to hand out yet.') {
     onOpen?.();
     titleEl.textContent = title;
     listEl.textContent = '';
@@ -32,7 +32,7 @@ export function createWield({ agents, inventory, blocked, onEquip, onOpen }) {
     if (options.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'hint';
-      empty.textContent = 'Nothing to hand out yet.';
+      empty.textContent = emptyText;
       listEl.append(empty);
     }
 
@@ -122,5 +122,7 @@ export function createWield({ agents, inventory, blocked, onEquip, onOpen }) {
   }, true);
 
   close();
-  return { chooseTool, chooseAgent, close, isOpen };
+  // Any other small either-or out on the isle - what to fill at a water
+  // catcher - is the same panel with its own options.
+  return { chooseTool, chooseAgent, choose: open, close, isOpen };
 }

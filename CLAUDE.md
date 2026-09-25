@@ -1385,10 +1385,14 @@ with one inhabitant who walks around and works on what is there.
   in the scene, a hitch every time a fire lit.
 
 - **Cups fill as a stack, and are drunk one at a time.** A cup is a vessel
-  like the bucket (`capacity` 100) with `fillsStack`: held in a hand and
-  clicked on water, `fillBucket` fills the one in hand and then every cup in
-  the inventory, emptiest first, as far as the source goes
-  (`inventory.fillAll`). DRINK on the cup's tile takes 100ml from the
+  like the bucket (`capacity` 100) with `fillsStack`, and it does NOT have
+  to be in a hand: a click on a water catcher (agent selected) opens a
+  choice in the wield panel (`chooseFill` in `main.js`, `wield.choose`) -
+  FILL WATER CUPS (x), x being how many would get water, at most
+  `CUP_BATCH` (8) - and the agent walks over and fills that many out of the
+  inventory, emptiest first (`fillCups`, `inventory.fillSome`); a cup in
+  their hand counts as one and fills first. A bucket in hand is the other
+  option there, filled by `fillBucket` as before. DRINK on the cup's tile takes 100ml from the
   FULLEST cup (`inventory.drain`), then the one in hand, and gives 20 water
   per 100ml; EAT on a loaf gives 25 food. Both are for the selected agent,
   or the isle's own inhabitant when nobody is selected, and the buttons
