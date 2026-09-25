@@ -231,6 +231,10 @@ with one inhabitant who walks around and works on what is there.
     dashed ring round the agent as wide on screen as the tube, fading with
     it. `#cutaway-badge` top right is always on screen - the key and ON/OFF
     - and glows while the cut is actually open (`body.cutaway-active`).
+  - A waist-high SECTION round the agent (everything over the waist cut
+    within 4.5 blocks, walls left as glazed stubs) was tried to stop the view
+    depending on the camera angle, and removed on request - it looked
+    horrid. Do not put it back.
   - Wire outlines of the blocks the cut hides, round the agent, were tried
     to tell real from fake and removed on request - they looked bad. Do
     not put them back.
