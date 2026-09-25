@@ -1360,10 +1360,19 @@ with one inhabitant who walks around and works on what is there.
   adds two, up to `maxLogs` (10) on top of the lighting, 23 minutes at most.
   `updateFires` in `main.js` burns it down off the frame delta and at zero it
   is simply out: nothing re-lights it but another striker. `PROP_KINDS
-  .campfire.burns` holds every number. The flames are emissive boxes kept at
-  0.55 - at 1.6 the tone mapping clipped them to one pale cream and the fire
-  read as a lamp - and they flicker while lit, which is the one idle motion
-  allowed, because a fire that does not move does not read as one.
+  .campfire.burns` holds every number.
+- **The fire is a loop of cubes, and the one idle motion allowed.**
+  `animateFire` in `props.js` moves every piece off one clock (offset per
+  fire by its salt): a breathing core on the logs, 16 flame cubes rising,
+  shrinking and cooling yellow -> orange -> red, 7 embers drifting up and
+  away, 5 smoke puffs thinning above. All unlit `MeshBasicMaterial`, the
+  flames with `toneMapped: false` - lit emissive boxes either clipped to
+  cream or went dull, and the scene's filmic curve washed plain orange out
+  too. None of it casts, takes a ray or gets an outline (`noOutline`), so
+  the hover readout does not flicker as a flame passes the cursor. The warm
+  ground glow is a PointLight that is ALWAYS in the scene and only turned to
+  0 when the fire is out: adding or hiding a light recompiles every material
+  in the scene, a hitch every time a fire lit.
 
 - **Cups fill as a stack, and are drunk one at a time.** A cup is a vessel
   like the bucket (`capacity` 100) with `fillsStack`: held in a hand and

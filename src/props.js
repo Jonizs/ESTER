@@ -487,7 +487,7 @@ export function buildOutline(prop) {
     // themselves walked - and the guard keeps a rebuild from doubling up.
     if (!object.isMesh) return;
     // A hitbox is not a shape: outlining one draws a cage around thin air.
-    if (object.userData.isHitPad) return;
+    if (object.userData.isHitPad || object.userData.noOutline) return;
     if (object.children.some((c) => c.userData.isOutline)) return;
 
     const line = new THREE.LineSegments(
@@ -977,10 +977,149 @@ export function setCookStone(prop, cooker) {
   return built;
 }
 
-/** Show a campfire's flames, or put them out. */
+// --- the fire itself --------------------------------------------------------
+//
+// A voxel fire, drawn as a loop of small cubes rather than a few boxes that
+// only stretch. A breathing core sits on the logs; flame cubes rise out of it,
+// shrinking and cooling from white-yellow through orange to red as they go;
+// embers drift up and away; smoke puffs grow and thin out above it all. Every
+// cube runs on its own phase off one clock, so nothing moves in step.
+//
+// All of it is unlit (`MeshBasicMaterial`): a flame is a light, not a thing a
+// light falls on, and lit emissive boxes either clipped to cream or went dull.
+// None of it casts a shadow or takes a ray - it moves every frame, and the
+// hover readout must not flicker as a flame passes under the cursor.
+
+const FLAME_CUBES = 16;
+const EMBERS = 7;
+const PUFFS = 5;
+
+const FLAME_HOT = new THREE.Color(0xffe27a);
+const FLAME_MID = new THREE.Color(0xffa22a);
+const FLAME_COOL = new THREE.Color(0xd8360c);
+const SMOKE = new THREE.Color(0x4a4640);
+
+/** A number 0..1 that is the same for the same inputs - a cube's own quirks. */
+const quirk = (i, k) => {
+  const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+};
+
+function fireCube(part, i, size, color, opacity = 1) {
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(size, size, size),
+    new THREE.MeshBasicMaterial({
+      color, transparent: opacity < 1 || part !== 'core', opacity, depthWrite: part === 'core',
+      // Out of the tone mapping, or the scene's filmic curve washes a flame's
+      // orange out to cream; smoke stays in it, being no light at all.
+      toneMapped: part === 'smoke'
+    })
+  );
+  cube.userData.part = part;
+  cube.userData.seed = i;
+  cube.userData.noOutline = true;
+  cube.raycast = () => {};
+  return cube;
+}
+
+function buildFire() {
+  const fire = new THREE.Group();
+  fire.name = 'flame';
+  // The heart of it, sat on the crossed logs: a pale-hot block inside an
+  // orange one, both breathing.
+  const heart = fireCube('core', 0, 0.16, 0xffd24a);
+  heart.position.y = 0.16;
+  fire.add(heart);
+  const shell = fireCube('core', 1, 0.26, 0xf06a14, 0.85);
+  shell.position.y = 0.15;
+  fire.add(shell);
+  for (let i = 0; i < FLAME_CUBES; i++) fire.add(fireCube('flame', i, 1, FLAME_HOT.getHex(), 0.95));
+  for (let i = 0; i < EMBERS; i++) fire.add(fireCube('ember', i, 0.035, 0xffb84a));
+  for (let i = 0; i < PUFFS; i++) fire.add(fireCube('smoke', i, 1, SMOKE.getHex(), 0.3));
+  fire.visible = false;
+  return fire;
+}
+
+/**
+ * Light the fire or put it out, and move every cube of it to where it is at
+ * time `t` (seconds). Called every frame for every campfire; out, it only
+ * hides the group and turns the glow down.
+ */
+export function animateFire(prop, t, lit) {
+  const fire = prop.mesh.getObjectByName('flame');
+  const glow = prop.mesh.getObjectByName('fireLight');
+  if (!fire) return;
+  fire.visible = !!lit;
+  if (glow) {
+    // Two uneven waves and a quicker one on top, so it never visibly loops.
+    glow.intensity = lit
+      ? 3.2 + 0.6 * Math.sin(t * 7.3) + 0.35 * Math.sin(t * 13.1 + 1.7) + 0.2 * Math.sin(t * 23.9)
+      : 0;
+  }
+  if (!lit) return;
+
+  for (const cube of fire.children) {
+    const { part, seed: i } = cube.userData;
+
+    if (part === 'core') {
+      const b = 1 + 0.12 * Math.sin(t * (8 + i * 3) + i) + 0.06 * Math.sin(t * 19 + i * 2);
+      cube.scale.set(b, b * (1 + 0.15 * Math.sin(t * 6 + i)), b);
+      cube.rotation.y = t * (i ? -0.6 : 0.9);
+      continue;
+    }
+
+    if (part === 'flame') {
+      // A flame cube's life: born low and hot in the core, risen and gone
+      // at about 0.75, a little under a second later.
+      const life = 0.7 + quirk(i, 1) * 0.35;
+      const u = (t / life + quirk(i, 2)) % 1;
+      const a = quirk(i, 3) * Math.PI * 2;
+      const r = 0.1 * (1 - u) * (0.4 + quirk(i, 4));
+      const sway = 0.05 * Math.sin(t * 5 + i) * u;
+      cube.position.set(Math.cos(a) * r + sway, 0.14 + u * (0.62 + quirk(i, 5) * 0.25), Math.sin(a) * r);
+      const size = (0.2 + quirk(i, 6) * 0.08) * Math.pow(1 - u, 0.8);
+      cube.scale.setScalar(Math.max(0.001, size));
+      cube.rotation.set(u * 2 + i, u * 3 + i, 0);
+      const c = cube.material.color;
+      if (u < 0.35) c.copy(FLAME_HOT).lerp(FLAME_MID, u / 0.35);
+      else c.copy(FLAME_MID).lerp(FLAME_COOL, (u - 0.35) / 0.65);
+      cube.material.opacity = 0.95 * (1 - u * u);
+      continue;
+    }
+
+    if (part === 'ember') {
+      // Sparks: slower, higher, drifting off sideways and blinking out.
+      const life = 1.8 + quirk(i, 7) * 1.2;
+      const u = (t / life + quirk(i, 8)) % 1;
+      const a = quirk(i, 9) * Math.PI * 2;
+      cube.position.set(
+        Math.cos(a) * u * 0.35 + 0.06 * Math.sin(t * 3 + i),
+        0.3 + u * (1.1 + quirk(i, 10) * 0.6),
+        Math.sin(a) * u * 0.35
+      );
+      cube.material.opacity = u < 0.1 ? u * 10 : (1 - u) * (0.6 + 0.4 * Math.sin(t * 20 + i * 5));
+      continue;
+    }
+
+    if (part === 'smoke') {
+      // Smoke: grows, thins and drifts as it climbs clear of the flames.
+      const life = 3.2 + quirk(i, 11) * 1.4;
+      const u = (t / life + quirk(i, 12)) % 1;
+      cube.position.set(
+        0.08 * Math.sin(t * 0.7 + i) + u * 0.25 * (quirk(i, 13) - 0.5),
+        0.75 + u * 1.5,
+        0.08 * Math.cos(t * 0.6 + i * 2)
+      );
+      cube.scale.setScalar(0.1 + u * 0.3);
+      cube.rotation.set(t * 0.3 + i, t * 0.4 + i, 0);
+      cube.material.opacity = 0.28 * Math.sin(Math.PI * u);
+    }
+  }
+}
+
+/** Show a campfire's flames, or put them out (the first frame of `animateFire`). */
 export function setFireLit(prop, lit) {
-  const flame = prop.mesh.getObjectByName('flame');
-  if (flame) flame.visible = !!lit;
+  animateFire(prop, 0, lit);
 }
 
 function mat(color, opts = {}) {
@@ -1267,7 +1406,7 @@ function buildProp(kind, salt) {
 
   if (kind === 'campfire') {
     // A ring of stones, two logs crossed in it, and the flames - a named
-    // group so `setFireLit` can show and hide them and the loop flicker them.
+    // group `animateFire` shows, hides and moves every frame.
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
       const stone = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.13, 0.16), mat(i % 2 ? 0x8b929c : 0x9aa0ad));
@@ -1287,21 +1426,14 @@ function buildProp(kind, salt) {
     ash.position.y = 0.02;
     g.add(ash);
 
-    const flame = new THREE.Group();
-    flame.name = 'flame';
-    // Glowing, but not so hard the tone mapping clips them to cream - at
-    // 1.6 every tongue came out the same pale yellow and read as a lamp.
-    for (const [x, z, h, c] of [[0, 0, 0.42, 0xe8540c], [0.07, 0.05, 0.3, 0xf08a1c], [-0.06, -0.04, 0.26, 0xf5b83a]]) {
-      const tongue = new THREE.Mesh(
-        new THREE.BoxGeometry(0.14, h, 0.14),
-        new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 1 })
-      );
-      tongue.geometry.translate(0, h / 2, 0);
-      tongue.position.set(x, 0.12, z);
-      flame.add(tongue);
-    }
-    flame.visible = false;
-    g.add(flame);
+    g.add(buildFire());
+    // The glow on the ground round it. A light that is added or taken away
+    // makes every material in the scene recompile, so this one is always
+    // there and simply turned down to nothing while the fire is out.
+    const glow = new THREE.PointLight(0xff8a3a, 0, 4.5, 1.6);
+    glow.name = 'fireLight';
+    glow.position.y = 0.45;
+    g.add(glow);
     return g;
   }
 

@@ -6,7 +6,7 @@ import {
   createProps, setPropHighlight, setPropOutline, setWorkbenchState,
   canMove, canPlace, placeProp, footprintCells, syncBlocked,
   spawnProp, removeProp, growProp, hasRoomToGrow, rollGrowSeconds, setWaterLevel,
-  setCropStage, cropStageOf, buildOutline, tagProp, setCrank, setFireLit, setCookStone,
+  setCropStage, cropStageOf, buildOutline, tagProp, setCrank, animateFire, setCookStone,
   GROUND_OFFSET, FARMLAND_SINK, FARMLAND_SOIL, PROP_KINDS
 } from './props.js';
 import { Person } from './person.js';
@@ -776,14 +776,10 @@ function updateFires(dt) {
     if (prop.gone || prop.kind !== 'campfire') continue;
     if (prop.burning > 0) prop.burning = Math.max(0, prop.burning - dt);
     const lit = prop.burning > 0;
-    setFireLit(prop, lit);
+    // Each fire on its own clock, offset by its salt, so two fires side by
+    // side never flicker in step.
+    animateFire(prop, fireClock + (prop.salt ?? 0) % 97, lit);
     if (prop.cooker) cook(prop, lit, dt);
-    if (!lit) continue;
-    const flame = prop.mesh.getObjectByName('flame');
-    flame?.children.forEach((tongue, i) => {
-      tongue.scale.y = 0.8 + 0.25 * Math.sin(fireClock * (9 + i * 3) + i * 2);
-      tongue.scale.x = tongue.scale.z = 0.9 + 0.1 * Math.sin(fireClock * (7 + i * 2) + i);
-    });
   }
 }
 
@@ -1930,7 +1926,7 @@ function propBox(prop) {
   }
   prop.mesh.updateWorldMatrix(true, true);
   prop.mesh.traverse((object) => {
-    if (!object.isMesh || object.userData.isHitPad) return;
+    if (!object.isMesh || object.userData.isHitPad || object.userData.noOutline) return;
     measured.expandByObject(object);
   });
   return measured.isEmpty() ? boxOf(prop.mesh) : measured;
