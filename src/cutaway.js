@@ -44,7 +44,6 @@ const CHEST = 0.9;           // the height on the agent the tube is aimed at
 const OPEN_RATE = 16;        // blocks of radius a second, growing or shrinking
 const LINGER = 0.35;         // seconds it stays open once they are back in view
 const HIDDEN_LAYER = 1;      // a layer nothing renders or picks from
-const FLOOR_KEPT = 3.3;      // how far round the agent the ground under the line to their feet is left standing
 const RIM = 1.1;             // how far past the cut the rim glaze reaches, in blocks
 const RIM_STRENGTH = 0.32;   // how far the block right at the edge of the cut is washed toward the rim colour
 // The ice-blue accent, in the linear space the lighting is worked in.
@@ -56,7 +55,6 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     uCutAt: { value: new THREE.Vector3() },
     uCutRadius: { value: 0 },
     uCutKeep: { value: new THREE.Vector3(0, -1e9, 0) },
-    uCutFeet: { value: new THREE.Vector3() },
     uCutFull: { value: RADIUS },
     uCutRim: { value: RIM_COLOUR }
   };
@@ -105,7 +103,6 @@ export function createCutaway({ island, propsGroup, props, camera }) {
           uniform vec3 uCutAt;
           uniform float uCutRadius;
           uniform vec3 uCutKeep;
-          uniform vec3 uCutFeet;
           uniform float uCutFull;
           uniform vec3 uCutRim;`)
         .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
@@ -118,25 +115,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
             float cutT = dot( cutRel, cutDir );
             float cutOff = length( cutRel - cutDir * cutT );
             bool cutAlong = cutT > 0.0 && cutT < cutLen - ${SHORT_OF.toFixed(2)};
-            // A block wholly under the line from the eye to the agent's FEET
-            // hides no part of them - it is the ground they are seen
-            // standing on - so it stays, however far inside the tube.
-            // Measured at the line's LOWEST over the block's whole width
-            // (half a diagonal either way along it), or a sloping line
-            // passes over the middle of a block and through its far corner.
-            vec3 feetAxis = uCutFeet - uCutEye;
-            float feetLen2 = max( dot( feetAxis, feetAxis ), 1e-4 );
-            float feetT = dot( vCutWorld - uCutEye, feetAxis ) / feetLen2;
-            float feetSpan = 0.87 / sqrt( feetLen2 );
-            float feetLow = uCutEye.y + min(
-              feetAxis.y * clamp( feetT - feetSpan, 0.0, 1.0 ),
-              feetAxis.y * clamp( feetT + feetSpan, 0.0, 1.0 ) );
-            // Only round the agent, where it is the floor they are on and
-            // walk to; nearer the eye it is the cut's own cross-section, and
-            // keeping that puts a wall of buried faces across the screen.
-            bool cutUnder = vCutWorld.y + 0.5 <= feetLow + 0.02
-              && length( vCutWorld.xz - uCutFeet.xz ) <= ${FLOOR_KEPT.toFixed(2)};
-            if ( distance( vCutWorld, uCutKeep ) > 0.3 && !cutUnder && cutAlong && cutOff < uCutRadius ) discard;
+            if ( distance( vCutWorld, uCutKeep ) > 0.3 && cutAlong && cutOff < uCutRadius ) discard;
             // The blocks left standing round the edge of the hole are glazed
             // ice blue, strongest right at the edge - so the hole reads as a
             // window the camera has cut, not as the isle really being open.
@@ -359,7 +338,6 @@ export function createCutaway({ island, propsGroup, props, camera }) {
       const kx = Math.round(agent.x);
       const kz = Math.round(agent.z);
       uniforms.uCutKeep.value.set(kx, island.userData.surface.get(`${kx},${kz}`) ?? -1e9, kz);
-      uniforms.uCutFeet.value.copy(agent.mesh.position);
       if (hidden(agent, radius > 0.001)) linger = LINGER;
       else linger = Math.max(0, linger - dt);
       if (linger > 0) want = RADIUS;
@@ -394,24 +372,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     probe.subVectors(point, uniforms.uCutEye.value);
     const t = probe.dot(axis);
     if (t <= 0 || t >= len - SHORT_OF) return false;
-    if (probe.addScaledVector(axis, -t).length() >= radius) return false;
-    return !underFeetLine(point);
-  }
-
-  /** The shader's `cutUnder`: wholly below the line from the eye to the feet. */
-  const feetAxis = new THREE.Vector3();
-  const rel = new THREE.Vector3();
-  function underFeetLine(point) {
-    const eyeAt = uniforms.uCutEye.value;
-    feetAxis.subVectors(uniforms.uCutFeet.value, eyeAt);
-    const len2 = Math.max(feetAxis.lengthSq(), 1e-4);
-    const t = rel.subVectors(point, eyeAt).dot(feetAxis) / len2;
-    const span = 0.87 / Math.sqrt(len2);
-    const clamp01 = (n) => THREE.MathUtils.clamp(n, 0, 1);
-    const low = eyeAt.y + Math.min(feetAxis.y * clamp01(t - span), feetAxis.y * clamp01(t + span));
-    const feet = uniforms.uCutFeet.value;
-    return point.y + 0.5 <= low + 0.02
-      && Math.hypot(point.x - feet.x, point.z - feet.z) <= FLOOR_KEPT;
+    return probe.addScaledVector(axis, -t).length() < radius;
   }
 
   /**
