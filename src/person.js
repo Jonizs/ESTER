@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { findPath } from './path.js';
+import { findPath, standable } from './path.js';
 import { PROP_KINDS, GROUND_OFFSET, footprintCells } from './props.js';
 import { ITEMS } from './inventory.js';
 
@@ -88,8 +88,12 @@ function sameSpot(a, b) {
 }
 
 export class Person {
-  constructor(surface, startCell, { name = 'Ester', blocked } = {}) {
+  constructor(surface, startCell, { name = 'Ester', blocked, isSolid = null } = {}) {
     this.surface = surface;
+    // The isle's own block test, so a tunnel is somewhere to stand: `floor`
+    // is the height of the block under their feet, which is the top of the
+    // column out in the open and lower than it inside one.
+    this.isSolid = isSolid;
     this.name = name;                 // shown in the agent list
     this.home = { x: startCell.x, z: startCell.z };   // where a reset puts them
     this.blocked = blocked ?? new Set();              // cells they cannot enter
@@ -108,6 +112,7 @@ export class Person {
   reset() {
     this.x = this.home.x;
     this.z = this.home.z;
+    this.floor = this.surface.get(`${this.x},${this.z}`);
 
     this.path = [];
     this.segment = null;       // the step being walked, for the hop arc
@@ -128,6 +133,11 @@ export class Person {
     this.mesh.position.copy(this.pos);
   }
 
+  /** Whether they could stand on this block - the top, or a tunnel floor. */
+  canStand(x, y, z) {
+    return standable(this.surface, this.isSolid, x, y, z);
+  }
+
   /**
    * For the save: where they are and how they are doing.
    *
@@ -139,7 +149,7 @@ export class Person {
     // The tool goes with them: it is out of the inventory while it is held,
     // so a run that did not write it down would lose it on the next launch.
     return {
-      x: this.x, z: this.z,
+      x: this.x, z: this.z, floor: this.floor,
       stats: { ...this.stats },
       tool: this.tool ? { ...this.tool } : null
     };
@@ -151,6 +161,9 @@ export class Person {
     if (this.surface.has(`${state.x},${state.z}`)) {
       this.x = state.x;
       this.z = state.z;
+      // A tunnel floor only if it is still one; the top otherwise.
+      this.floor = state.floor !== undefined && this.canStand(this.x, state.floor, this.z)
+        ? state.floor : this.surface.get(`${this.x},${this.z}`);
     }
     this.stats = { ...this.stats, ...(state.stats ?? {}) };
     this.tool = state.tool && ITEMS[state.tool.item] ? { ...state.tool } : null;
@@ -166,9 +179,22 @@ export class Person {
     this.mesh.position.copy(this.pos);
   }
 
-  groundAt(x, z) {
-    const h = this.surface.get(`${x},${z}`);
+  /** Where their feet go on a cell: its floor `y`, or the top of the column. */
+  groundAt(x, z, y = x === this.x && z === this.z ? this.floor : undefined) {
+    const h = y ?? this.surface.get(`${x},${z}`);
     return h === undefined ? this.pos?.y ?? 0 : h + GROUND_OFFSET;
+  }
+
+  /**
+   * The floor they are on - checked, not trusted. Digging or filling can
+   * take a tunnel floor away under them or roof the top over, so anything
+   * that is no longer standable falls back to the top of the column.
+   */
+  _floorNow() {
+    if (this.floor === undefined || !this.canStand(this.x, this.floor, this.z)) {
+      this.floor = this.surface.get(`${this.x},${this.z}`);
+    }
+    return this.floor;
   }
 
   /** The work in progress, or null: { action, elapsed, seconds, remaining }.
@@ -192,7 +218,8 @@ export class Person {
 
   /** Send them to a cell. Returns false if there is no way there. */
   goTo(cell, { adjacent = false } = {}) {
-    const path = findPath(this.surface, { x: this.x, z: this.z }, cell, { adjacent, blocked: this.blocked });
+    const path = findPath(this.surface, { x: this.x, y: this._floorNow(), z: this.z }, cell,
+      { adjacent, blocked: this.blocked, isSolid: this.isSolid });
     if (!path) return false;
     this.path = path;
     this.segment = null;       // start the next step from wherever they are
@@ -409,7 +436,7 @@ export class Person {
   }
 
   _step(dt) {
-    const [tx, tz] = this.path[0];
+    const [tx, tz, ty] = this.path[0];
 
     // Each step is walked as its own segment, so the hop can be shaped from
     // where it began rather than from wherever they happen to be now.
@@ -421,7 +448,7 @@ export class Person {
         fromX: this.pos.x,
         fromZ: this.pos.z,
         fromY: this.pos.y,
-        toY: this.groundAt(tx, tz),
+        toY: this.groundAt(tx, tz, ty),
         distance: Math.hypot(tx - this.pos.x, tz - this.pos.z),
         travelled: 0
       };
@@ -448,6 +475,7 @@ export class Person {
     if (t >= 1) {
       this.x = tx;
       this.z = tz;
+      this.floor = ty ?? this.surface.get(`${tx},${tz}`);
       this.pos.set(tx, segment.toY, tz);
       this.path.shift();
       this.segment = null;

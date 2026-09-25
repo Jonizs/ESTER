@@ -231,6 +231,11 @@ with one inhabitant who walks around and works on what is there.
     dashed ring round the agent as wide on screen as the tube, fading with
     it. `#cutaway-badge` top right is always on screen - the key and ON/OFF
     - and glows while the cut is actually open (`body.cutaway-active`).
+  - Round the agent, every block the cut hides is drawn as an ice-blue WIRE
+    shell (`updateBlockGhosts`): 3 cells across, one under their feet to four
+    over, outer faces only - a face between two hidden blocks is not drawn,
+    or the rock fills with a 3D grid. A spot that looks open through the
+    X-ray but is solid says so; this is what "is that really empty?" was.
   - A FAKE block cannot be worked. If the pointer's ray passed through a
     block the cut threw away before landing AND the block it landed on is
     buried on every side (`fakeBlock` in `main.js`, `isExposed` false) - a
@@ -484,20 +489,24 @@ with one inhabitant who walks around and works on what is there.
   while the brackets (cast at the isle alone) sat on the block under the
   cursor. The rings now refuse rays outright as well. Anything else added to
   the scene that is only dressing wants `raycast = () => {}` the same way.
-- **A plain click only walks to the TOP of a column.** The face hit has to
-  point up and belong to the column's top block; a click on the side of a
-  wall, or on the floor of a hole under an overhang, does nothing - it used
-  to send the agent to the top of whichever column the wall belonged to.
-  Shift-work on a wall face is unaffected.
-- **F2 is the analysis panel, and it mirrors `handleClick`.** `src/analysis.js`
-  walks the same hits a plain left click would - cut-away faces skipped,
-  agents and props taking the click, a growing plot passed over - then checks
-  the face is a top face, the block is its column's top, the cell is not
-  `blocked`, the cell has a neighbour within one block, and runs `findPath`
-  from the agent, listing each check with a tick or a cross. It only reads.
-  Change the walk rules in `handleClick` and this has to change with them,
-  or it tells the player the wrong reason. `toggleAnalysis` in
-  `settings.js`; it costs nothing while closed.
+- **A plain click only walks to a TOP FACE of a block someone can stand
+  on** - the top of a column, or a tunnel floor (`canStand` on the agent).
+  A click on the side of a wall does nothing - it used to send the agent to
+  the top of whichever column the wall belonged to. Shift-work on a wall
+  face is unaffected.
+- **Tunnels are walkable: the pathing runs over FLOORS, not columns.** A
+  floor is a block with `HEADROOM` (2) blocks of air over it - the top of a
+  column always is one, and a block dug under into the side of a cliff can
+  be one too (`floorsAt`/`standable` in `path.js`). A* nodes are
+  `x,y,z` and a path is `[x, z, y]` steps; a step is to a neighbour's floor
+  within one block up or down, with headroom over the HIGHER of the two in
+  both cells so a hop up never puts a head through a ceiling, and a
+  diagonal needs a passable floor in both shoulder cells. The agent keeps
+  `floor`, checked (`_floorNow`) before every route and saved with them.
+  `blocked` (a solid station) only blocks the TOP of its column. Without
+  `isSolid` passed, `findPath` falls back to one floor per column, which is
+  what the swarm's placement check still uses. `isSolid.bottomAt` (from
+  `island.js`) is where a column ends, so the floor scan stops at the void.
 - **Which block a ray hit is read off the FACE, not the point.** The hit
   point is on the surface, so rounding it is a coin toss at every face.
   `blockAt` in `main.js` steps a hair back along the face's own normal

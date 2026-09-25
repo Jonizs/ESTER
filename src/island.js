@@ -233,6 +233,9 @@ export function createIsland() {
     return !!column && y >= column.bottom && y <= column.top && !holes.has(key(x, y, z));
   };
 
+  // Where a column ends, for the pathing: under it is the void.
+  group.userData.isSolid.bottomAt = (x, z) => columns.get(`${x},${z}`)?.bottom;
+
   /** Whether any face of this block is open to the air - somewhere to dig at it from. */
   group.userData.isExposed = (x, y, z) => {
     const solid = group.userData.isSolid;

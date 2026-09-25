@@ -54,49 +54,110 @@ export function withinReach(surface, h, target) {
 }
 
 /** Whether there is anywhere beside `target` to stand and reach it from. */
-export function reachable(surface, target, blocked = EMPTY) {
+export function reachable(surface, target, blocked = EMPTY, isSolid = null) {
   for (const [dx, dz] of NEIGHBOURS) {
     const x = target.x + dx;
     const z = target.z + dz;
-    const h = surface.get(`${x},${z}`);
-    if (h === undefined || blocked.has(`${x},${z}`)) continue;
-    if (withinReach(surface, h, target)) return true;
+    const top = surface.get(`${x},${z}`);
+    for (const h of floorsAt(surface, isSolid, x, z)) {
+      if (h === top && blocked.has(`${x},${z}`)) continue;
+      if (withinReach(surface, h, target)) return true;
+    }
   }
   return false;
 }
 
-export function findPath(surface, start, goal, { adjacent = false, blocked = EMPTY } = {}) {
+/**
+ * Where someone can stand in a column: every block with ground under the
+ * feet and two blocks of air over it (`HEADROOM`), top first. Without
+ * `isSolid` there is one, the top of the column, which is all the isle had
+ * before tunnels. With it, a tunnel dug into the side of a cliff is a floor
+ * of its own underneath the column's top.
+ */
+export const HEADROOM = 2;
+
+export function floorsAt(surface, isSolid, x, z) {
+  const top = surface.get(`${x},${z}`);
+  if (top === undefined) return [];
+  if (!isSolid) return [top];
+  const floors = [top];
+  // Anything under the top with air over it is a hole dug into the column.
+  // `isSolid.bottomAt` is where the column ends; below that is the void.
+  const bottom = isSolid.bottomAt?.(x, z) ?? top - 32;
+  for (let y = top - 1; y >= bottom; y--) {
+    if (!isSolid(x, y, z)) continue;
+    let clear = true;
+    for (let h = 1; h <= HEADROOM; h++) if (isSolid(x, y + h, z)) { clear = false; break; }
+    if (clear) floors.push(y);
+  }
+  return floors;
+}
+
+/** Whether a block can be stood on: solid, with `HEADROOM` of air over it. */
+export function standable(surface, isSolid, x, y, z) {
+  if (surface.get(`${x},${z}`) === y) return true;
+  if (!isSolid || !isSolid(x, y, z)) return false;
+  for (let h = 1; h <= HEADROOM; h++) if (isSolid(x, y + h, z)) return false;
+  return true;
+}
+
+/**
+ * A* over the FLOORS of the isle: a node is a cell and the height stood at
+ * in it, `x,y,z`, so a tunnel under a column's top is somewhere to walk as
+ * well as the top itself. The path comes back as `[x, z, y]` steps.
+ *
+ * `start` and each goal may carry `y`, the floor; without it that is the
+ * top of the column. `blocked` - a solid station - only blocks the TOP of
+ * its column: a tunnel dug under the bench is still a tunnel.
+ */
+export function findPath(surface, start, goal, { adjacent = false, blocked = EMPTY, isSolid = null } = {}) {
   const targets = Array.isArray(goal) ? goal : [goal];
   if (targets.length === 0) return null;
-  const heightAt = (x, z) => {
-    const h = surface.get(`${x},${z}`);
-    return h === undefined ? null : h;
+  const topAt = (x, z) => surface.get(`${x},${z}`);
+  const solid = (x, y, z) => (isSolid ? isSolid(x, y, z) : y <= (topAt(x, z) ?? -Infinity));
+
+  const floorCache = new Map();
+  const floors = (x, z) => {
+    const k = `${x},${z}`;
+    let list = floorCache.get(k);
+    if (!list) floorCache.set(k, list = floorsAt(surface, isSolid, x, z));
+    return list;
   };
+
+  const startTop = topAt(start.x, start.z);
+  if (startTop === undefined) return null;
+  const startY = start.y ?? startTop;
+  const startKey = `${start.x},${startY},${start.z}`;
 
   // Where the agent may stand. Wherever it already is always counts, so a
   // cell that becomes solid underneath it is never a trap.
-  const startKey = `${start.x},${start.z}`;
-  const open_ = (x, z) => {
-    const key = `${x},${z}`;
-    return key === startKey || !blocked.has(key);
+  const open_ = (x, y, z) => `${x},${y},${z}` === startKey
+    || y !== topAt(x, z) || !blocked.has(`${x},${z}`);
+
+  // Air for someone at height `y` to pass through this cell at: the two
+  // blocks over the floor, over the HIGHER of the two floors being stepped
+  // between, so a hop up does not put their head through the ceiling.
+  const headClear = (x, z, y) => {
+    for (let h = 1; h <= HEADROOM; h++) if (solid(x, y + h, z)) return false;
+    return true;
   };
 
-  if (heightAt(start.x, start.z) === null) return null;
-  if (!adjacent && targets.some((t) => t.x === start.x && t.z === start.z)) return [];
+  const goalY = (t) => t.y ?? topAt(t.x, t.z);
+  if (!adjacent && targets.some((t) => t.x === start.x && t.z === start.z && goalY(t) === startY)) return [];
   // Walking onto something solid is not a route, only walking up beside it.
-  if (!adjacent && targets.every((t) => blocked.has(`${t.x},${t.z}`))) return null;
+  if (!adjacent && targets.every((t) => goalY(t) === topAt(t.x, t.z) && blocked.has(`${t.x},${t.z}`))) return null;
 
-  const open = [{ x: start.x, z: start.z, f: 0 }];
+  const open = [{ x: start.x, y: startY, z: start.z, f: 0 }];
   const cameFrom = new Map();
   const gScore = new Map([[startKey, 0]]);
   const closed = new Set();
 
   // Standing diagonally beside a prop counts as being next to it. With
-  // several targets, reaching any one of them is arriving.
-  // And only from somewhere within `REACH` of it, up or down.
-  const reached = (x, z) => targets.some((t) => (adjacent
-    ? chebyshev(x, z, t.x, t.z) === 1 && withinReach(surface, heightAt(x, z), t)
-    : x === t.x && z === t.z));
+  // several targets, reaching any one of them is arriving - and only from
+  // somewhere within `REACH` of it, up or down.
+  const reached = (x, y, z) => targets.some((t) => (adjacent
+    ? chebyshev(x, z, t.x, t.z) === 1 && withinReach(surface, y, t)
+    : x === t.x && z === t.z && y === goalY(t)));
 
   // The heuristic has to stay optimistic, so it measures to the nearest
   // target - anything else can stop A* returning the shortest route.
@@ -111,46 +172,43 @@ export function findPath(surface, start, goal, { adjacent = false, blocked = EMP
     let best = 0;
     for (let i = 1; i < open.length; i++) if (open[i].f < open[best].f) best = i;
     const current = open.splice(best, 1)[0];
-    const key = `${current.x},${current.z}`;
+    const { x: cx, y: here, z: cz } = current;
+    const key = `${cx},${here},${cz}`;
 
-    if (reached(current.x, current.z)) return rebuild(cameFrom, key);
+    if (reached(cx, here, cz)) return rebuild(cameFrom, key);
     if (closed.has(key)) continue;
     closed.add(key);
 
-    const here = heightAt(current.x, current.z);
     for (const [dx, dz, stepCost] of NEIGHBOURS) {
-      const nx = current.x + dx;
-      const nz = current.z + dz;
-      const there = heightAt(nx, nz);
-      if (there === null) continue;
-      if (!open_(nx, nz)) continue;
+      const nx = cx + dx;
+      const nz = cz + dz;
+      for (const there of floors(nx, nz)) {
+        const climb = Math.abs(there - here);
+        if (climb > 1) continue;                  // too steep to step up
+        if (!open_(nx, there, nz)) continue;
+        const high = Math.max(here, there);
+        if (!headClear(cx, cz, high) || !headClear(nx, nz, high)) continue;
 
-      const climb = Math.abs(there - here);
-      if (climb > 1) continue;                  // too steep to step up
+        // A diagonal passes over the corner shared with the two cells
+        // beside it, so both have to have a floor within a step of each end
+        // and room to pass at the height of the higher one. Without this the
+        // agent clips the corner of a raised block, or slips through the gap
+        // between two of them.
+        if (dx !== 0 && dz !== 0) {
+          const side = (sx, sz) => floors(sx, sz).some((f) => Math.abs(f - here) <= 1
+            && Math.abs(f - there) <= 1 && open_(sx, f, sz) && headClear(sx, sz, Math.max(high, f)));
+          if (!side(cx + dx, cz) || !side(cx, cz + dz)) continue;
+        }
 
-      // A diagonal passes over the corner shared with the two cells beside
-      // it, so both have to be there and within a step of each end. Without
-      // this the agent clips the corner of a raised block, or slips through
-      // the gap between two of them.
-      if (dx !== 0 && dz !== 0) {
-        const sideA = heightAt(current.x + dx, current.z);
-        const sideB = heightAt(current.x, current.z + dz);
-        if (sideA === null || sideB === null) continue;
-        // Both shoulders of the diagonal have to be clear too, or the agent
-        // shaves the corner of whatever is standing beside it.
-        if (!open_(current.x + dx, current.z) || !open_(current.x, current.z + dz)) continue;
-        if (Math.abs(sideA - here) > 1 || Math.abs(sideB - here) > 1) continue;
-        if (Math.abs(sideA - there) > 1 || Math.abs(sideB - there) > 1) continue;
-      }
+        const nKey = `${nx},${there},${nz}`;
+        if (closed.has(nKey)) continue;
 
-      const nKey = `${nx},${nz}`;
-      if (closed.has(nKey)) continue;
-
-      const cost = (gScore.get(key) ?? Infinity) + stepCost + climb * 0.6;
-      if (cost < (gScore.get(nKey) ?? Infinity)) {
-        cameFrom.set(nKey, key);
-        gScore.set(nKey, cost);
-        open.push({ x: nx, z: nz, f: cost + heuristic(nx, nz) });
+        const cost = (gScore.get(key) ?? Infinity) + stepCost + climb * 0.6;
+        if (cost < (gScore.get(nKey) ?? Infinity)) {
+          cameFrom.set(nKey, key);
+          gScore.set(nKey, cost);
+          open.push({ x: nx, y: there, z: nz, f: cost + heuristic(nx, nz) });
+        }
       }
     }
   }
@@ -162,8 +220,8 @@ function rebuild(cameFrom, endKey) {
   const path = [];
   let key = endKey;
   while (cameFrom.has(key)) {
-    const [x, z] = key.split(',').map(Number);
-    path.push([x, z]);
+    const [x, y, z] = key.split(',').map(Number);
+    path.push([x, z, y]);
     key = cameFrom.get(key);
   }
   return path.reverse();

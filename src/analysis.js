@@ -1,4 +1,5 @@
-import { findPath } from './path.js';
+import * as THREE from 'three';
+import { findPath, floorsAt, standable, HEADROOM } from './path.js';
 
 /**
  * F2: the analysis panel. A dev readout, top right under the see-through
@@ -22,6 +23,7 @@ export function createAnalysis({ scene, island, surface, props, blocked, raycast
   const list = root.querySelector('.analysis-lines');
   const where = root.querySelector('.analysis-where');
   let open = false;
+  const centre = new THREE.Vector3();
   let last = 0;
 
   function propOf(object) {
@@ -76,31 +78,43 @@ export function createAnalysis({ scene, island, surface, props, blocked, raycast
       : normal.y > 0.5 ? 'top' : normal.y < -0.5 ? 'bottom' : 'side';
     if (face !== 'top') add(false, `Hit the ${face} face - only a TOP face is somewhere to walk`);
     else add(true, 'Hit a top face');
-    if (y !== top) add(false, `Block is ${top - y} below its column's top (${top}) - under an overhang or buried`);
-    else add(true, 'Block is the top of its column');
-
-    if (blocked.has(`${x},${z}`)) add(false, 'Cell is blocked by something solid standing on it (a station)');
-    const standing = props.filter((p) => !p.gone && p.x === x && p.z === z).map((p) => p.kind);
-    if (standing.length) add(true, `Standing there (not blocking): ${standing.join(', ')}`);
-
-    if (!agent) return { lines, place };
-    const from = { x: Math.round(agent.x), z: Math.round(agent.z) };
-    if (from.x === x && from.z === z) { add(true, 'The agent is already standing there'); return { lines, place }; }
-
-    // Steps out of the cell: a neighbour more than one block up or down
-    // cannot be stepped to.
-    const steps = [];
-    for (const [dx, dz] of NEIGHBOURS) {
-      const h = surface.get(`${x + dx},${z + dz}`);
-      if (h === undefined) continue;
-      if (Math.abs(h - top) <= 1 && !blocked.has(`${x + dx},${z + dz}`)) steps.push(h);
+    // Somewhere to stand: the top of the column, or a tunnel floor - a block
+    // with HEADROOM blocks of air over it. Whatever is in the way is named,
+    // and said to be hidden when it is the see-through camera hiding it.
+    const isSolid = island.userData.isSolid;
+    if (y === top) add(true, 'Block is the top of its column');
+    else {
+      const over = [];
+      for (let h = 1; h <= HEADROOM; h++) if (isSolid(x, y + h, z)) over.push(y + h);
+      if (!over.length) add(true, `Tunnel floor: ${HEADROOM} blocks of air over it (column top is ${top})`);
+      else {
+        const hidden = over.filter((yy) => cutaway.hides(centre.set(x, yy, z)));
+        add(false, `No room to stand: block(s) at height ${over.join(', ')} over it`
+          + (hidden.length ? ` - ${hidden.length === over.length ? 'all' : 'some'} HIDDEN by the see-through camera (G), they are really there` : ''));
+      }
     }
-    if (!steps.length) add(false, 'Walled in: every neighbour is more than 1 block up or down (or blocked)');
-    else add(true, `${steps.length} of 8 neighbours can be stepped to`);
+    const floor = standable(surface, isSolid, x, y, z) ? y : null;
 
-    const path = findPath(surface, from, { x, z }, { blocked });
-    if (path) add(true, `Route found: ${path.length} step(s) from ${from.x}, ${from.z}`);
-    else if (steps.length) add(false, `No route from where they stand (${from.x}, ${from.z}) - the two are not joined by steps of 1 block or less`);
+    if (floor === top && blocked.has(`${x},${z}`)) add(false, 'Cell is blocked by something solid standing on it (a station)');
+    const standing = props.filter((p) => !p.gone && p.x === x && p.z === z).map((p) => p.kind);
+    if (standing.length && floor === top) add(true, `Standing there (not blocking): ${standing.join(', ')}`);
+
+    if (!agent || floor === null) return { lines, place };
+    const from = { x: Math.round(agent.x), y: agent.floor, z: Math.round(agent.z) };
+    if (from.x === x && from.z === z && from.y === floor) { add(true, 'The agent is already standing there'); return { lines, place }; }
+
+    // Steps out of the floor: a neighbouring floor more than one block up
+    // or down cannot be stepped to.
+    let steps = 0;
+    for (const [dx, dz] of NEIGHBOURS) {
+      if (floorsAt(surface, isSolid, x + dx, z + dz).some((f) => Math.abs(f - floor) <= 1)) steps++;
+    }
+    if (!steps) add(false, 'Walled in: no neighbouring floor within 1 block up or down');
+    else add(true, `${steps} of 8 neighbours have a floor within a step`);
+
+    const path = findPath(surface, from, { x, y: floor, z }, { blocked, isSolid });
+    if (path) add(true, `Route found: ${path.length} step(s) from ${from.x}, ${from.y}, ${from.z}`);
+    else if (steps) add(false, `No route from where they stand (${from.x}, ${from.y}, ${from.z}) - no chain of floors 1 step apart with 2 blocks of headroom joins them`);
     return { lines, place };
   }
 

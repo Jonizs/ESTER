@@ -65,7 +65,7 @@ const { group: propsGroup, props, workbench, blocked } = createProps(surface, sc
 
 // --- the person ------------------------------------------------------------
 
-const person = new Person(surface, startingCell(), { blocked });
+const person = new Person(surface, startingCell(), { blocked, isSolid: island.userData.isSolid });
 scene.add(person.mesh);
 
 // Everything the panels read: what has been gathered, and how far along the
@@ -436,16 +436,16 @@ function canDig(agent, cell) {
   // Somewhere beside it within reach to stand and swing from - a face deep
   // down a pit wall is not dug from the rim. The brackets ask this too, so
   // they stay white over a block nobody could get at.
-  if (!reachable(surface, { x: cell.x, y, z: cell.z }, blocked)) return null;
+  if (!reachable(surface, { x: cell.x, y, z: cell.z }, blocked, island.userData.isSolid)) return null;
 
   // Not out from under anything: a prop standing on it would be left in the
-  // air, and an agent standing on it would be too. Only the top block is
-  // stood on; one out of the side of the column is not.
-  if (y === top) {
-    if (props.some((p) => !p.gone && footprintCells(p.kind, p)
-      .some((c) => c.x === cell.x && c.z === cell.z))) return null;
-    if (agents.some((a) => Math.round(a.x) === cell.x && Math.round(a.z) === cell.z)) return null;
-  }
+  // air, and an agent standing on it would be too. Props only stand on the
+  // top; an agent can stand on a tunnel floor as well, so it is whichever
+  // block is under THEIR feet.
+  if (y === top && props.some((p) => !p.gone && footprintCells(p.kind, p)
+    .some((c) => c.x === cell.x && c.z === cell.z))) return null;
+  if (agents.some((a) => Math.round(a.x) === cell.x && Math.round(a.z) === cell.z
+    && (a.floor ?? top) === y)) return null;
 
   return { tool, drop, y };
 }
@@ -1611,13 +1611,13 @@ function handleClick(event) {
       // the queue alone rather than calling the whole thing off and walking
       // there. Walking is never queued: it is what CALLS a queue off.
       if (queueing(event)) return;
-      // Only the TOP of a column is somewhere to walk to. A click on the
-      // side of a wall - or on the floor of a hole dug under an overhang -
-      // is not a place anyone can stand, so it does nothing at all rather
-      // than sending them to whatever column the wall belongs to.
+      // Only a TOP face is somewhere to walk to, and only of a block with
+      // room over it to stand: the top of a column, or the floor of a tunnel
+      // dug into one. A click on the side of a wall does nothing at all
+      // rather than sending them to whatever column the wall belongs to.
       const normal = hit.normal ?? hit.face?.normal;
-      if (!normal || normal.y < 0.5 || y !== surface.get(`${x},${z}`)) return;
-      if (agent.walkTo({ x, z })) markers.ping(x, surface.get(`${x},${z}`) + GROUND_OFFSET, z);
+      if (!normal || normal.y < 0.5 || !agent.canStand(x, y, z)) return;
+      if (agent.walkTo({ x, y, z })) markers.ping(x, y + GROUND_OFFSET, z);
       return;
     }
   }
@@ -1777,7 +1777,7 @@ function callSwarm() {
     const cell = standingCellNear({ x: person.x, z: person.z });
     if (!cell) break;                      // nowhere left to put them
 
-    const mate = new Person(surface, cell, { name: `Helper ${++borrowedCount}`, blocked });
+    const mate = new Person(surface, cell, { name: `Helper ${++borrowedCount}`, blocked, isSolid: island.userData.isSolid });
     mate.borrowed = SWARM_SECONDS;         // counted down in the frame loop
     scene.add(mate.mesh);
     castFromFront(mate.mesh);              // built after boot, like any other
