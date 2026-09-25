@@ -231,11 +231,9 @@ with one inhabitant who walks around and works on what is there.
     dashed ring round the agent as wide on screen as the tube, fading with
     it. `#cutaway-badge` top right is always on screen - the key and ON/OFF
     - and glows while the cut is actually open (`body.cutaway-active`).
-  - Round the agent, every block the cut hides is drawn as an ice-blue WIRE
-    shell (`updateBlockGhosts`): 3 cells across, one under their feet to four
-    over, outer faces only - a face between two hidden blocks is not drawn,
-    or the rock fills with a 3D grid. A spot that looks open through the
-    X-ray but is solid says so; this is what "is that really empty?" was.
+  - Wire outlines of the blocks the cut hides, round the agent, were tried
+    to tell real from fake and removed on request - they looked bad. Do
+    not put them back.
   - A FAKE block cannot be worked. If the pointer's ray passed through a
     block the cut threw away before landing AND the block it landed on is
     buried on every side (`fakeBlock` in `main.js`, `isExposed` false) - a

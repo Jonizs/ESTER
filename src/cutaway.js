@@ -319,95 +319,6 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     }
   }
 
-  // --- the blocks it hides, drawn as wire -----------------------------------
-  //
-  // What is real and what is not: round the agent, every block the cut is
-  // hiding is drawn as an ice-blue wire cube, so a spot that looks open
-  // through the X-ray but is really solid rock says so. Only round the
-  // agent (`GHOST_REACH` across, a little under their feet to a few blocks
-  // over their head), because that is where it decides whether they can
-  // walk somewhere - wire over the whole tube would be a lattice filling the
-  // screen. Edges two cubes share are drawn once. Rebuilt a few times a
-  // second, and only when the set of hidden blocks has changed.
-  const GHOST_REACH = 3;
-  const GHOST_BELOW = 1;
-  const GHOST_ABOVE = 4;
-  const GHOST_EVERY = 0.2;
-  const ghostGeometry = new THREE.BufferGeometry();
-  const blockGhosts = new THREE.LineSegments(ghostGeometry, new THREE.LineBasicMaterial({
-    color: RIM_COLOUR, transparent: true, opacity: 0.6, depthWrite: false
-  }));
-  blockGhosts.raycast = noRay;
-  blockGhosts.frustumCulled = false;
-  blockGhosts.visible = false;
-  let ghostClock = 0;
-  let ghostKey = '';
-  const at3 = new THREE.Vector3();
-
-  function updateBlockGhosts(agent, dt) {
-    if (!blockGhosts.parent && propsGroup.parent) propsGroup.parent.add(blockGhosts);
-    if (!agent || radius <= 0.001) { blockGhosts.visible = false; ghostKey = ''; return; }
-    ghostClock -= dt;
-    if (ghostClock > 0) { blockGhosts.visible = true; return; }
-    ghostClock = GHOST_EVERY;
-
-    const ax = Math.round(agent.x);
-    const az = Math.round(agent.z);
-    const floor = agent.floor ?? island.userData.surface.get(`${ax},${az}`) ?? 0;
-    const cubes = [];
-    for (let x = ax - GHOST_REACH; x <= ax + GHOST_REACH; x++) {
-      for (let z = az - GHOST_REACH; z <= az + GHOST_REACH; z++) {
-        for (let y = floor - GHOST_BELOW; y <= floor + GHOST_ABOVE; y++) {
-          if (!island.userData.isSolid(x, y, z)) continue;
-          if (hides(at3.set(x, y, z))) cubes.push(x, y, z);
-        }
-      }
-    }
-    const key = cubes.join(',');
-    blockGhosts.visible = cubes.length > 0;
-    if (key === ghostKey) return;
-    ghostKey = key;
-
-    // Only the OUTSIDE of the hidden mass: a face is drawn when what is
-    // across it is not another hidden block - air, or ground the camera is
-    // still showing. Every edge between two hidden blocks drew a 3D grid
-    // through the middle of the rock that read as clutter, not as blocks.
-    const hidden = new Set();
-    for (let i = 0; i < cubes.length; i += 3) hidden.add(`${cubes[i]},${cubes[i + 1]},${cubes[i + 2]}`);
-    const seen = new Set();
-    const pts = [];
-    const H = 0.5;
-    const edge = (x1, y1, z1, x2, y2, z2) => {
-      const k = x1 < x2 || (x1 === x2 && (y1 < y2 || (y1 === y2 && z1 < z2)))
-        ? `${x1},${y1},${z1},${x2},${y2},${z2}` : `${x2},${y2},${z2},${x1},${y1},${z1}`;
-      if (seen.has(k)) return;
-      seen.add(k);
-      pts.push(x1, y1, z1, x2, y2, z2);
-    };
-    for (let i = 0; i < cubes.length; i += 3) {
-      const c = [cubes[i], cubes[i + 1], cubes[i + 2]];
-      for (let axis = 0; axis < 3; axis++) {
-        for (const sign of [-1, 1]) {
-          const n = [...c];
-          n[axis] += sign;
-          if (hidden.has(`${n[0]},${n[1]},${n[2]}`)) continue;
-          // The face's four corners, walked round, and the edges between.
-          const u = (axis + 1) % 3;
-          const v = (axis + 2) % 3;
-          const corner = (a, b) => {
-            const q = [...c];
-            q[axis] += sign * H; q[u] += a * H; q[v] += b * H;
-            return q;
-          };
-          const ring = [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)];
-          for (let k = 0; k < 4; k++) edge(...ring[k], ...ring[(k + 1) % 4]);
-        }
-      }
-    }
-    ghostGeometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-    ghostGeometry.computeBoundingSphere();
-  }
-
   let radius = 0;
   let linger = 0;
 
@@ -444,7 +355,6 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     // Props go the moment the tube opens and come back the moment it shuts;
     // they are whole things, so there is no size to grow them through.
     hideOnly(want > 0 && agent ? propsInTheWay() : new Set());
-    updateBlockGhosts(enabled ? agent : null, dt);
   }
 
   /**
@@ -485,7 +395,7 @@ export function createCutaway({ island, propsGroup, props, camera }) {
     /** G: switch the whole thing on or off. Off puts everything back. */
     toggle() {
       enabled = !enabled;
-      if (!enabled) { radius = 0; linger = 0; uniforms.uCutRadius.value = 0; hideOnly(new Set()); blockGhosts.visible = false; ghostKey = ''; }
+      if (!enabled) { radius = 0; linger = 0; uniforms.uCutRadius.value = 0; hideOnly(new Set()); }
       return enabled;
     },
     get radius() { return radius; },
