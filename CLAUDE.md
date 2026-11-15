@@ -54,6 +54,9 @@ with one inhabitant who walks around and works on what is there.
   - `src/island.js` - voxel island, and the surface heightmap everything
     standing on it uses (`group.userData.surface`, keyed `"x,z"`).
   - `src/space.js` - nebula shell, stars and lighting.
+  - `src/sky.js` - comets and drifting rocks passing by now and then.
+  - `src/feedback.js` - the pause menu's playtest page: 0-5 bars and a
+    comment, saved as a text file on the Desktop.
   - `src/orbitCamera.js` - quaternion orbit camera, and the free camera on F.
   - `src/noise.js` - deterministic value noise.
   - `src/props.js` - the few trees and rocks, the broken workbench in the
@@ -335,9 +338,13 @@ with one inhabitant who walks around and works on what is there.
   sphere is about 25 across, and at +/-22 the far corners fell outside the
   shadow map and came out unshadowed. Do not wrap it tighter than the isle.
 
-- **Nothing in the scene drifts.** The island does not bob or rotate, the
-  stars do not turn, and there is no debris belt. Idle motion was removed on
-  request - do not reintroduce it.
+- **The isle and the stars never drift; comets and passing rocks do.** The
+  island does not bob or rotate, the stars do not turn, and there is no
+  debris belt - idle motion was removed on request. The exception, asked
+  for later by name, is `src/sky.js`: a comet streaks across the far sky
+  every 5-14s, and a clump of stone cubes drifts past the isle every
+  14-30s (at most 3 at once, never nearer than 34 blocks), tumbling slowly.
+  None of it takes a ray or casts a shadow. Nothing else moves on its own.
 - **Nothing in the game is deterministic-critical about the UI.** The motes
   are placed with `Math.random()` on purpose; the no-bare-`Math.random()`
   rule under Conventions is about world generation, not dressing.
@@ -1434,7 +1441,16 @@ with one inhabitant who walks around and works on what is there.
 | `npm run electron:dev` | Dev server + Electron window together |
 | `npm start` | Build then launch the desktop app |
 | `npm run build` | Production bundle into `dist/` |
-| `npm run build:exe` | Package `dist-exe/ESTER.exe` (run on Windows) |
+| `npm run build:exe` | Package `dist-exe/ESTER.exe` plus a numbered copy `ESTER-<version>.exe` to hand out (run on Windows) |
+
+## Versions
+
+The version is 0.01 per first-parent commit on `main` since `d71d9f1`
+(`scripts/version.cjs`), so every update adds 0.01 and every clone agrees on
+the number without a file to bump. Vite bakes it in as `__ESTER_VERSION__`
+(shown under the pause menu and in the playtest file). `build:exe` keeps
+`dist-exe/ESTER.exe` - WATCH.bat and the shortcut launch it by that name -
+and copies it to `ESTER-<version>.exe` for testers.
 
 ## Testing the game
 

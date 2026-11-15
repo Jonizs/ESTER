@@ -51,7 +51,7 @@ export function createFeedback(root) {
   function report() {
     const minutes = Math.round((Date.now() - startedAt) / 60000);
     const lines = [
-      'ESTER playtest feedback',
+      `ESTER ${__ESTER_VERSION__} playtest feedback`,
       `Date: ${new Date().toLocaleString()}`,
       `Played this session: ~${minutes} min`,
       '',

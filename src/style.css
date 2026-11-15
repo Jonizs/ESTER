@@ -3201,3 +3201,11 @@ body.cutaway-active #cutaway-badge {
 }
 
 #feedback-status { margin: 4px 0 10px; min-height: 1em; }
+
+#menu .version {
+  margin: 14px 0 0;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-align: center;
+  color: var(--dim);
+}

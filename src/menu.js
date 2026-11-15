@@ -15,6 +15,7 @@ export function createMenu({ settings, controls, music, onLeave, onDevReset, onS
     keybinds: root.querySelector('[data-page="keybinds"]'),
     feedback: root.querySelector('[data-page="feedback"]')
   };
+  root.querySelector('#menu-version').textContent = `ESTER ${__ESTER_VERSION__}`;
   const feedback = createFeedback(root);
   const feedbackLeave = root.querySelector('#feedback-leave');
   let feedbackSaved = false;

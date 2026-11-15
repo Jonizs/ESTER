@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createIsland, ISLAND_RADIUS } from './island.js';
 import { createSpace } from './space.js';
+import { createSky } from './sky.js';
 import { OrbitCamera } from './orbitCamera.js';
 import {
   createProps, setPropHighlight, setPropOutline, OUTLINE_OUT_OF_REACH, setWorkbenchState,
@@ -56,6 +57,8 @@ scene.fog = new THREE.FogExp2(0x05060f, 0.0032);
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
 
 createSpace(scene);
+// Comets and drifting rocks, now and then - the one thing out there that moves.
+const sky = createSky(scene);
 
 const island = createIsland();
 scene.add(island);
@@ -2819,6 +2822,7 @@ function frame() {
   updateGround(delta);
   machines.update(delta);
   updateFires(delta);
+  sky.update(delta);
   updateBowls();
   // After the camera has moved this frame, so the tube is aimed from where
   // the eye actually is.
@@ -2844,7 +2848,7 @@ setTimeout(() => loading.remove(), 800);
 console.log(`[ESTER] ${island.userData.blockCount} blocks, ${props.length} props`);
 
 // Handle for the devtools console (F12) and for automated testing.
-window.ESTER = { consume, canConsume, mixBowl, bowlState, cook, updateFires, takeBack, canWrenchUp, stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
+window.ESTER = { sky, consume, canConsume, mixBowl, bowlState, cook, updateFires, takeBack, canWrenchUp, stations, grindMill, millState, propHitUnderPointer, cutaway, ITEMS, machines, wrenchPipe, wrenchMachine, crankMachine, layPipe, canLay,
   attachCrank, canAttach, lookAt, wield, highlight, tillGround, canTill, digGround, canDig,
   beginCarrying, stopCarrying, sowPlot, canSow, canFill, fillGround, showCrop, blockAt, propBox,
   busyPlot, cropStageOf, workFarmland, fillBucket, fillCups, chooseFill, inScreenReach, outlineHovered, setHovered, waterFarmland, updateGround, ripe, equipTool, wearTool, wieldable, scene, camera, renderer, controls, island, person, agents, props, propsGroup, workbench, blocked, surface, markers, menu, music, panels, crafting, placement, selectBox, inventory, progression, settings, raycaster, THREE, saves, plant: beginPlanting, updateGrowth, finishProp, selectOnly, selectedAgent, applyBox, callSwarm, updateSwarm };
