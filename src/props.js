@@ -508,10 +508,15 @@ export function buildOutline(prop) {
   });
 }
 
-/** Show or hide a prop's outline. */
-export function setPropOutline(prop, on) {
+// A station whose screen nobody is close enough to open.
+export const OUTLINE_OUT_OF_REACH = 0xff4d5e;
+
+/** Show or hide a prop's outline, in its ice blue or in `colour`. */
+export function setPropOutline(prop, on, colour = OUTLINE_COLOUR) {
   prop.mesh.traverse((object) => {
-    if (object.userData.isOutline) object.visible = on;
+    if (!object.userData.isOutline) return;
+    object.visible = on;
+    if (on) object.material.color.setHex(colour);
   });
 }
 
