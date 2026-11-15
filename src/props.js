@@ -94,6 +94,8 @@ export const PROP_KINDS = {
    */
   waterCatcher: {
     label: 'water catcher',
+    // Walked around, like the bench - stations are all worked from beside.
+    solid: true,
     placed: true,
     portable: true,
     item: 'waterCatcher',
@@ -127,6 +129,8 @@ export const PROP_KINDS = {
    */
   sprinkler: {
     label: 'sprinkler',
+    // Walked around, like the bench - stations are all worked from beside.
+    solid: true,
     placed: true,
     portable: true,
     // A wrench's ctrl click takes it straight back up (main.js).
@@ -146,6 +150,8 @@ export const PROP_KINDS = {
    */
   chest: {
     label: 'chest',
+    // Walked around, like the bench - stations are all worked from beside.
+    solid: true,
     placed: true,
     portable: true,
     item: 'chest',
@@ -160,6 +166,8 @@ export const PROP_KINDS = {
    */
   mill: {
     label: 'mill',
+    // Walked around, like the bench - stations are all worked from beside.
+    solid: true,
     placed: true,
     portable: true,
     // A wrench's ctrl click takes it straight back up (main.js).
@@ -178,6 +186,8 @@ export const PROP_KINDS = {
    */
   campfire: {
     label: 'campfire',
+    // Walked around, like the bench - stations are all worked from beside.
+    solid: true,
     placed: true,
     portable: true,
     item: 'campfire',
@@ -193,6 +203,8 @@ export const PROP_KINDS = {
    */
   mixingBowl: {
     label: 'mixing bowl',
+    // Walked around, like the bench - stations are all worked from beside.
+    solid: true,
     placed: true,
     portable: true,
     mechanical: true,
@@ -209,7 +221,7 @@ export const PROP_KINDS = {
     action: 'Repairing the workbench',
     seconds: 8,
     cost: { item: 'wood', amount: 10 },
-    // The only prop with a hitbox: it is walked around, not over.
+    // Walked around, not over - like every station the player puts down.
     solid: true,
     // A station the player put down rather than something the isle grew:
     // it outlines on hover and it can be picked up and moved.

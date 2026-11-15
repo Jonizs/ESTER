@@ -829,10 +829,13 @@ with one inhabitant who walks around and works on what is there.
   steps of more than one block of height, and refuses the cells in its
   `blocked` set; everything else is walkable, which is what keeps the isle
   free of pockets the agent can never leave. Only props whose kind is marked
-  `solid` in `PROP_KINDS` go into `blocked` - today that is the workbench
-  alone. Before marking anything else solid, sweep the isle and check every
-  cell is still reachable; trees and rocks standing in a line would wall a
-  corner off.
+  `solid` in `PROP_KINDS` go into `blocked` - the workbench and every
+  station the player puts down (chest, mill, campfire, mixing bowl, water
+  catcher, sprinkler), all of which are worked from BESIDE their cell, so
+  nothing ever has to stand on one. Pipes stay walkable: a laid run would
+  otherwise wall agents in. Before marking a generated kind solid, sweep the
+  isle and check every cell is still reachable; trees and rocks standing in
+  a line would wall a corner off.
 - **Props have footprints, and the anchor is the low corner, not the
   middle.** `PROP_KINDS[kind].footprint` is how many cells a kind stands on -
   the workbench is `{ w: 2, d: 1 }`, everything else defaults to one cell.

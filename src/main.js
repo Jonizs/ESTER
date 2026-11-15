@@ -1225,6 +1225,7 @@ function beginPlanting(item) {
 
   if (!placement.plant(prop)) {
     removeProp(prop, propsGroup, props);
+    syncBlocked(props, blocked);
     return false;
   }
   return true;
