@@ -439,8 +439,23 @@
             <button type="button" id="menu-defaults">RESET TO DEFAULTS</button>
             <button type="button" id="menu-devreset" class="dev">DEV RESET</button>
             <button type="button" id="menu-swarm" class="dev">AGENT SWARM</button>
+            <button type="button" id="menu-feedback">RATE THIS PLAYTEST</button>
             <button type="button" id="menu-resume">RESUME</button>
             <button type="button" id="menu-leave" class="danger">LEAVE GAME</button>
+          </div>
+        </section>
+
+        <section data-page="feedback" hidden>
+          <h2>Playtest</h2>
+          <p class="hint">Click a bar to rate, 0 to 5. Click it again to lower it.</p>
+          <div id="feedback-bars"></div>
+          <textarea id="feedback-comment" rows="4" maxlength="4000"
+            placeholder="Anything you liked, hated, or got stuck on?"></textarea>
+          <p id="feedback-status" class="hint"></p>
+          <div class="buttons">
+            <button type="button" id="feedback-save">SAVE FEEDBACK</button>
+            <button type="button" id="feedback-leave" class="danger" hidden>LEAVE GAME</button>
+            <button type="button" id="feedback-back">BACK</button>
           </div>
         </section>
 

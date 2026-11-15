@@ -1,3 +1,4 @@
+import { createFeedback } from './feedback.js';
 import { ACTIONS, CAMERA_SPEED, MUSIC_VOLUME, keyLabel } from './settings.js';
 
 /**
@@ -11,8 +12,12 @@ export function createMenu({ settings, controls, music, onLeave, onDevReset, onS
   const root = document.getElementById('menu');
   const pages = {
     main: root.querySelector('[data-page="main"]'),
-    keybinds: root.querySelector('[data-page="keybinds"]')
+    keybinds: root.querySelector('[data-page="keybinds"]'),
+    feedback: root.querySelector('[data-page="feedback"]')
   };
+  const feedback = createFeedback(root);
+  const feedbackLeave = root.querySelector('#feedback-leave');
+  let feedbackSaved = false;
 
   const speedInput = root.querySelector('#camera-speed');
   const speedValue = root.querySelector('#camera-speed-value');
@@ -124,7 +129,27 @@ export function createMenu({ settings, controls, music, onLeave, onDevReset, onS
   // they are gone again. Like DEV RESET it closes the menu on the way, so
   // they can be seen arriving.
   root.querySelector('#menu-swarm').addEventListener('click', () => onSwarm?.());
-  root.querySelector('#menu-leave').addEventListener('click', () => onLeave?.());
+  // LEAVE GAME asks for a rating once, if none has been saved yet - with
+  // its own LEAVE button there, so it is never in the way of going.
+  root.querySelector('#menu-leave').addEventListener('click', () => {
+    if (feedbackSaved) { onLeave?.(); return; }
+    openFeedback(true);
+  });
+  root.querySelector('#menu-feedback').addEventListener('click', () => openFeedback(false));
+  root.querySelector('#feedback-back').addEventListener('click', () => show('main'));
+  feedbackLeave.addEventListener('click', () => onLeave?.());
+  root.querySelector('#feedback-save').addEventListener('click', async () => {
+    if (await feedback.save()) {
+      feedbackSaved = true;
+      feedbackLeave.hidden = false;
+    }
+  });
+
+  function openFeedback(leaving) {
+    feedback.clearStatus();
+    feedbackLeave.hidden = !leaving;
+    show('feedback');
+  }
 
   // --- keyboard -----------------------------------------------------------
   // Capture phase, so a key being bound never reaches the camera as well.
@@ -140,7 +165,7 @@ export function createMenu({ settings, controls, music, onLeave, onDevReset, onS
     if (event.key !== 'Escape') return;
     event.preventDefault();
     if (!isOpen()) open();
-    else if (page === 'keybinds') show('main');
+    else if (page !== 'main') show('main');
     else close();
   }, true);
 

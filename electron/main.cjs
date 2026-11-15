@@ -1,4 +1,5 @@
 const path = require('node:path');
+const fs = require('node:fs');
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 
 const isDev = process.env.ESTER_DEV === '1';
@@ -54,6 +55,14 @@ function createWindow() {
 
 // LEAVE GAME in the pause menu.
 ipcMain.on('ester:quit', () => app.quit());
+
+// The playtest page's SAVE: a text file on the Desktop, named by the page.
+// The name is reduced to its last part so it can only land on the Desktop.
+ipcMain.handle('ester:save-feedback', (_event, name, text) => {
+  const file = path.join(app.getPath('desktop'), path.basename(String(name)));
+  fs.writeFileSync(file, String(text), 'utf8');
+  return file;
+});
 
 app.whenReady().then(() => {
   createWindow();

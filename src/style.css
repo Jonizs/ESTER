@@ -3150,3 +3150,54 @@ body.cutaway-active #cutaway-badge {
 #analysis .analysis-where { margin: 2px 0 6px; color: var(--dim); }
 #analysis .ok { color: #b8e8a0; }
 #analysis .no { color: #ff9a9a; }
+
+/* The playtest page: a row of five bars per category. */
+#menu .rating {
+  display: grid;
+  grid-template-columns: 70px 1fr 30px;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+#menu .rating .bars { display: flex; gap: 4px; }
+
+#menu .rating .bar {
+  flex: 1;
+  height: 16px;
+  padding: 0;
+  border-radius: 3px;
+  border: 1px solid rgba(122, 215, 255, 0.28);
+  background: rgba(122, 215, 255, 0.05);
+}
+
+#menu .rating .bar.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(122, 215, 255, 0.5);
+}
+
+#menu .rating .value {
+  color: var(--ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#feedback-comment {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 12px 0 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(122, 215, 255, 0.28);
+  background: rgba(4, 6, 12, 0.8);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+  user-select: text;
+}
+
+#feedback-status { margin: 4px 0 10px; min-height: 1em; }
