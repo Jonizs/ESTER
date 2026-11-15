@@ -920,7 +920,10 @@ export function setCrank(prop, on) {
 function buildCog() {
   const cog = new THREE.Group();
   cog.name = 'cog';
-  const wheel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.3, 0.3), mat(0xc99359));
+  // The wheel is thicker than the teeth so it covers the middle where the
+  // four bars cross: bars of one thickness crossing there put their faces in
+  // the same plane, and those faces fought each other in stripes.
+  const wheel = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.3, 0.3), mat(0xc99359));
   cog.add(wheel);
   for (let i = 0; i < 4; i++) {
     const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.42, 0.1), mat(0xa8763f));
@@ -1063,6 +1066,10 @@ export function animateFire(prop, t, lit) {
   }
   if (!lit) return;
 
+  // A cooking stone on top is a lid: the flames spread out under it rather
+  // than rising through it, and the sparks escape out past its edge.
+  const covered = !!prop.mesh.getObjectByName('cookstone');
+
   for (const cube of fire.children) {
     const { part, seed: i } = cube.userData;
 
@@ -1079,10 +1086,16 @@ export function animateFire(prop, t, lit) {
       const life = 0.7 + quirk(i, 1) * 0.35;
       const u = (t / life + quirk(i, 2)) % 1;
       const a = quirk(i, 3) * Math.PI * 2;
-      const r = 0.1 * (1 - u) * (0.4 + quirk(i, 4));
+      const r = covered
+        ? Math.min(0.26, (0.05 + 0.22 * u) * (0.4 + quirk(i, 4)))
+        : 0.1 * (1 - u) * (0.4 + quirk(i, 4));
       const sway = 0.05 * Math.sin(t * 5 + i) * u;
-      cube.position.set(Math.cos(a) * r + sway, 0.14 + u * (0.62 + quirk(i, 5) * 0.25), Math.sin(a) * r);
       const size = (0.2 + quirk(i, 6) * 0.08) * Math.pow(1 - u, 0.8);
+      let y = 0.14 + u * (0.62 + quirk(i, 5) * 0.25);
+      // Under the slab (its underside is at 0.465), with room for a cube
+      // turned corner-up: half its diagonal is 0.87 of its side.
+      if (covered) y = Math.min(y, 0.45 - size * 0.87);
+      cube.position.set(Math.cos(a) * r + sway, y, Math.sin(a) * r);
       cube.scale.setScalar(Math.max(0.001, size));
       cube.rotation.set(u * 2 + i, u * 3 + i, 0);
       const c = cube.material.color;
@@ -1097,11 +1110,22 @@ export function animateFire(prop, t, lit) {
       const life = 1.8 + quirk(i, 7) * 1.2;
       const u = (t / life + quirk(i, 8)) % 1;
       const a = quirk(i, 9) * Math.PI * 2;
-      cube.position.set(
-        Math.cos(a) * u * 0.35 + 0.06 * Math.sin(t * 3 + i),
-        0.3 + u * (1.1 + quirk(i, 10) * 0.6),
-        Math.sin(a) * u * 0.35
-      );
+      if (covered) {
+        // Out sideways under the slab first, up only once clear of it (its
+        // corners are 0.5 out), so a spark never passes through the stone.
+        const r = u * 0.85;
+        cube.position.set(
+          Math.cos(a) * r,
+          r < 0.5 ? 0.3 + r * 0.24 : 0.42 + (r - 0.5) * (4 + quirk(i, 10) * 2),
+          Math.sin(a) * r
+        );
+      } else {
+        cube.position.set(
+          Math.cos(a) * u * 0.35 + 0.06 * Math.sin(t * 3 + i),
+          0.3 + u * (1.1 + quirk(i, 10) * 0.6),
+          Math.sin(a) * u * 0.35
+        );
+      }
       cube.material.opacity = u < 0.1 ? u * 10 : (1 - u) * (0.6 + 0.4 * Math.sin(t * 20 + i * 5));
       continue;
     }
